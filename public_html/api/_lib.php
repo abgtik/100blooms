@@ -341,6 +341,8 @@ function ol_extra(array $o): array {
     } elseif (is_scalar($v) && $v !== '' && $v !== null && !is_bool($v)) $out[$path] = mb_substr((string)$v, 0, 500);
   };
   foreach ($o as $k => $v) if (!isset($known[$k])) $walk($v, (string)$k);
+  $itemKnown = array_flip(['id','sku','name','description','image','price','stock','weight','quantity','is_hidden','product_id','has_variant','max_quantity','variant_options','is_manage_inventory']);
+  foreach ((array)($o['order_list'] ?? []) as $i => $it) if (is_array($it)) foreach ($it as $k => $v) if (!isset($itemKnown[$k])) $walk($v, "item$i.$k");
   $dt = $o['additional_charges']['delivery_type']['name'] ?? null; if ($dt) $out['Delivery'] = (string)$dt;
   return $out;
 }
@@ -349,6 +351,8 @@ function ol_guess(array $extra, string $notes): array {
   $date = null; $recv = null;
   $bm = ['januari' => 'January', 'februari' => 'February', 'mac' => 'March', 'april' => 'April', 'mei' => 'May', 'jun' => 'June', 'julai' => 'July', 'ogos' => 'August', 'september' => 'September', 'oktober' => 'October', 'november' => 'November', 'disember' => 'December'];
   $extra = array_map(fn($v) => preg_replace_callback('/\b(' . implode('|', array_keys($bm)) . ')\b/i', fn($m) => $bm[strtolower($m[1])], (string)$v), $extra);
+  $stamp = '/(created|updated|deleted|modified|paid)_?(at|on|date|time)|timestamp/i'; // record timestamps, never the delivery day
+  $extra = array_filter($extra, fn($k) => !preg_match($stamp, (string)$k), ARRAY_FILTER_USE_KEY);
   foreach ($extra as $k => $v) {
     $lk = strtolower($k);
     if (!$recv && preg_match('/receiver|recipient|penerima/', $lk) && (preg_match('/name|nama/', $lk) || preg_match('/^(receiver|recipient|penerima)$/', $lk))) $recv = $v;
@@ -357,6 +361,10 @@ function ol_guess(array $extra, string $notes): array {
       elseif (preg_match('/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/', $v, $m) && ($t = strtotime($m[1]))) $date = date('Y-m-d', $t);
       elseif (preg_match('#(\d{1,2})/(\d{1,2})/(\d{4})#', $v, $m)) $date = sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
     }
+  }
+  if (!$date) foreach ($extra as $k => $v) { // date-ish key holding an ISO date / datetime (e.g. booking_date, appointment.start_at, slot.date)
+    if (preg_match('/^additional_charges\./', $k) || !preg_match('/date|time|slot|book|appoint|schedule|start|tarikh|delivery/i', $k)) continue;
+    if (preg_match('/\b(20\d{2}-\d{2}-\d{2})\b/', $v, $m)) { $date = $m[1]; break; }
   }
   if (!$date) foreach ($extra as $k => $v) { // no labelled date: any value that reads like "Thursday, 20 November 2026" or a dd/mm/yyyy
     if (preg_match('/^additional_charges\./', $k)) continue;
@@ -393,19 +401,37 @@ function orderla_autosync(): void {
   if (time() - (int)setting('ol_auto_at', 0) < 1800) return;
   set_setting('ol_auto_at', (string)time());
   try {
-    if (setting('ol_reparse_v') !== '2') { // once after an update: re-read dates/receivers already imported with the newer detection
+    if (setting('ol_reparse_v') !== '3') { // once after an update: re-read dates/receivers already imported with the newer detection
       foreach (q('SELECT id, raw FROM legacy_orders WHERE del_date IS NULL OR receiver IS NULL')->fetchAll() as $r) {
         $o = json_decode((string)$r['raw'], true) ?: []; [$d, $rc] = ol_guess(ol_extra($o), (string)($o['notes'] ?? '') . "\n" . (string)($o['seller_notes'] ?? ''));
         if ($d || $rc) q('UPDATE legacy_orders SET del_date=COALESCE(del_date,?), receiver=COALESCE(receiver,?) WHERE id=?', [$d, $rc, $r['id']]);
       }
-      set_setting('ol_reparse_v', '2');
+      set_setting('ol_reparse_v', '3');
     }
     foreach ([date('Y-m', strtotime('first day of last month')), date('Y-m')] as $m) {
       $j = orderla_get('/orders', ['start_date' => "$m-01", 'end_date' => date('Y-m-t', strtotime("$m-01"))]);
       foreach ((array)($j['orders'] ?? []) as $o) ol_upsert((array)$o);
     }
     set_setting('ol_synced', date('Y-m-d H:i:s'));
+    ol_enrich(25);
   } catch (Throwable $e) { error_log('100blooms orderla autosync: ' . $e->getMessage()); set_setting('ol_err', mb_substr($e->getMessage(), 0, 200)); }
+}
+/** For recent orders still missing a delivery date: read the single-order endpoint (it may carry the booking date/slot) and merge it in. */
+function ol_enrich(int $limit = 20): array {
+  $rows = q("SELECT id, code_id, raw FROM legacy_orders WHERE del_date IS NULL AND (status IS NULL OR status NOT IN ('cancelled')) AND created_at>=? ORDER BY created_at DESC LIMIT 400", [date('Y-m-d H:i:s', strtotime('-90 days'))])->fetchAll();
+  $tried = []; foreach (q("SELECT k FROM settings WHERE k LIKE 'ole!_%' ESCAPE '!'")->fetchAll() as $t) $tried[$t['k']] = 1;
+  $done = 0; $found = 0; $left = 0;
+  foreach ($rows as $r) {
+    if (isset($tried['ole_' . $r['id']])) continue; // already looked at, nothing found
+    if ($done >= $limit) { $left++; continue; }
+    $d = orderla_get('/order/' . rawurlencode($r['code_id'])); $d = $d['order'] ?? $d['data'] ?? $d;
+    $o = array_replace_recursive(json_decode((string)$r['raw'], true) ?: [], is_array($d) ? $d : []);
+    $x = ol_extra($o); [$dd, $rc] = ol_guess($x, (string)($o['notes'] ?? '') . "\n" . (string)($o['seller_notes'] ?? ''));
+    q('UPDATE legacy_orders SET raw=?, extra=?, del_date=COALESCE(del_date,?), receiver=COALESCE(receiver,?) WHERE id=?', [json_encode($o, JSON_UNESCAPED_UNICODE), json_encode($x, JSON_UNESCAPED_UNICODE), $dd, $rc, $r['id']]);
+    if (!$dd) set_setting('ole_' . $r['id'], '1');
+    $done++; if ($dd) $found++;
+  }
+  return ['checked' => $done, 'found' => $found, 'left' => $left];
 }
 /** Orderla rows that count as sales. */
 const OL_PAID = "pay_status='paid' AND (status IS NULL OR status<>'cancelled')";

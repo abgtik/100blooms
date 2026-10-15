@@ -354,6 +354,10 @@ case 'olreparse': // re-read delivery date / receiver from orders already import
   }
   json_out(['ok' => true, 'fixed' => $n]);
 
+case 'olenrich': // read the single-order endpoint for recent orders still missing a delivery date (batch of 20)
+  need_owner(); @set_time_limit(120);
+  try { json_out(['ok' => true] + ol_enrich(20)); } catch (Throwable $e) { fail($e->getMessage(), 502); }
+
 case 'oltest': // fetch the last 30 days and report what fields Orderla sends (names only, no customer data)
   need_owner();
   try { $j = orderla_get('/orders', ['start_date' => date('Y-m-d', strtotime('-30 days')), 'end_date' => date('Y-m-d')]); } catch (Throwable $e) { fail($e->getMessage(), 502); }
@@ -361,7 +365,20 @@ case 'oltest': // fetch the last 30 days and report what fields Orderla sends (n
   foreach ($orders as $o) { foreach (array_keys((array)$o) as $k) $keys[$k] = 1; $x = ol_extra((array)$o); foreach (array_keys($x) as $k) $extra[$k] = ($extra[$k] ?? 0) + 1;
     [$d, $r] = ol_guess($x, (string)($o['notes'] ?? '')); if ($d) $guess['date']++; if ($r) $guess['receiver']++; }
   arsort($extra);
-  json_out(['count' => count($orders), 'msg' => $j['msg'] ?? null, 'keys' => array_keys($keys), 'extra' => array_slice($extra, 0, 60, true), 'guess' => $guess]);
+  // where do dates live? only date-looking values are shown (no names, phones or addresses)
+  $dateish = function (array $o, string $pre = '') use (&$dateish): array { $f = [];
+    foreach ($o as $k => $v) { $p = $pre === '' ? (string)$k : "$pre.$k";
+      if (is_array($v)) { $f += $dateish($v, $p); continue; }
+      if (!is_scalar($v) || in_array($p, ['created_at', 'updated_at'], true)) continue;
+      $v = (string)$v;
+      if (preg_match('/20\d{2}-\d{2}-\d{2}|\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Mac|Mei|Ogos|Dis)[a-z]*\s+20\d{2}|\d{1,2}\/\d{1,2}\/20\d{2}|\d{1,2}:\d{2}\s*(AM|PM)/i', $v)) $f[preg_replace('/\.\d+\./', '.#.', $p)] = mb_substr($v, 0, 60);
+    } return $f; };
+  $found = []; foreach (array_slice($orders, 0, 20) as $o) $found += $dateish((array)$o);
+  $detail = []; $dkeys = [];
+  if ($orders) { try { $d = orderla_get('/order/' . rawurlencode((string)($orders[0]['code_id'] ?? ''))); $d = $d['order'] ?? $d['data'] ?? $d;
+    $dkeys = array_values(array_diff(array_keys((array)$d), array_keys((array)$orders[0]))); $detail = $dateish((array)$d); } catch (Throwable $e) { $dkeys = ['(gagal: ' . mb_substr($e->getMessage(), 0, 80) . ')']; } }
+  json_out(['count' => count($orders), 'msg' => $j['msg'] ?? null, 'keys' => array_keys($keys), 'extra' => array_slice($extra, 0, 60, true), 'guess' => $guess,
+    'dates' => $found, 'detail_keys' => $dkeys, 'detail_dates' => array_diff_key($detail, $found)]);
 
 case 'olimport': // one month per call (the page loops 2021-01 → now, so no request runs too long)
   need_owner(); @set_time_limit(120);

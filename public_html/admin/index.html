@@ -778,13 +778,17 @@ async function Acc(el){
     $('#ols').onclick=async()=>{try{await api('olset',{method:'POST',body:{email:$('#ole').value,token:$('#olt').value}});$('#olt').value='';toast('Disimpan');Acc(el)}catch(e){toast(e.message)}};
     $('#olx').onclick=async()=>{out('<p class="mini">Menghubungi Orderla…</p>');try{const r=await api('oltest');
       out(`<div class="msg ok">Sambungan berjaya. ${r.count} order dalam 30 hari lepas.</div><p class="mini" style="margin:8px 0 4px"><b>Medan tambahan dijumpai</b> (nama sahaja): ${Object.entries(r.extra).map(([k,n])=>`${h(k)} <span style="opacity:.6">(${n})</span>`).join(' · ')||'tiada'}</p>
+        <p class="mini" style="margin:4px 0"><b>Medan berbentuk tarikh</b>: ${Object.entries(r.dates||{}).map(([k,v])=>`${h(k)} = <code>${h(v)}</code>`).join(' · ')||'tiada'}</p>
+        <p class="mini" style="margin:4px 0"><b>Halaman butiran order</b>: medan tambahan ${h((r.detail_keys||[]).join(', ')||'tiada')}${Object.keys(r.detail_dates||{}).length?' · tarikh: '+Object.entries(r.detail_dates).map(([k,v])=>`${h(k)} = <code>${h(v)}</code>`).join(' · '):''}</p>
         <p class="mini" style="margin:0">Tarikh hantar dikenal pasti dalam ${r.guess.date}/${r.count} order · nama penerima dalam ${r.guess.receiver}/${r.count} order. Kalau angka ni rendah, screenshot kotak ni dan hantar kepada Claude untuk dihalusi.</p>`)}catch(e){out(`<div class="msg bad">${h(e.message)}</div>`)}};
     const run=async months=>{const btns=['#oli','#olr','#olx'].map(x=>$(x));btns.forEach(b=>b.disabled=true);let tot={new:0,updated:0},i=0;
       for(const m of months){i++;out(`<p class="mini">Mengimport ${m} (${i}/${months.length})… ${tot.new} baru, ${tot.updated} dikemas kini</p><div style="height:8px;background:var(--bg);border-radius:9px;overflow:hidden"><div style="height:100%;width:${Math.round(i/months.length*100)}%;background:var(--accent)"></div></div>`);
         try{const r=await api('olimport',{method:'POST',body:{m}});tot.new+=r.new;tot.updated+=r.updated}catch(e){out(`<div class="msg bad">Berhenti di ${m}: ${h(e.message)}. Tekan Import semula untuk sambung (data yang dah masuk tak berganda).</div>`);btns.forEach(b=>b.disabled=false);return}}
       btns.forEach(b=>b.disabled=false);toast('Import selesai');out(`<div class="msg ok">Selesai: ${tot.new} order baru, ${tot.updated} dikemas kini. Lihat tab Pelanggan dan Dashboard.</div>`)};
     const monthsFrom=(y,m)=>{const a=[],n=new Date();for(let d=new Date(y,m-1,1);d<=n;d.setMonth(d.getMonth()+1))a.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));return a};
-    $('#olp').onclick=async()=>{try{const r=await api('olreparse',{method:'POST'});toast(`${r.fixed} order dikemas kini`)}catch(e){toast(e.message)}};
+    $('#olp').onclick=async()=>{$('#olp').disabled=true;try{const r=await api('olreparse',{method:'POST'});let f=r.fixed,c=0;
+        for(let i=0;i<20;i++){out(`<p class="mini">Menyemak butiran order terkini… ${c} disemak, ${f} tarikh dijumpai</p>`);const e=await api('olenrich',{method:'POST'});c+=e.checked;f+=e.found;if(!e.checked||!e.left)break}
+        out(`<div class="msg ok">${f} order dapat tarikh hantar (${c} butiran order disemak).</div>`)}catch(e){out(`<div class="msg bad">${h(e.message)}</div>`)}$('#olp').disabled=false};
     $('#oli').onclick=()=>{if(confirm('Import semua order Orderla dari Januari 2021? Proses ni ambil beberapa minit. Jangan tutup halaman.'))run(monthsFrom(2021,1))};
     $('#olr').onclick=()=>{const n=new Date(),p=new Date(n.getFullYear(),n.getMonth()-1,1);run(monthsFrom(p.getFullYear(),p.getMonth()+1))};
   }
