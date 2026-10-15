@@ -730,7 +730,7 @@ const SCR={
   if(!R.paid){
    el.innerHTML=`<div class="done"><div class="tick" style="background:var(--bg2)"><span class="typing"><i></i><i></i><i></i></span></div>
     <h1>Menunggu pengesahan bayaran…</h1><p class="sub">Order <b>${h(R.code||'')}</b>. Kalau awak dah bayar, status akan dikemas kini dalam beberapa saat.</p>
-    ${R.payUrl?`<a class="btn" href="${h(R.payUrl)}" style="flex:none;width:100%;text-decoration:none;text-align:center">Belum bayar? Bayar sekarang</a>`:''}
+    ${R.payUrl?`<a class="btn" href="${h(R.payUrl)}" style="display:block;flex:none;width:100%;text-decoration:none;text-align:center">Belum bayar? Bayar sekarang</a>`:''}
     <a class="link" href="https://wa.me/${CAT.wa||'601165862584'}?text=${encodeURIComponent('Hai 100 Blooms, saya nak semak order '+(R.code||''))}" target="_blank" rel="noopener">WhatsApp kami tentang order ni</a></div>`;
    return;
   }
@@ -862,7 +862,7 @@ async function submitOrder(){
   try{r=await fetch('api/order.php',{method:'POST',body:fd});j=await r.json().catch(()=>({}));}
   catch(e){return err('Tiada sambungan internet. Semak sambungan dan cuba lagi.');}
   if(j.payUrl){try{localStorage.setItem('hb_last',JSON.stringify({code:j.code}))}catch(e){}$('#pst').textContent='Membuka halaman bayaran…';location.href=j.payUrl;return;}
-  if(j.code){submitting=false;$('#pst').textContent='';$('#perr').innerHTML=`<div class="status bad">${h(j.error||'Halaman bayaran tak dapat dibuka.')}</div><a class="btn" style="flex:none;width:100%;margin-top:12px;text-align:center;text-decoration:none" href="https://wa.me/${CAT.wa||'601165862584'}?text=${encodeURIComponent('Hai 100 Blooms, saya nak bayar order '+j.code)}" target="_blank" rel="noopener">WhatsApp kami</a>`;return;}
+  if(j.code){submitting=false;$('#pst').textContent='';$('#perr').innerHTML=`<div class="status bad">${h(j.error||'Halaman bayaran tak dapat dibuka.')}</div><a class="btn" style="display:block;flex:none;width:100%;margin-top:12px;text-align:center;text-decoration:none" href="https://wa.me/${CAT.wa||'601165862584'}?text=${encodeURIComponent('Hai 100 Blooms, saya nak bayar order '+j.code)}" target="_blank" rel="noopener">WhatsApp kami</a>`;return;}
   err(j.error||'Order tak dapat dihantar. Cuba lagi sebentar.');
 }
 async function checkReturn(code,k,tries){

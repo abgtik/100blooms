@@ -226,7 +226,8 @@ function tp_mock(string $fn, array $f): string { // local testing only (TP_MOCK 
 }
 
 // ---------- HitPay ----------
-function hp_base(): string { return HP_SANDBOX ? 'https://api.sandbox.hit-pay.com/v1' : 'https://api.hit-pay.com/v1'; }
+function hp_sandbox(): bool { return filter_var(HP_SANDBOX, FILTER_VALIDATE_BOOLEAN); } // tolerates 'false' typed with quotes
+function hp_base(): string { return hp_sandbox() ? 'https://api.sandbox.hit-pay.com/v1' : 'https://api.hit-pay.com/v1'; }
 function hp_req(string $method, string $path, array $fields = []): array {
   if (defined('HP_MOCK') && HP_MOCK) return hp_mock($method, $path, $fields);
   $ch = curl_init(hp_base() . $path);
