@@ -65,6 +65,7 @@ function db(): PDO {
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, PDO::ATTR_EMULATE_PREPARES => false]);
   if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') $pdo->exec("SET time_zone = '+08:00'");
   migrate($pdo);
+  register_shutdown_function('cron_tick'); // light background jobs after each response (throttled)
   return $pdo;
 }
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
@@ -289,14 +290,16 @@ function after_paid(int $id): void {
 // ---------- WhatsApp notifications through Murpati (https://murpati.com/developers/api) ----------
 // Owner sets the API key, sending number and recipients in admin → Pengguna. Messages are queued and sent after the
 // page has answered, so a slow WhatsApp API never delays the customer, the payment webhook or the admin screen.
-const WA_TYPES = ['team_paid' => 'Team: order baru dibayar', 'buyer_paid' => 'Pembeli: bayaran diterima', 'buyer_otw' => 'Pembeli: hadiah dalam perjalanan',
+const UNPAID_MIN = 5; // minutes before an unpaid website order is followed up
+const WA_TYPES = ['team_paid' => 'Team: order baru dibayar', 'team_unpaid' => 'Team: order website belum dibayar selepas 5 minit (untuk follow up)',
+  'buyer_unpaid' => 'Pembeli: peringatan bayar selepas 5 minit (dengan link bayaran)', 'buyer_paid' => 'Pembeli: bayaran diterima', 'buyer_otw' => 'Pembeli: hadiah dalam perjalanan',
   'buyer_done' => 'Pembeli: hadiah dah sampai (dengan link gambar penerima)', 'agent_comm' => 'Agent: komisen baru', 'agent_payout' => 'Agent: komisen dibayar', 'agent_welcome' => 'Agent: selamat datang selepas daftar'];
 function wa_cfg(): array {
   static $c = null; if ($c !== null) return $c;
   $on = json_decode((string)setting('wa_on', ''), true);
   return $c = ['key' => (string)setting('wa_key', ''), 'session' => (string)setting('wa_session', ''),
     'team' => array_values(array_filter(array_map(fn($x) => wa_num($x), explode(',', (string)setting('wa_team', WA_MAIN))))),
-    'on' => is_array($on) ? $on : array_fill_keys(array_keys(WA_TYPES), true)];
+    'on' => array_merge(array_fill_keys(array_keys(WA_TYPES), true), is_array($on) ? $on : [])]; // new message types start switched on
 }
 function wa_num(string $p): string { $d = digits($p); if ($d === '') return ''; if (str_starts_with($d, '60')) return $d; return '60' . ltrim($d, '0'); }
 function wa_ready(string $type): bool { $c = wa_cfg(); return $c['key'] !== '' && $c['session'] !== '' && !empty($c['on'][$type]); }
@@ -365,6 +368,16 @@ function wa_order(array $o, string $event): void {
           $add('agent_comm', 'agent_comm', $ag['phone'], "Tahniah {$ag['name']}! 🎉\n\nOrder *{$o['code']}* dari link awak dah dibayar.\n💰 Komisen: *RM" . number_format((float)$c, 2) . "*\n💼 Baki komisen: RM" . number_format($due, 2)
             . "\n\nKomisen dibayar setiap Jumaat bila baki RM" . number_format(payout_min(), 0) . " ke atas.\n" . SITE_URL . '/agent/'); }
       }
+    } elseif ($event === 'unpaid') {
+      $bw = wa_num($o['b_phone']); $C2 = $C['bq'][$o['bouquet']] ?? $o['bouquet'];
+      $ag = $o['agent_ref'] ? q('SELECT id,name FROM agents WHERE id=?', [(int)$o['agent_ref']])->fetch() : null;
+      $team = "⏳ *Order belum dibayar* · {$o['code']}\n(" . UNPAID_MIN . " minit selepas submit)\n💰 RM" . number_format((float)$o['total'], 2)
+        . "\n🧾 {$o['b_name']} · $bw\n🚚 $day · $slot\n💐 $C2 untuk {$o['r_name']} ({$o['r_post']})" . ($ag ? "\n🤝 Agent #{$ag['id']} {$ag['name']}" : '')
+        . "\n\nFollow up pembeli: https://wa.me/$bw\n" . SITE_URL . '/admin/';
+      foreach (wa_cfg()['team'] as $i => $t) $add("unpaid_team$i", 'team_unpaid', $t, $team);
+      $pay = $o['bill_code'] ? (pay_url($o['bill_code']) ?: $track) : $track;
+      $add('buyer_unpaid', 'buyer_unpaid', $o['b_phone'], "Hai $first 🌸\n\nOrder *{$o['code']}* (RM" . number_format((float)$o['total'], 2) . ") untuk *{$o['r_name']}* dah kami simpan, tapi bayaran belum kami terima.\n\n"
+        . "Kalau ada masalah masa bayar tadi, boleh sambung bayar di sini:\n$pay\n\nAtau balas mesej ni, team kami sedia bantu 😊\n— 100 Blooms");
     } elseif ($event === 'otw') {
       $add('buyer_otw', 'buyer_otw', $o['b_phone'], "Hai $first 🚗\n\nHadiah untuk *{$o['r_name']}* sedang dalam perjalanan bersama runner kami 💐\n\nSemak status:\n$track\n\n— 100 Blooms");
     } elseif ($event === 'delivered') {
@@ -372,6 +385,30 @@ function wa_order(array $o, string $event): void {
     }
     if ($sent) q('UPDATE orders SET wa_log=? WHERE id=?', [json_encode($log), $o['id']]);
   } catch (Throwable $e) { error_log('100blooms wa_order: ' . $e->getMessage()); }
+}
+/** Background jobs, run after a response at most once a minute (also callable from api/cron.php via Plesk Scheduled Tasks). */
+function cron_tick(bool $force = false): void {
+  try {
+    $last = (int)setting('cron_at', 0); if (!$force && time() - $last < 60) return;
+    set_setting('cron_at', (string)time());
+    if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
+    unpaid_sweep();
+    if ($GLOBALS['WA_Q']) wa_flush();
+  } catch (Throwable $e) { error_log('100blooms cron: ' . $e->getMessage()); }
+}
+/** Website orders still unpaid UNPAID_MIN minutes after submit: re-check the gateway first, then nudge team + buyer once. */
+function unpaid_sweep(): void {
+  if (!wa_ready('team_unpaid') && !wa_ready('buyer_unpaid')) return;
+  $rows = q("SELECT * FROM orders WHERE pay_status<>'paid' AND status<>'batal' AND created_by IS NULL AND created_at<=? AND created_at>=? ORDER BY id LIMIT 20",
+    [date('Y-m-d H:i:s', time() - UNPAID_MIN * 60), date('Y-m-d H:i:s', time() - 6 * 3600)])->fetchAll();
+  foreach ($rows as $o) {
+    $log = jdec($o['wa_log']); if (isset($log['buyer_unpaid']) || isset($log['unpaid_team0'])) continue;
+    if (str_contains((string)$o['notes'], 'ORDER UJIAN')) continue;
+    if ($o['bill_code']) { // paid but the webhook was missed? then it is not "unpaid"
+      try { [$paid, $ref, $ch, $amt] = pay_check($o['bill_code']); if ($paid && mark_paid($o, $ref, $ch, $amt)) continue; } catch (Throwable $e) { error_log('100blooms sweep: ' . $e->getMessage()); }
+    }
+    wa_order($o, 'unpaid');
+  }
 }
 function wa_agent(array $ag, string $type, string $msg): void { if (wa_ready($type)) wa_queue($ag['phone'], $msg); }
 function fmt_day(string $ymd): string {
