@@ -65,6 +65,8 @@ a{color:var(--accent)}
 
 .grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px}
 .kpi.hl{background:#fff7e8;border:1.5px solid #f1d38f}
+.dl{display:inline-block;font:700 12px var(--body);border-radius:99px;padding:2px 7px;vertical-align:4px;background:#f1eef0;color:var(--soft)}.dl.up{background:var(--okb);color:var(--ok)}.dl.down{background:var(--badb);color:var(--bad)}
+.lg{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .kpi .mini a{color:inherit}
 .seg{display:inline-flex;background:var(--bg);border-radius:12px;padding:3px;gap:2px}
 .seg button{border:0;background:none;padding:6px 12px;border-radius:9px;font:600 13px var(--body);color:var(--soft);cursor:pointer}
@@ -119,7 +121,7 @@ a{color:var(--accent)}
 <script>
 const $=s=>document.querySelector(s);
 const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const rm=n=>(+n<0?'−':'')+'RM'+Math.abs(+n).toFixed(+n%1?2:0);
+const rm=n=>{const d=+n%1?2:0;return (+n<0?'−':'')+'RM'+Math.abs(+n).toLocaleString('en-MY',{minimumFractionDigits:d,maximumFractionDigits:d})};
 let PM={bq:{},bal:{},cake:{}},GW='gateway bayaran',ME=null,CSRF='',CAT=null,TODAY='',tab='dash',f='today',qs='',dfrom='',dto='';
 const ST={menunggu_bayaran:'Menunggu bayaran',baru:'Baru (dibayar)',disiapkan:'Sedang disiapkan',dalam_penghantaran:'Dalam penghantaran',selesai:'Selesai',batal:'Batal'};
 const DEL={free:'Percuma 10am–6pm',A:'Slot A 9am–12pm',B:'Slot B 1pm–4pm',C:'Slot C 5pm–8pm',spec:'Masa khusus'};
@@ -371,48 +373,65 @@ function showInvoice(el,j,phone,again){
 
 /* ---------- shared: charts (plain SVG, no external library) ---------- */
 function niceMax(v){if(v<=0)return 100;const p=Math.pow(10,Math.floor(Math.log10(v))),n=v/p;return(n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p}
-function barChart(id,labels,data){
+function barChart(id,labels,data,prev,prevLabels){
   const box=document.getElementById(id);if(!box)return;
-  const W=Math.max(320,box.clientWidth||600),H=box.clientHeight||260,L=52,R=8,T=10,B=26,cw=W-L-R,ch=H-T-B,n=data.length||1,mx=niceMax(Math.max(0,...data));
+  const W=Math.max(320,box.clientWidth||600),H=box.clientHeight||260,L=52,R=8,T=10,B=26,cw=W-L-R,ch=H-T-B,n=data.length||1,mx=niceMax(Math.max(0,...data,...(prev||[])));
   const slot=cw/n,bw=Math.min(38,slot*.68),every=Math.ceil(n/Math.max(1,Math.floor(cw/58)));
   const fmt=v=>'RM'+(v>=1000?(Math.round(v/100)/10)+'k':Math.round(v));
   let g='';for(let i=0;i<=4;i++){const v=mx*i/4,y=T+ch-ch*i/4;g+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="#f1e4e8"/><text x="${L-6}" y="${y+4}" text-anchor="end" font-size="11" fill="#7d6370">${fmt(v)}</text>`}
-  const bars=data.map((v,i)=>{const h=v/mx*ch,x=L+slot*i+(slot-bw)/2,y=T+ch-h;
-    return `<g class="bb"><rect x="${x}" y="${y}" width="${bw}" height="${Math.max(h,v>0?2:0)}" rx="5" fill="#e9799a"><title>${labels[i]}: ${rm(v)}</title></rect>${i%every===0?`<text x="${x+bw/2}" y="${H-8}" text-anchor="middle" font-size="11" fill="#7d6370">${labels[i]}</text>`:''}</g>`}).join('');
+  const bars=data.map((v,i)=>{const h=v/mx*ch,x=L+slot*i+(slot-bw)/2,y=T+ch-h,p=prev?prev[i]||0:null;
+    const ph=p!==null?p/mx*ch:0,pw=bw*.55,tip=`${labels[i]}: ${rm(v)}${p!==null?` · sebelum (${prevLabels?prevLabels[i]:''}): ${rm(p)}`:''}`;
+    return `<g class="bb"><title>${tip}</title>${p!==null&&p>0?`<rect x="${x-bw*.18}" y="${T+ch-ph}" width="${pw}" height="${Math.max(ph,2)}" rx="4" fill="#f6cfdb"/>`:''}
+      <rect x="${x+(p!==null?bw*.18:0)}" y="${y}" width="${p!==null?bw*.82:bw}" height="${Math.max(h,v>0?2:0)}" rx="5" fill="#e9799a"/>
+      <rect x="${L+slot*i}" y="${T}" width="${slot}" height="${ch}" fill="transparent"/>${i%every===0?`<text x="${x+bw/2}" y="${H-8}" text-anchor="middle" font-size="11" fill="#7d6370">${labels[i]}</text>`:''}</g>`}).join('');
   box.innerHTML=`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graf: ${labels.length} titik data">${g}${bars}</svg>`;
 }
 const dShort=s=>new Date(s+'T00:00').toLocaleDateString('ms-MY',{day:'numeric',month:'short'});
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 
 /* ---------- dashboard ---------- */
-let dashMode='day';
+let dashMode='day',dashBy=(()=>{try{return localStorage.getItem('hb_dash_by')||'paid'}catch(e){return 'paid'}})();
+const delta=(cur,prev)=>{cur=+cur;prev=+prev;if(!prev&&!cur)return '<span class="dl">—</span>';if(!prev)return '<span class="dl up">↑ baru</span>';
+  const p=(cur-prev)/prev*100,r=Math.abs(p)<10?Math.abs(p).toFixed(1):Math.round(Math.abs(p));return `<span class="dl ${p>=0?'up':'down'}">${p>=0?'↑':'↓'} ${r}%</span>`};
 async function Dash(el){
   el.innerHTML='<div class="empty">Memuatkan…</div>';
-  let j;try{j=await api('dash')}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  let j;try{j=await api('dash',{params:{by:dashBy}})}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
   const hr=new Date().getHours(),greet=hr<12?'Selamat pagi':hr<15?'Selamat tengah hari':hr<19?'Selamat petang':'Selamat malam';
-  const td=j.today_del,tdN=Object.values(td).reduce((a,b)=>a+ +b,0),mx=Math.max(1,...j.top_bq.map(b=>+b.n));
-  el.innerHTML=`<h2 style="font:600 22px var(--display);margin:6px 0 2px">${greet}, ${h(ME.name.split(' ')[0])}</h2>
-   <p class="mini" style="margin:0 0 12px">${new Date().toLocaleDateString('ms-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
+  const td=j.today_del,tdN=Object.values(td).reduce((a,b)=>a+ +b,0),mx=Math.max(1,...j.top_bq.map(b=>+b.n)),K=j.kpi;
+  const [lmA,lmB]=j.cut.lm.split('|'),lmTxt=`${dShort(lmA)}–${dShort(lmB)}`;
+  const card=(t,c,sub,prevTxt)=>`<div class="kpi"><small>${t}</small><b>${rm(c.s)}</b> ${delta(c.s,c.prev.s)}<div class="mini">${c.n} order · ${sub}</div><div class="mini">vs ${rm(c.prev.s)} ${prevTxt}</div></div>`;
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin:6px 0 12px"><div><h2 style="font:600 22px var(--display);margin:0 0 2px">${greet}, ${h(ME.name.split(' ')[0])}</h2>
+     <p class="mini" style="margin:0">${new Date().toLocaleDateString('ms-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p></div>
+    <div><span class="mini" style="margin-right:6px">Kira ikut</span><div class="seg" role="group" aria-label="Kira sales ikut">${[['paid','Tarikh bayar'],['created','Tarikh order']].map(([k,t])=>`<button data-by="${k}" aria-pressed="${dashBy===k}">${t}</button>`).join('')}</div></div></div>
    <div class="grid4">
-    <div class="kpi"><small>Sales hari ni</small><b>${rm(j.today.s)}</b><div class="mini">${j.today.n} order dibayar hari ni</div></div>
-    <div class="kpi"><small>Order masuk hari ni</small><b>${j.created_today}</b><div class="mini">termasuk yang belum bayar</div></div>
+    ${card('Sales hari ni',K.today,`sehingga ${j.cut.now}`,`semalam (sehingga ${j.cut.now})`)}
+    ${card('Sales 7 hari',K.week,'7 hari terakhir','7 hari sebelumnya')}
+    ${card('Sales bulan ni',K.month,'bulan ni setakat hari ni',`bulan lepas (${lmTxt})`)}
+    <div class="kpi"><small>Order masuk hari ni</small><b>${K.created.n}</b> ${delta(K.created.n,K.created.prev.n)}<div class="mini">termasuk yang belum bayar</div><div class="mini">vs ${K.created.prev.n} semalam (sehingga ${j.cut.now})</div></div>
     <div class="kpi ${+j.pending.n?'hl':''}"><small>Menunggu bayaran (7 hari)</small><b>${j.pending.n}</b><div class="mini">${rm(j.pending.s)} belum dibayar · <a href="#" id="fu">Follow up</a></div></div>
-    <div class="kpi"><small>Sales bulan ni</small><b>${rm(j.month.s)}</b><div class="mini">${j.month.n} order dibayar</div></div>
    </div>
-   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px"><h2 style="margin:0">Jumlah sales</h2>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><h2 style="margin:0">Jumlah sales</h2>
      <div class="seg" role="group" aria-label="Tempoh graf">${[['day','Harian'],['week','Mingguan'],['month','Bulanan']].map(([k,t])=>`<button data-m="${k}" aria-pressed="${dashMode===k}">${t}</button>`).join('')}</div></div>
-    <div class="chartbox"><div id="ch1" style="height:260px"></div></div><p class="mini" style="margin:8px 0 0">Order yang dah dibayar sahaja, ikut tarikh bayaran. Order batal tak dikira.</p></div>
+    <div id="chsum" class="mini" style="margin:0 0 8px"></div>
+    <div class="chartbox"><div id="ch1" style="height:260px"></div></div>
+    <p class="mini" style="margin:8px 0 0"><span class="lg" style="background:#e9799a"></span>Tempoh ini &nbsp; <span class="lg" style="background:#f6cfdb"></span><span id="chprev"></span>
+     · Order dibayar sahaja, ikut <b>${dashBy==='created'?'tarikh order dibuat':'tarikh bayaran'}</b>. Order batal tak dikira.</p></div>
    <div class="ranks">
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Hantar hari ni</h2><span class="pill p-baru">${tdN} order</span></div>
      ${[['baru','Baru (belum mula)'],['disiapkan','Sedang disiapkan'],['siap','Siap dihantar'],['dalam_penghantaran','Dalam penghantaran'],['sampai','Dah sampai'],['selesai','Selesai']].map(([k,t])=>`<div class="rowx"><span>${t}</span><span><b>${td[k]||0}</b></span></div>`).join('')}
      <button class="btn ghost sm" id="goToday" style="margin-top:10px">Buka order hari ni</button></div>
     <div class="card"><h2>Bouquet laris bulan ni</h2>${j.top_bq.length?j.top_bq.map((b,i)=>`<div class="hbar"><span class="n">${i+1}</span><span>${h(b.name)}</span><b>${b.n}</b><i><b style="width:${b.n/mx*100}%"></b></i></div>`).join(''):'<p class="mini">Belum ada order dibayar bulan ni.</p>'}</div>
    </div>`;
-  const draw=()=>{const S=j.series[dashMode],k=Object.keys(S);
+  const draw=()=>{const S=j.series[dashMode],k=S.keys;
     const lab=dashMode==='day'?k.map(dShort):dashMode==='week'?k.map(w=>'Mg '+w.split('W')[1]):k.map(m=>new Date(m+'-01T00:00').toLocaleDateString('ms-MY',{month:'short',year:'2-digit'}));
-    barChart('ch1',lab,Object.values(S).map(v=>Math.round(v*100)/100));};
+    const pl={day:'14 hari sebelumnya',week:'12 minggu sebelumnya',month:'bulan sama tahun lepas'}[dashMode];
+    const pLab=dashMode==='day'?k.map(d=>dShort(ymd(new Date(new Date(d+'T00:00').getTime()-14*864e5)))):dashMode==='week'?k.map(()=>'12 mg lepas'):k.map(m=>new Date((+m.slice(0,4)-1)+m.slice(4)+'-01T00:00').toLocaleDateString('ms-MY',{month:'short',year:'2-digit'}));
+    const a=S.cur.reduce((x,y)=>x+y,0),b=S.prev.reduce((x,y)=>x+y,0);
+    $('#chsum').innerHTML=`Jumlah tempoh ini <b style="color:var(--ink)">${rm(a)}</b> ${delta(a,b)} · ${pl}: ${rm(b)}`;$('#chprev').textContent=pl.charAt(0).toUpperCase()+pl.slice(1);
+    barChart('ch1',lab,S.cur,S.prev,pLab);};
   draw();
   el.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{dashMode=b.dataset.m;el.querySelectorAll('[data-m]').forEach(x=>x.setAttribute('aria-pressed',x===b));draw()});
+  el.querySelectorAll('[data-by]').forEach(b=>b.onclick=()=>{dashBy=b.dataset.by;try{localStorage.setItem('hb_dash_by',dashBy)}catch(e){}Dash(el)});
   $('#fu').onclick=e=>{e.preventDefault();tab='orders';f='pending';render()};
   $('#goToday').onclick=()=>{tab='orders';f='today';render()};
 }

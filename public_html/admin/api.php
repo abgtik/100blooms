@@ -362,25 +362,38 @@ case 'deluser':
   if ($id === (int)$me['id']) fail('Tak boleh padam akaun sendiri.');
   q('DELETE FROM admins WHERE id=?', [$id]); json_out(['ok' => true]);
 
-case 'dash':
+case 'dash': // ?by=paid (tarikh bayar) | created (tarikh order). Sales = paid, not cancelled orders, grouped by the chosen date.
   need_login();
-  $t = date('Y-m-d'); $m0 = date('Y-m-01');
-  $paidSum = fn(string $from, string $to) => q("SELECT COUNT(*) n, COALESCE(SUM(total),0) s FROM orders WHERE pay_status='paid' AND status<>'batal' AND paid_at>=? AND paid_at<=?", [$from, $to])->fetch();
-  $today = $paidSum("$t 00:00:00", "$t 23:59:59"); $month = $paidSum("$m0 00:00:00", "$t 23:59:59");
-  $pend = q("SELECT COUNT(*) n, COALESCE(SUM(total),0) s FROM orders WHERE pay_status='pending' AND status<>'batal' AND created_at>=?", [date('Y-m-d H:i:s', time() - 7 * 86400)])->fetch();
-  $created = (int)q('SELECT COUNT(*) FROM orders WHERE created_at>=?', ["$t 00:00:00"])->fetchColumn();
-  // sales series by paid date: 14 days, 12 weeks, 12 months
-  $rows = q("SELECT paid_at, total FROM orders WHERE pay_status='paid' AND status<>'batal' AND paid_at>=?", [date('Y-m-01', strtotime('-11 months')) . ' 00:00:00'])->fetchAll();
-  $day = []; for ($i = 13; $i >= 0; $i--) $day[date('Y-m-d', strtotime("-$i days"))] = 0;
-  $wk = []; for ($i = 11; $i >= 0; $i--) $wk[date('o-\WW', strtotime("-$i weeks"))] = 0;
-  $mo = []; for ($i = 11; $i >= 0; $i--) $mo[date('Y-m', strtotime(date('Y-m-01') . " -$i months"))] = 0;
-  foreach ($rows as $r) { $ts = strtotime($r['paid_at']); $v = (float)$r['total'];
-    if (isset($day[$k = date('Y-m-d', $ts)])) $day[$k] += $v; if (isset($wk[$k = date('o-\WW', $ts)])) $wk[$k] += $v; if (isset($mo[$k = date('Y-m', $ts)])) $mo[$k] += $v; }
+  $col = ($_GET['by'] ?? 'paid') === 'created' ? 'created_at' : 'paid_at';
+  $now = time(); $t = date('Y-m-d', $now); $m0 = date('Y-m-01', $now);
+  $rows = q("SELECT $col AS d, total FROM orders WHERE pay_status='paid' AND status<>'batal' AND $col>=?", [date('Y-m-01', strtotime('-23 months', strtotime($m0))) . ' 00:00:00'])->fetchAll();
+  $pts = array_map(fn($r) => [strtotime($r['d']), (float)$r['total']], $rows);
+  $sum = function (int $from, int $to) use ($pts) { $n = 0; $s = 0.0; foreach ($pts as [$ts, $v]) if ($ts >= $from && $ts <= $to) { $n++; $s += $v; } return ['n' => $n, 's' => round($s, 2)]; };
+  $cmp = fn(int $a, int $b, int $pa, int $pb) => $sum($a, $b) + ['prev' => $sum($pa, $pb)];
+  // like-for-like: today so far vs yesterday up to the same time; month to date vs the same days last month; last 7 days vs the 7 before
+  $d0 = strtotime("$t 00:00:00");
+  $lm0 = strtotime(date('Y-m-01', strtotime('-1 month', strtotime($m0)))); $lmEnd = strtotime(date('Y-m-t 23:59:59', $lm0));
+  $lmCut = strtotime(date('Y-m-', $lm0) . date('d H:i:s', $now)); // same day + time last month
+  if ($lmCut === false || date('Y-m', $lmCut) !== date('Y-m', $lm0)) $lmCut = $lmEnd; // e.g. 31st vs a 30-day month
+  $w0 = strtotime('-6 days', $d0);
+  $kpi = ['today' => $cmp($d0, $now, $d0 - 86400, $now - 86400), 'week' => $cmp($w0, $now, $w0 - 7 * 86400, $w0 - 1),
+    'month' => $cmp(strtotime($m0), $now, $lm0, $lmCut)];
+  $created = fn(int $a, int $b) => (int)q('SELECT COUNT(*) FROM orders WHERE created_at>=? AND created_at<=?', [date('Y-m-d H:i:s', $a), date('Y-m-d H:i:s', $b)])->fetchColumn();
+  $kpi['created'] = ['n' => $created($d0, $now), 'prev' => ['n' => $created($d0 - 86400, $now - 86400)]];
+  $pend = q("SELECT COUNT(*) n, COALESCE(SUM(total),0) s FROM orders WHERE pay_status='pending' AND status<>'batal' AND created_at>=?", [date('Y-m-d H:i:s', $now - 7 * 86400)])->fetch();
+  // series + the period before (day: previous 14 days, week: previous 12 weeks, month: same months last year)
+  $bucket = function (string $fmt, array $keys) use ($pts) { $o = array_fill_keys($keys, 0.0); foreach ($pts as [$ts, $v]) { $k = date($fmt, $ts); if (isset($o[$k])) $o[$k] += $v; } return array_map(fn($x) => round($x, 2), $o); };
+  $days = []; $pdays = []; for ($i = 13; $i >= 0; $i--) { $days[] = date('Y-m-d', strtotime("-$i days", $d0)); $pdays[] = date('Y-m-d', strtotime('-' . ($i + 14) . ' days', $d0)); }
+  $wks = []; $pwks = []; for ($i = 11; $i >= 0; $i--) { $wks[] = date('o-\WW', strtotime("-$i weeks", $d0)); $pwks[] = date('o-\WW', strtotime('-' . ($i + 12) . ' weeks', $d0)); }
+  $mos = []; $pmos = []; for ($i = 11; $i >= 0; $i--) { $mos[] = date('Y-m', strtotime("-$i months", strtotime($m0))); $pmos[] = date('Y-m', strtotime('-' . ($i + 12) . ' months', strtotime($m0))); }
+  $series = ['day' => ['keys' => $days, 'cur' => array_values($bucket('Y-m-d', $days)), 'prev' => array_values($bucket('Y-m-d', $pdays))],
+    'week' => ['keys' => $wks, 'cur' => array_values($bucket('o-\WW', $wks)), 'prev' => array_values($bucket('o-\WW', $pwks))],
+    'month' => ['keys' => $mos, 'cur' => array_values($bucket('Y-m', $mos)), 'prev' => array_values($bucket('Y-m', $pmos))]];
   $todayDel = q("SELECT status, COUNT(*) n FROM orders WHERE del_date=? AND pay_status='paid' AND status<>'batal' GROUP BY status", [$t])->fetchAll();
-  $topBq = q("SELECT bouquet, COUNT(*) n FROM orders WHERE pay_status='paid' AND status<>'batal' AND paid_at>=? GROUP BY bouquet ORDER BY n DESC", ["$m0 00:00:00"])->fetchAll();
+  $topBq = q("SELECT bouquet, COUNT(*) n FROM orders WHERE pay_status='paid' AND status<>'batal' AND $col>=? GROUP BY bouquet ORDER BY n DESC", ["$m0 00:00:00"])->fetchAll();
   $C = catalog(); foreach ($topBq as &$b) $b['name'] = $C['bq'][$b['bouquet']] ?? $b['bouquet']; unset($b);
-  json_out(['today' => $today, 'month' => $month, 'pending' => $pend, 'created_today' => $created,
-    'series' => ['day' => $day, 'week' => $wk, 'month' => $mo], 'today_del' => array_column($todayDel, 'n', 'status'), 'top_bq' => $topBq]);
+  json_out(['by' => $col === 'created_at' ? 'created' : 'paid', 'kpi' => $kpi, 'pending' => $pend, 'series' => $series,
+    'cut' => ['now' => date('H:i', $now), 'lm' => date('Y-m-d', $lm0) . '|' . date('Y-m-d', $lmCut)], 'today_del' => array_column($todayDel, 'n', 'status'), 'top_bq' => $topBq]);
 
 case 'report':
 case 'reportcsv':
