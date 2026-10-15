@@ -297,5 +297,7 @@ function notify_paid(array $o): void {
   $C = catalog();
   $body = "Order baru DIBAYAR: {$o['code']}\nJumlah: RM{$o['total']}\nTarikh hantar: {$o['del_date']} ({$o['del_type']}" . ($o['del_time'] ? " {$o['del_time']}" : '') . ")\n"
     . "Bouquet: " . ($C['bq'][$o['bouquet']] ?? $o['bouquet']) . "\nPenerima: {$o['r_name']}, {$o['r_post']}\nPembeli: {$o['b_name']} {$o['b_phone']}\n\nLihat di " . SITE_URL . "/admin/";
-  @mail(NOTIFY_EMAIL, "[100 Blooms] Order dibayar {$o['code']} RM{$o['total']}", $body, 'From: ' . (defined('MAIL_FROM') ? MAIL_FROM : NOTIFY_EMAIL) . "\r\nContent-Type: text/plain; charset=utf-8");
+  $from = defined('MAIL_FROM') && MAIL_FROM ? MAIL_FROM : NOTIFY_EMAIL;
+  if (!@mail(NOTIFY_EMAIL, "[100 Blooms] Order dibayar {$o['code']} RM{$o['total']}", $body, "From: 100 Blooms <$from>\r\nContent-Type: text/plain; charset=utf-8", '-f' . $from))
+    error_log("100blooms: notify mail failed for {$o['code']}");
 }

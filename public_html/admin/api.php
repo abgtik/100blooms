@@ -163,6 +163,14 @@ case 'deluser':
   if ($id === (int)$me['id']) fail('Tak boleh padam akaun sendiri.');
   q('DELETE FROM admins WHERE id=?', [$id]); json_out(['ok' => true]);
 
+case 'testmail':
+  need_owner();
+  if (!defined('NOTIFY_EMAIL') || !NOTIFY_EMAIL) fail('NOTIFY_EMAIL kosong dalam config.php.');
+  $from = defined('MAIL_FROM') && MAIL_FROM ? MAIL_FROM : NOTIFY_EMAIL;
+  $ok = @mail(NOTIFY_EMAIL, '[100 Blooms] Ujian email notifikasi', "Kalau awak terima email ini, notifikasi order berfungsi.\n\n" . SITE_URL . '/admin/',
+    "From: 100 Blooms <$from>\r\nContent-Type: text/plain; charset=utf-8", '-f' . $from);
+  json_out(['ok' => $ok, 'to' => NOTIFY_EMAIL, 'from' => $from]);
+
 case 'passwd':
   $m = need_login(); $u = q('SELECT pass_hash FROM admins WHERE id=?', [$m['id']])->fetch();
   if (!password_verify((string)($body['old'] ?? ''), $u['pass_hash'])) fail('Password lama salah.');

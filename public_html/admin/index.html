@@ -226,9 +226,11 @@ async function Acc(el){
     <h2 style="margin-top:16px">Tambah pengguna</h2><div class="bar"><input id="un" placeholder="Nama" aria-label="Nama"><input id="ue" type="email" placeholder="Email" aria-label="Email"><input id="up" type="password" placeholder="Password (min 8)" aria-label="Password">
     <select id="ur" aria-label="Peranan"><option value="staff">Staff</option><option value="owner">Owner</option></select><button class="btn sm" id="ua">Tambah</button></div>
     <p class="mini" style="margin:0">Staff boleh urus order, stok dan tarikh. Hanya Owner boleh tanda bayaran manual dan urus pengguna.</p></div>`;}
+  if(ME.role==='owner')users+=`<div class="card"><h2>Notifikasi email</h2><p class="mini" style="margin-top:0">Hantar email ujian ke alamat NOTIFY_EMAIL dalam config.php.</p><button class="btn ghost sm" id="tm">Hantar email ujian</button> <span class="mini" id="tmr"></span></div>`;
   el.innerHTML=users+`<div class="card"><h2>Tukar password saya</h2><div class="bar"><input id="po" type="password" placeholder="Password lama" aria-label="Password lama" autocomplete="current-password"><input id="pn" type="password" placeholder="Password baru (min 8)" aria-label="Password baru" autocomplete="new-password"><button class="btn sm" id="pc">Tukar</button></div></div>`;
   if($('#ua'))$('#ua').onclick=async()=>{try{await api('adduser',{method:'POST',body:{name:$('#un').value,email:$('#ue').value,pw:$('#up').value,role:$('#ur').value}});toast('Pengguna ditambah');Acc(el)}catch(e){toast(e.message)}};
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(confirm('Padam pengguna ini?')){await api('deluser',{method:'POST',body:{id:+b.dataset.del}});Acc(el)}});
+  if($('#tm'))$('#tm').onclick=async()=>{$('#tmr').textContent='Menghantar…';try{const j=await api('testmail',{method:'POST'});$('#tmr').textContent=j.ok?`Server dah hantar ke ${j.to} (dari ${j.from}). Semak inbox dan spam.`:'Server gagal hantar email (fungsi mail() ditolak hosting).'}catch(e){$('#tmr').textContent=e.message}};
   $('#pc').onclick=async()=>{try{await api('passwd',{method:'POST',body:{old:$('#po').value,new:$('#pn').value}});toast('Password ditukar');$('#po').value=$('#pn').value=''}catch(e){toast(e.message)}};
 }
 boot();
