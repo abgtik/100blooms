@@ -479,14 +479,15 @@ async function Dash(el){
     ${card('Sales 7 hari',K.week,'7 hari terakhir','7 hari sebelumnya')}
     ${card('Sales bulan ni',K.month,'bulan ni setakat hari ni',`bulan lepas (${lmTxt})`)}
     <div class="kpi"><small>Order masuk hari ni</small><b>${K.created.n}</b> ${delta(K.created.n,K.created.prev.n)}<div class="mini">termasuk yang belum bayar</div><div class="mini">vs ${K.created.prev.n} semalam (sehingga ${j.cut.now})</div></div>
+    ${j.alltime&&j.alltime.orderla.n?`<div class="kpi"><small>Sepanjang masa</small><b>${rm(Math.round(j.alltime.orderla.s+j.alltime.baru.s))}</b><div class="mini">${(j.alltime.orderla.n+j.alltime.baru.n).toLocaleString()} order dibayar</div><div class="mini">Orderla ${rm(Math.round(j.alltime.orderla.s))} · baru ${rm(Math.round(j.alltime.baru.s))}</div></div>`:''}
     <div class="kpi ${+j.pending.n?'hl':''}"><small>Menunggu bayaran (7 hari)</small><b>${j.pending.n}</b><div class="mini">${rm(j.pending.s)} belum dibayar · <a href="#" id="fu">Follow up</a></div></div>
    </div>
    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px"><h2 style="margin:0">Jumlah sales</h2>
-     <div class="seg" role="group" aria-label="Tempoh graf">${[['day','Harian'],['week','Mingguan'],['month','Bulanan']].map(([k,t])=>`<button data-m="${k}" aria-pressed="${dashMode===k}">${t}</button>`).join('')}</div></div>
+     <div class="seg" role="group" aria-label="Tempoh graf">${[['day','Harian'],['week','Mingguan'],['month','Bulanan'],...(j.series.year?[['year','Tahunan']]:[])].map(([k,t])=>`<button data-m="${k}" aria-pressed="${dashMode===k}">${t}</button>`).join('')}</div></div>
     <div id="chsum" class="mini" style="margin:0 0 8px"></div>
     <div class="chartbox"><div id="ch1" style="height:260px"></div></div>
     <p class="mini" style="margin:8px 0 0"><span class="lg" style="background:var(--bar)"></span>Tempoh ini &nbsp; <span class="lg" style="background:var(--bar2)"></span><span id="chprev"></span>
-     · Order dibayar sahaja, ikut <b>${dashBy==='created'?'tarikh order dibuat':'tarikh bayaran'}</b>. Order batal tak dikira.</p></div>
+     · Order dibayar sahaja, ikut <b>${dashBy==='created'?'tarikh order dibuat':'tarikh bayaran'}</b>. Order batal tak dikira.${j.alltime&&j.alltime.orderla.n?' Termasuk sejarah Orderla (ikut tarikh order).':''}</p></div>
    <div class="ranks">
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Hantar hari ni</h2><span class="pill p-baru">${tdN} order</span></div>
      ${[['baru','Baru (belum mula)'],['disiapkan','Sedang disiapkan'],['siap','Siap dihantar'],['dalam_penghantaran','Dalam penghantaran'],['sampai','Dah sampai'],['selesai','Selesai']].map(([k,t])=>`<div class="rowx"><span>${t}</span><span><b>${td[k]||0}</b></span></div>`).join('')}
@@ -494,11 +495,11 @@ async function Dash(el){
     <div class="card"><h2>Bouquet laris bulan ni</h2>${j.top_bq.length?j.top_bq.map((b,i)=>`<div class="hbar"><span class="n">${i+1}</span><span>${h(b.name)}</span><b>${b.n}</b><i><b style="width:${b.n/mx*100}%"></b></i></div>`).join(''):'<p class="mini">Belum ada order dibayar bulan ni.</p>'}</div>
    </div>`;
   const draw=()=>{const S=j.series[dashMode],k=S.keys;
-    const lab=dashMode==='day'?k.map(dShort):dashMode==='week'?k.map(w=>'Mg '+w.split('W')[1]):k.map(m=>new Date(m+'-01T00:00').toLocaleDateString('ms-MY',{month:'short',year:'2-digit'}));
-    const pl={day:'14 hari sebelumnya',week:'12 minggu sebelumnya',month:'bulan sama tahun lepas'}[dashMode];
-    const pLab=dashMode==='day'?k.map(d=>dShort(ymd(new Date(new Date(d+'T00:00').getTime()-14*864e5)))):dashMode==='week'?k.map(()=>'12 mg lepas'):k.map(m=>new Date((+m.slice(0,4)-1)+m.slice(4)+'-01T00:00').toLocaleDateString('ms-MY',{month:'short',year:'2-digit'}));
+    const lab=dashMode==='year'?k:dashMode==='day'?k.map(dShort):dashMode==='week'?k.map(w=>'Mg '+w.split('W')[1]):k.map(m=>new Date(m+'-01T00:00').toLocaleDateString('ms-MY',{month:'short',year:'2-digit'}));
+    const pl={day:'14 hari sebelumnya',week:'12 minggu sebelumnya',month:'bulan sama tahun lepas',year:'tahun sebelumnya'}[dashMode];
+    const pLab=dashMode==='year'?k.map(y=>String(y-1)):dashMode==='day'?k.map(d=>dShort(ymd(new Date(new Date(d+'T00:00').getTime()-14*864e5)))):dashMode==='week'?k.map(()=>'12 mg lepas'):k.map(m=>new Date((+m.slice(0,4)-1)+m.slice(4)+'-01T00:00').toLocaleDateString('ms-MY',{month:'short',year:'2-digit'}));
     const a=S.cur.reduce((x,y)=>x+y,0),b=S.prev.reduce((x,y)=>x+y,0);
-    $('#chsum').innerHTML=`Jumlah tempoh ini <b style="color:var(--ink)">${rm(a)}</b> ${delta(a,b)} · ${pl}: ${rm(b)}`;$('#chprev').textContent=pl.charAt(0).toUpperCase()+pl.slice(1);
+    $('#chsum').innerHTML=dashMode==='year'?`Jumlah sepanjang masa <b style="color:var(--ink)">${rm(Math.round(a))}</b> · tahun ni ${rm(Math.round(S.cur[S.cur.length-1]))} (setakat hari ni)`:`Jumlah tempoh ini <b style="color:var(--ink)">${rm(a)}</b> ${delta(a,b)} · ${pl}: ${rm(b)}`;$('#chprev').textContent=pl.charAt(0).toUpperCase()+pl.slice(1);
     barChart('ch1',lab,S.cur,S.prev,pLab);};
   draw();
   el.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{dashMode=b.dataset.m;el.querySelectorAll('[data-m]').forEach(x=>x.setAttribute('aria-pressed',x===b));draw()});

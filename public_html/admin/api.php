@@ -505,7 +505,12 @@ case 'dash': // ?by=paid (tarikh bayar) | created (tarikh order). Sales = paid, 
   $todayDel = q("SELECT status, COUNT(*) n FROM orders WHERE del_date=? AND pay_status='paid' AND status<>'batal' GROUP BY status", [$t])->fetchAll();
   $topBq = q("SELECT bouquet, COUNT(*) n FROM orders WHERE pay_status='paid' AND status<>'batal' AND $col>=? GROUP BY bouquet ORDER BY n DESC", ["$m0 00:00:00"])->fetchAll();
   $C = catalog(); foreach ($topBq as &$b) $b['name'] = $C['bq'][$b['bouquet']] ?? $b['bouquet']; unset($b);
-  json_out(['by' => $col === 'created_at' ? 'created' : 'paid', 'kpi' => $kpi, 'pending' => $pend, 'series' => $series,
+  // all time, per year: new system + Orderla history
+  $yr = []; $all = ['baru' => ['n' => 0, 's' => 0.0], 'orderla' => ['n' => 0, 's' => 0.0]];
+  foreach (q("SELECT SUBSTR($col,1,4) y, COUNT(*) n, COALESCE(SUM(total),0) s FROM orders WHERE pay_status='paid' AND status<>'batal' AND $col IS NOT NULL GROUP BY SUBSTR($col,1,4)")->fetchAll() as $r) { $yr[$r['y']] = ($yr[$r['y']] ?? 0) + (float)$r['s']; $all['baru']['n'] += (int)$r['n']; $all['baru']['s'] += (float)$r['s']; }
+  try { foreach (q('SELECT SUBSTR(created_at,1,4) y, COUNT(*) n, COALESCE(SUM(total),0) s FROM legacy_orders WHERE ' . OL_PAID . ' GROUP BY SUBSTR(created_at,1,4)')->fetchAll() as $r) { $yr[$r['y']] = ($yr[$r['y']] ?? 0) + (float)$r['s']; $all['orderla']['n'] += (int)$r['n']; $all['orderla']['s'] += (float)$r['s']; } } catch (Throwable $e) {}
+  if ($yr) { $y0 = (int)min(array_keys($yr)); $ys = range($y0, (int)date('Y')); $series['year'] = ['keys' => array_map('strval', $ys), 'cur' => array_map(fn($y) => round($yr[(string)$y] ?? 0, 2), $ys), 'prev' => array_map(fn($y) => round($yr[(string)($y - 1)] ?? 0, 2), $ys)]; }
+  json_out(['by' => $col === 'created_at' ? 'created' : 'paid', 'kpi' => $kpi, 'pending' => $pend, 'series' => $series, 'alltime' => $all,
     'cut' => ['now' => date('H:i', $now), 'lm' => date('Y-m-d', $lm0) . '|' . date('Y-m-d', $lmCut)], 'today_del' => array_column($todayDel, 'n', 'status'), 'top_bq' => $topBq]);
 
 case 'report':
