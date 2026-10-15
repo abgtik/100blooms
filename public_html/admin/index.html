@@ -72,7 +72,7 @@ a{color:var(--accent)}
 const $=s=>document.querySelector(s);
 const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rm=n=>'RM'+(+n).toFixed(+n%1?2:0);
-let ME=null,CSRF='',CAT=null,TODAY='',tab='orders',f='today',qs='',dfrom='',dto='';
+let GW='gateway bayaran',ME=null,CSRF='',CAT=null,TODAY='',tab='orders',f='today',qs='',dfrom='',dto='';
 const ST={menunggu_bayaran:'Menunggu bayaran',baru:'Baru (dibayar)',disiapkan:'Sedang disiapkan',dalam_penghantaran:'Dalam penghantaran',selesai:'Selesai',batal:'Batal'};
 const DEL={free:'Percuma 10am–6pm',A:'Slot A 9am–12pm',B:'Slot B 1pm–4pm',C:'Slot C 5pm–8pm',spec:'Masa khusus'};
 const OCC_T=()=>CAT.occ,REL_T=()=>CAT.rel;
@@ -101,7 +101,7 @@ function login(err){
   $('#le').focus();
 }
 async function boot(){
-  try{const j=await api('me');ME=j.user;CSRF=j.csrf;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
+  try{const j=await api('me');ME=j.user;CSRF=j.csrf;GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
 }
 function render(){
   const T=[['orders','Order'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
@@ -152,7 +152,7 @@ async function openOrder(id,reload){
    ${paid?`<div class="card"><h2>Status order</h2><div class="steps">${flow.map(s=>`<button class="chip" data-s="${s}" aria-pressed="${o.status===s}">${ST[s]}</button>`).join('')}</div>
      <p class="mini" style="margin:8px 0 0">Dibayar ${fmtDT(o.paid_at)} melalui ${h(o.pay_channel||'-')} (${h(o.pay_ref||'-')})${o.updated_by?` · kemas kini terakhir oleh ${h(o.updated_by)}`:''}</p></div>`
     :`<div class="card"><h2>Bayaran belum diterima</h2><p class="mini" style="margin-top:0">Order disimpan ${fmtDT(o.created_at)}. Customer mungkin belum habis bayar, atau bayaran gagal.</p>
-     <div class="bar" style="margin:0"><button class="btn sm" id="rc">Semak semula dengan ToyyibPay</button>
+     <div class="bar" style="margin:0"><button class="btn sm" id="rc">Semak semula dengan ${h(GW)}</button>
      ${ME.role==='owner'?`<button class="btn ghost sm" id="mp">Tanda dibayar (manual)</button>`:''}<button class="btn ghost sm" id="cn">Batalkan</button></div></div>`}
    <div class="card"><h2>Penghantaran</h2>
     <div class="rowx"><span>Tarikh</span><span><b>${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</span></div>

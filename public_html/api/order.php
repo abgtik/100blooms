@@ -1,6 +1,6 @@
 <?php
 // POST multipart: data=<json>, photo[]=<jpeg/png files>. Validates, prices, saves the order as pending payment,
-// creates a ToyyibPay bill and returns where to send the customer to pay.
+// creates a payment request (HitPay or ToyyibPay) and returns where to send the customer to pay.
 require __DIR__ . '/_lib.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') fail('POST sahaja.', 405);
 
@@ -54,12 +54,12 @@ try {
 
 // The order is saved even if the payment page fails, so the team can follow up.
 try {
-  $bill = tp_create_bill($o);
+  [$bill, $url] = pay_create($o);
   q('UPDATE orders SET bill_code=? WHERE id=?', [$bill, $o['id']]);
-  json_out(['code' => $o['code'], 'total' => $o['total'], 'payUrl' => tp_pay_url($bill)]);
+  json_out(['code' => $o['code'], 'total' => $o['total'], 'payUrl' => $url]);
 } catch (Throwable $e) {
   error_log('100blooms bill: ' . $e->getMessage());
-  q('UPDATE orders SET notes=? WHERE id=?', ['Gagal cipta bil ToyyibPay: ' . mb_substr($e->getMessage(), 0, 200), $o['id']]);
+  q('UPDATE orders SET notes=? WHERE id=?', ['Gagal cipta bayaran ' . gateway_name() . ': ' . mb_substr($e->getMessage(), 0, 200), $o['id']]);
   json_out(['code' => $o['code'], 'total' => $o['total'], 'payUrl' => null,
     'error' => 'Order ' . $o['code'] . ' dah disimpan, tapi halaman bayaran tak dapat dibuka. WhatsApp kami dengan kod ni dan kami bantu.'], 502);
 }

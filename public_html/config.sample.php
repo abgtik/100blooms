@@ -1,7 +1,7 @@
 <?php
 // 100 Blooms: tetapan sistem.
 // Salin fail ini sebagai config.php (dalam folder yang sama) dan isi nilai sebenar.
-// JANGAN kongsi config.php dengan sesiapa: ia ada password database dan kunci ToyyibPay.
+// JANGAN kongsi config.php dengan sesiapa: ia ada password database dan kunci gateway bayaran.
 
 // ---- Database (cPanel → MySQL Databases) ----
 define('DB_DSN',  'mysql:host=localhost;dbname=NAMA_DATABASE;charset=utf8mb4');
@@ -11,7 +11,16 @@ define('DB_PASS', 'PASSWORD_DATABASE');
 // ---- Alamat laman (tanpa / di hujung) ----
 define('SITE_URL', 'https://domainawak.com');
 
-// ---- ToyyibPay ----
+// ---- Gateway bayaran: 'hitpay' atau 'toyyibpay' ----
+define('PAY_GATEWAY', 'hitpay');
+
+// ---- HitPay (Dashboard → Developers → API Keys) ----
+// Mula dengan sandbox (true). Tukar ke false bila nak terima bayaran sebenar.
+define('HP_SANDBOX', true);
+define('HP_API_KEY', 'API_KEY_HITPAY');
+define('HP_SALT', 'SALT_HITPAY');
+
+// ---- ToyyibPay (simpanan, jika PAY_GATEWAY = 'toyyibpay') ----
 // Mula dengan sandbox (true). Tukar ke false bila akaun sebenar dah verified.
 define('TP_SANDBOX', true);
 define('TP_SECRET', 'USER_SECRET_KEY_TOYYIBPAY');

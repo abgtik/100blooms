@@ -34,24 +34,16 @@ Web app tempahan Combo Jimat RM128, bayaran ToyyibPay (DuitNow QR + FPX) dan das
 5. **SSL.** Pastikan domain guna `https` (cPanel → *SSL/TLS Status* → *Run AutoSSL*). ToyyibPay hantar callback ke alamat https.
 6. **Log masuk admin** di `https://domainawak/admin/`.
 
-## ToyyibPay
+## Gateway bayaran: HitPay
 
-**Uji dulu dengan sandbox (percuma, tak perlu verify):**
-1. Daftar di https://dev.toyyibpay.com.
-2. Cipta satu *Category*, contohnya "Combo Jimat". Salin **Category Code**.
-3. Salin **User Secret Key** dari profil akaun.
-4. Dalam `config.php`, set `TP_SANDBOX` kepada `true` dan isi dua kod tadi.
-5. Buat order percubaan dari app, kemudian bayar guna bank ujian dalam sandbox.
-6. Semak di `/admin/` bahawa order tu bertukar jadi **Baru (dibayar)**.
+Sistem guna **HitPay** (`PAY_GATEWAY = 'hitpay'`). ToyyibPay masih ada sebagai simpanan (`PAY_GATEWAY = 'toyyibpay'`).
 
-**Bila akaun sebenar dah verified:**
-1. Cipta Category di https://toyyibpay.com dan salin kod-kod yang baru.
-2. Tukar `TP_SANDBOX` kepada `false`.
-3. Minta ToyyibPay aktifkan **DuitNow QR**. Lepas diaktifkan, tukar `TP_DUITNOW_QR` kepada `true`. Sebelum tu, customer bayar guna FPX (online banking) sahaja.
+1. **Kunci API.** HitPay Dashboard → **Developers → API Keys**. Salin **API Key** dan **Salt** ke `config.php` (`HP_API_KEY`, `HP_SALT`).
+   Sandbox dan production ada kunci dan salt yang berbeza. Uji dulu dengan sandbox (`HP_SANDBOX = true`), kemudian tukar ke kunci production dan `HP_SANDBOX = false`.
+2. **Webhook.** HitPay Dashboard → **Developers → Webhook Endpoints → Add**: URL `https://100blooms.my/api/hitpay-webhook.php`, event **payment_request.completed**.
+3. **Kaedah bayaran.** Hidupkan **DuitNow QR** dan **FPX** dalam HitPay Dashboard. Halaman bayaran HitPay papar kaedah yang dihidupkan.
 
-**Macam mana bayaran disahkan:** ToyyibPay hantar callback ke `/api/callback.php`. Sistem semak hash callback tu, kemudian tanya ToyyibPay sendiri (`getBillTransactions`) dan banding jumlah bayaran sebelum tanda order sebagai dibayar. Kalau callback lambat atau tak sampai:
-- Halaman terima kasih customer akan semak status sendiri.
-- Admin boleh tekan **Semak semula dengan ToyyibPay** dalam order tu.
+**Pengesahan bayaran:** webhook disemak dengan tandatangan HMAC (Salt), kemudian sistem tanya HitPay sendiri status bayaran dan banding jumlah sebelum tanda order dibayar. Jika webhook lambat, halaman terima kasih customer dan butang **Semak semula** di admin akan semak terus dengan HitPay.
 
 ## Peraturan yang dikuatkuasakan di server
 

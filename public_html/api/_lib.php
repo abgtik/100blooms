@@ -225,6 +225,64 @@ function tp_mock(string $fn, array $f): string { // local testing only (TP_MOCK 
   return '[]';
 }
 
+// ---------- HitPay ----------
+function hp_base(): string { return HP_SANDBOX ? 'https://api.sandbox.hit-pay.com/v1' : 'https://api.hit-pay.com/v1'; }
+function hp_req(string $method, string $path, array $fields = []): array {
+  if (defined('HP_MOCK') && HP_MOCK) return hp_mock($method, $path, $fields);
+  $ch = curl_init(hp_base() . $path);
+  $opt = [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 25,
+    CURLOPT_HTTPHEADER => ['X-BUSINESS-API-KEY: ' . HP_API_KEY, 'X-Requested-With: XMLHttpRequest', 'Accept: application/json']];
+  if ($method === 'POST') { $opt[CURLOPT_POST] = true; $opt[CURLOPT_POSTFIELDS] = http_build_query($fields); }
+  curl_setopt_array($ch, $opt);
+  $r = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+  if ($r === false) throw new RuntimeException('HitPay tidak dapat dihubungi: ' . $err);
+  $j = json_decode((string)$r, true);
+  if ($code >= 400 || !is_array($j)) throw new RuntimeException("HitPay $code: " . mb_substr((string)$r, 0, 300));
+  return $j;
+}
+/** Create a hosted payment request. Returns [payment_request_id, checkout_url]. */
+function hp_create(array $o): array {
+  $j = hp_req('POST', '/payment-requests', [
+    'amount' => number_format((float)$o['total'], 2, '.', ''), 'currency' => 'MYR',
+    'reference_number' => $o['code'], 'purpose' => 'Combo Jimat 100 Blooms ' . $o['code'],
+    'name' => mb_substr($o['b_name'], 0, 60),
+    'redirect_url' => SITE_URL . '/?r=' . rawurlencode($o['code']) . '&k=' . $o['token'],
+  ]);
+  if (empty($j['id']) || empty($j['url'])) throw new RuntimeException('HitPay: jawapan tidak lengkap');
+  return [$j['id'], $j['url']];
+}
+/** Ask HitPay whether the payment request was paid. Returns [paid, ref, channel, amount]. */
+function hp_check(string $id): array {
+  $j = hp_req('GET', '/payment-requests/' . rawurlencode($id));
+  foreach ((array)($j['payments'] ?? []) as $p)
+    if (in_array($p['status'] ?? '', ['succeeded', 'succeeded_manually'], true))
+      return [true, (string)($p['id'] ?? $id), (string)($p['payment_type'] ?? 'HitPay'), (float)($p['amount'] ?? 0)];
+  if (($j['status'] ?? '') === 'completed') return [true, $id, 'HitPay', (float)($j['amount'] ?? 0)];
+  return [false, '', '', 0];
+}
+function hp_mock(string $m, string $path, array $f): array { // local testing only (HP_MOCK in config)
+  $dir = sys_get_temp_dir() . '/hpmock'; @mkdir($dir);
+  if ($m === 'POST') { $id = 'mock-' . bin2hex(random_bytes(6)); file_put_contents("$dir/$id", json_encode(['paid' => 0, 'amt' => $f['amount']])); return ['id' => $id, 'url' => 'https://securecheckout.sandbox.hit-pay.com/mock/' . $id, 'status' => 'pending']; }
+  $id = basename($path); $d = json_decode(@file_get_contents("$dir/$id") ?: '{}', true);
+  return ['id' => $id, 'url' => 'https://securecheckout.sandbox.hit-pay.com/mock/' . $id, 'status' => !empty($d['paid']) ? 'completed' : 'pending', 'amount' => $d['amt'] ?? '0',
+    'payments' => !empty($d['paid']) ? [['id' => 'pay-' . $id, 'status' => 'succeeded', 'amount' => $d['amt'], 'payment_type' => 'duitnow']] : []];
+}
+
+// ---------- gateway switch (PAY_GATEWAY in config: 'hitpay' or 'toyyibpay') ----------
+function gateway(): string { return defined('PAY_GATEWAY') ? PAY_GATEWAY : 'toyyibpay'; }
+function gateway_name(): string { return gateway() === 'hitpay' ? 'HitPay' : 'ToyyibPay'; }
+/** Returns [reference stored in bill_code, url to send the customer to]. */
+function pay_create(array $o): array {
+  if (gateway() === 'hitpay') return hp_create($o);
+  $b = tp_create_bill($o); return [$b, tp_pay_url($b)];
+}
+function pay_check(string $ref): array { return gateway() === 'hitpay' ? hp_check($ref) : tp_check($ref); }
+function pay_url(string $ref): ?string {
+  if (gateway() !== 'hitpay') return tp_pay_url($ref);
+  try { $j = hp_req('GET', '/payment-requests/' . rawurlencode($ref)); return ($j['status'] ?? '') === 'pending' ? ($j['url'] ?? null) : null; }
+  catch (Throwable $e) { return null; }
+}
+
 /** Mark an order paid exactly once (callback and status check can race). Returns true if this call changed it. */
 function mark_paid(array $o, string $ref, string $channel, float $amount): bool {
   if (abs($amount - (float)$o['total']) > 0.009) { error_log("100blooms: amount mismatch for {$o['code']}: $amount vs {$o['total']}"); return false; }

@@ -26,7 +26,7 @@ switch ($a) {
 case 'me':
   if (!$me) fail('Sila log masuk.', 401);
   if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(16));
-  json_out(['user' => $me, 'csrf' => $_SESSION['csrf'], 'catalog' => catalog(), 'today' => date('Y-m-d'), 'site' => SITE_URL]);
+  json_out(['user' => $me, 'csrf' => $_SESSION['csrf'], 'catalog' => catalog(), 'today' => date('Y-m-d'), 'site' => SITE_URL, 'gateway' => gateway_name()]);
 
 case 'login':
   if (!$post) fail('POST sahaja.', 405);
@@ -107,8 +107,8 @@ case 'recheck':
   need_login();
   $o = q('SELECT * FROM orders WHERE id=?', [(int)($body['id'] ?? 0)])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404);
   if ($o['pay_status'] === 'paid') json_out(['paid' => true]);
-  if (!$o['bill_code']) fail('Order ini tiada bil ToyyibPay.');
-  try { [$paid, $ref, $ch, $amt] = tp_check($o['bill_code']); } catch (Throwable $e) { fail('ToyyibPay tidak dapat dihubungi.', 502); }
+  if (!$o['bill_code']) fail('Order ini tiada rekod bayaran ' . gateway_name() . '.');
+  try { [$paid, $ref, $ch, $amt] = pay_check($o['bill_code']); } catch (Throwable $e) { fail(gateway_name() . ' tidak dapat dihubungi.', 502); }
   if ($paid) mark_paid($o, $ref, $ch, $amt);
   json_out(['paid' => $paid]);
 

@@ -713,7 +713,7 @@ const SCR={
     <div class="field"><label for="bname">Nama awak</label><input id="bname" type="text" value="${h(S.bname)}"></div>
     <div class="field"><label for="bphone">Nombor WhatsApp awak</label><input id="bphone" type="tel" inputmode="tel" value="${h(S.bphone)}"><span class="hint">Kami hantar resit dan gambar penerima ke nombor ni.</span></div></div>`;
   const chk=()=>foot('Bayar '+rm(total()),S.bname.trim()&&S.bphone.replace(/\D/g,'').length>=9);
-  el.insertAdjacentHTML('beforeend','<p class="hint" style="text-align:center;margin:0">Bayar dengan DuitNow QR atau FPX (online banking) melalui ToyyibPay.</p>');
+  el.insertAdjacentHTML('beforeend','<p class="hint" style="text-align:center;margin:0">Bayar dengan DuitNow QR atau FPX (online banking) melalui halaman bayaran yang selamat.</p>');
   ['bname','bphone'].forEach(k=>$('#'+k).oninput=e=>{S[k]=e.target.value;chk();save()});chk();
  },
  pay(el){
