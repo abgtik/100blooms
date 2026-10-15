@@ -142,6 +142,16 @@ case 'myqr':
   $m = need_agent(); $p = qr_path($m); if (!$p) { http_response_code(404); exit; }
   header('Content-Type: ' . (str_ends_with($p, '.png') ? 'image/png' : 'image/jpeg')); header('Cache-Control: private, no-store'); readfile($p); exit;
 
+case 'media': // library for posting: posters, product/customer photos, reviews, ready captions; videos live in the Telegram channel
+  $m = need_agent();
+  $rows = q('SELECT id,cat,title,caption,file FROM media WHERE active=1 ORDER BY cat, sort, id DESC')->fetchAll();
+  json_out(['cats' => MEDIA_CATS, 'tg' => (string)setting('tg_link', ''), 'link' => link_of((int)$m['id']),
+    'rows' => array_map(fn($r) => ['id' => (int)$r['id'], 'cat' => $r['cat'], 'title' => $r['title'], 'caption' => (string)$r['caption'], 'img' => (bool)$r['file']], $rows)]);
+
+case 'mfile':
+  need_agent(); $r = q('SELECT * FROM media WHERE id=? AND active=1', [(int)($_GET['id'] ?? 0)])->fetch();
+  if (!$r) { http_response_code(404); exit; } media_serve($r, !empty($_GET['dl']));
+
 case 'passwd':
   $m = need_agent();
   if (!password_verify((string)($body['old'] ?? ''), $m['pass_hash'])) fail('Password lama salah.');

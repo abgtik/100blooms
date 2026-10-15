@@ -42,6 +42,7 @@ function schema_sql(string $driver): array {
   note VARCHAR(200) NULL, created_at DATETIME NOT NULL
 )$tail",
 "CREATE TABLE IF NOT EXISTS login_attempts (ip VARCHAR(45) NOT NULL, at DATETIME NOT NULL)$tail",
+  "CREATE TABLE IF NOT EXISTS media (id $id, cat VARCHAR(12) NOT NULL, title VARCHAR(100) NOT NULL, caption TEXT NULL, file VARCHAR(160) NULL, active TINYINT NOT NULL DEFAULT 1, sort INT NOT NULL DEFAULT 0, created_at DATETIME NOT NULL)$tail",
   ], agent_schema($driver));
 }
 function seed_products(): void {

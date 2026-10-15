@@ -296,6 +296,44 @@ case 'watest': // owner: send a test message now
   catch (Throwable $e) { fail($e->getMessage(), 502); }
   json_out(['ok' => true]);
 
+case 'media': // owner manages the agents' media library
+  need_login();
+  json_out(['cats' => MEDIA_CATS, 'tg' => (string)setting('tg_link', ''), 'rows' => q('SELECT * FROM media ORDER BY cat, sort, id DESC')->fetchAll()]);
+
+case 'mfile':
+  need_login(); $r = q('SELECT * FROM media WHERE id=?', [(int)($_GET['id'] ?? 0)])->fetch(); if (!$r) { http_response_code(404); exit; } media_serve($r);
+
+case 'madd': // multipart: cat, title, caption, file (optional for caption-only)
+  need_owner();
+  $cat = (string)($_POST['cat'] ?? ''); if (!isset(MEDIA_CATS[$cat])) fail('Pilih kategori.');
+  $title = str_in($_POST['title'] ?? '', 100); $cap = str_in($_POST['caption'] ?? '', 2000);
+  $name = null; $f = $_FILES['file'] ?? null;
+  if ($f && $f['error'] !== UPLOAD_ERR_NO_FILE) {
+    if ($f['error'] !== UPLOAD_ERR_OK) fail('Gambar gagal dimuat naik (saiz terlalu besar?).');
+    $info = @getimagesize($f['tmp_name']); if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) fail('Guna gambar JPG, PNG atau WEBP.');
+    $dir = UPLOAD_DIR . '/_media'; if (!is_dir($dir)) mkdir($dir, 0755, true);
+    $name = 'm-' . date('ymd') . '-' . bin2hex(random_bytes(4)) . '.jpg';
+    save_jpeg($f['tmp_name'], "$dir/$name", 1600, 88);
+  }
+  if (!$name && $cap === '') fail('Isi caption atau pilih gambar.');
+  if ($title === '') $title = MEDIA_CATS[$cat];
+  q('INSERT INTO media (cat,title,caption,file,active,sort,created_at) VALUES (?,?,?,?,1,0,?)', [$cat, $title, $cap ?: null, $name, date('Y-m-d H:i:s')]);
+  json_out(['ok' => true]);
+
+case 'medit':
+  need_owner(); $id = (int)($body['id'] ?? 0); $r = q('SELECT * FROM media WHERE id=?', [$id])->fetch(); if (!$r) fail('Bahan tidak dijumpai.', 404);
+  if (!empty($body['delete'])) { if ($r['file'] && !str_starts_with($r['file'], 'asset:')) @unlink(UPLOAD_DIR . '/_media/' . basename($r['file'])); q('DELETE FROM media WHERE id=?', [$id]); json_out(['ok' => true]); }
+  if (isset($body['active'])) q('UPDATE media SET active=? WHERE id=?', [!empty($body['active']) ? 1 : 0, $id]);
+  if (isset($body['caption'])) q('UPDATE media SET caption=? WHERE id=?', [str_in($body['caption'], 2000) ?: null, $id]);
+  if (isset($body['title']) && trim((string)$body['title']) !== '') q('UPDATE media SET title=? WHERE id=?', [str_in($body['title'], 100), $id]);
+  if (isset($body['cat']) && isset(MEDIA_CATS[$body['cat']])) q('UPDATE media SET cat=? WHERE id=?', [$body['cat'], $id]);
+  json_out(['ok' => true]);
+
+case 'tgset':
+  need_owner(); $u = trim((string)($body['tg'] ?? ''));
+  if ($u !== '' && !preg_match('#^https://t\.me/[A-Za-z0-9_+/-]+$#', $u)) fail('Link mesti bermula dengan https://t.me/');
+  set_setting('tg_link', $u ?: null); json_out(['ok' => true]);
+
 case 'agset': // owner: default commission + minimum payout
   need_owner();
   $rate = max(0, min(500, (float)($body['rate'] ?? AGENT_RATE))); $min = max(0, min(5000, (float)($body['payout_min'] ?? PAYOUT_MIN)));

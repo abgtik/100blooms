@@ -71,7 +71,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 8) return;
+  if ($v >= 9) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -99,13 +99,16 @@ function migrate(PDO $pdo): void {
   foreach (agent_schema($my ? 'mysql' : 'sqlite') as $sql) $run($sql);
   // v8: WhatsApp notifications already sent per order (no repeats)
   $run('ALTER TABLE orders ADD COLUMN wa_log TEXT NULL');
+  // v9: media library for agents (posters, product & customer photos, reviews, ready captions)
+  $run("CREATE TABLE IF NOT EXISTS media (id " . ($my ? 'INT UNSIGNED AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT') . ", cat VARCHAR(12) NOT NULL, title VARCHAR(100) NOT NULL, caption TEXT NULL, file VARCHAR(160) NULL, active TINYINT NOT NULL DEFAULT 1, sort INT NOT NULL DEFAULT 0, created_at DATETIME NOT NULL)$tail");
+  if ($v < 9) media_seed($pdo);
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','8')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','9')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
@@ -229,16 +232,52 @@ function area_of(string $addr, string $post): string {
 /** Recipient photos shown on the agent sign-up page (owner uploads them in admin → Agent). */
 function showcase_files(): array { $f = glob(UPLOAD_DIR . '/_site/showcase-*.jpg') ?: []; sort($f); return array_map('basename', $f); }
 /** Saves an uploaded image as a JPEG no wider than $max px (falls back to the original if GD is missing). */
-function save_jpeg(string $tmp, string $dest, int $max = 900): void {
+function save_jpeg(string $tmp, string $dest, int $max = 900, int $q = 82): void {
   if (function_exists('imagecreatefromstring') && ($src = @imagecreatefromstring((string)file_get_contents($tmp)))) {
     $w = imagesx($src); $h = imagesy($src); $k = min(1, $max / max($w, $h));
     $dst = imagecreatetruecolor((int)round($w * $k), (int)round($h * $k));
     imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
     imagecopyresampled($dst, $src, 0, 0, 0, 0, imagesx($dst), imagesy($dst), $w, $h);
-    if (!imagejpeg($dst, $dest, 82)) fail('Simpan gambar gagal.', 500);
+    if (!imagejpeg($dst, $dest, $q)) fail('Simpan gambar gagal.', 500);
     return;
   }
   if (!move_uploaded_file($tmp, $dest)) fail('Simpan gambar gagal.', 500);
+}
+
+// ---------- media library for agents ----------
+const MEDIA_CATS = ['poster' => 'Poster', 'produk' => 'Produk', 'pelanggan' => 'Pelanggan sebenar', 'ulasan' => 'Ulasan', 'caption' => 'Caption'];
+/** Starter content so the agent Media tab is useful on day one (uses images already in the app). Captions use {link} for the agent's own link. */
+function media_seed(PDO $pdo): void {
+  if ((int)$pdo->query('SELECT COUNT(*) FROM media')->fetchColumn() > 0) return;
+  $now = date('Y-m-d H:i:s'); $st = $pdo->prepare('INSERT INTO media (cat,title,caption,file,active,sort,created_at) VALUES (?,?,?,?,1,?,?)'); $i = 0;
+  $set = "💐 Bouquet · 🍰 Sepotong kek Secret Recipe · 🎈 Balloon · 📸 Polaroid · 💌 Wishcard";
+  $tail = "\n\n*Combo Jimat RM128* · 🚚 Delivery PERCUMA (10 pagi – 6 petang)\n\n👉 Order di sini:\n{link}";
+  $caps = [
+    ['Birthday', "🎂 *Birthday orang tersayang dah dekat?*\n\nHantar hadiah lengkap terus ke pintu dia:\n$set$tail"],
+    ['Anniversary', "💞 *Happy anniversary!*\n\nSatu lagi tahun bersama. Raikan dengan hadiah yang buat dia senyum sepanjang hari 🌸\n$set$tail"],
+    ['Pujuk / minta maaf', "🥺 *Dia tengah merajuk?*\n\nKadang-kadang \"sorry\" lebih sampai bila datang dengan bunga dan sepotong kek.\n$set$tail"],
+    ['Rindu mak & ayah', "🤍 *Rindu mak & ayah, tapi jauh?*\n\nBiar kami hantarkan sedikit tanda sayang sampai depan pintu rumah.\n📷 Awak dapat gambar penerima masa hadiah sampai.$tail"],
+    ['Tahniah grad / konvo', "🎓 *Tahniah graduan!*\n\nPenat lelah bertahun-tahun, raikan dengan hadiah yang tak dilupakan.\n$set$tail"],
+    ['Tak dapat datang sendiri', "📍 *Sibuk atau tinggal jauh?*\n\nTak dapat datang sendiri pun, kejutan tetap sampai. Pilih hadiah, tulis ucapan, kami siapkan dan hantar.\n📷 Dapat gambar penerima masa hadiah sampai.$tail"],
+  ];
+  foreach ($caps as [$t, $c]) $st->execute(['caption', $t, $c, null, $i++, $now]);
+  foreach (catalog()['bq'] as $k => $n) if (is_file(__DIR__ . "/../assets/img/bouquet/$k.webp"))
+    $st->execute(['produk', "Bouquet $n", "💐 *Bouquet $n* dalam set Combo Jimat RM128\n\nLengkap dengan sepotong kek Secret Recipe, balloon, polaroid dan wishcard.$tail", "asset:assets/img/bouquet/$k.webp", $i++, $now]);
+  foreach (glob(__DIR__ . '/../assets/img/bouquet/*-c*.webp') ?: [] as $f)
+    $st->execute(['pelanggan', 'Penerima ' . ucfirst(strtok(basename($f), '-')), "🌸 Senyuman macam ni yang buat kami semangat setiap hari.\n\nNak bagi kejutan yang sama pada orang tersayang?$tail", 'asset:assets/img/bouquet/' . basename($f), $i++, $now]);
+  foreach (glob(__DIR__ . '/../assets/img/testi/*.webp') ?: [] as $f)
+    $st->execute(['ulasan', 'Ulasan Google', "⭐ *5.0 · 680+ ulasan Google*\n\nTerima kasih semua yang percayakan 100 Blooms untuk sampaikan rasa sayang 💕$tail", 'asset:assets/img/testi/' . basename($f), $i++, $now]);
+}
+function media_path(string $file): ?string {
+  if (str_starts_with($file, 'asset:')) { $p = realpath(__DIR__ . '/../' . substr($file, 6)); $root = realpath(__DIR__ . '/../assets'); return $p && $root && str_starts_with($p, $root) ? $p : null; }
+  $p = UPLOAD_DIR . '/_media/' . basename($file); return is_file($p) ? $p : null;
+}
+function media_serve(array $m, bool $download = false): void {
+  $p = $m['file'] ? media_path($m['file']) : null; if (!$p) { http_response_code(404); exit; }
+  $mime = (string)(@getimagesize($p)['mime'] ?? ''); if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) { http_response_code(415); exit; }
+  header('Content-Type: ' . $mime); header('Cache-Control: private, max-age=86400'); header('X-Content-Type-Options: nosniff');
+  if ($download) header('Content-Disposition: attachment; filename="100blooms-' . preg_replace('/[^a-z0-9]+/', '-', strtolower($m['title'])) . '-' . $m['id'] . '.' . explode('/', $mime)[1] . '"');
+  readfile($p); exit;
 }
 
 // ---------- wishcard + polaroids sent in after the order (tracking page and admin) ----------

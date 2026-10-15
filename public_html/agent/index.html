@@ -66,6 +66,22 @@ nav button[aria-current=page]{color:#fff;background:var(--accent)}
 .ck{display:flex;gap:10px;align-items:flex-start;font-weight:500;font-size:14px}.ck input{width:20px;height:20px;flex:none;margin-top:1px}
 .qr{max-width:200px;border-radius:12px;border:1px solid var(--line);display:block;margin:6px 0 10px}
 .empty{text-align:center;color:var(--soft);padding:18px 6px;font-size:14px}
+.mchips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none}
+.mchips button{flex:none;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:7px 13px;font:600 13px var(--body);cursor:pointer}
+.mchips button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.mi{background:var(--card);border-radius:18px;overflow:hidden;display:flex;flex-direction:column}
+.mi img{width:100%;aspect-ratio:1;object-fit:cover;background:var(--bg2);display:block;cursor:zoom-in}
+.mi .mb{padding:10px;display:flex;flex-direction:column;gap:8px;flex:1}
+.mi b{font:600 14px var(--display)}
+.mi .ma{display:flex;gap:6px;margin-top:auto}.mi .ma button,.mi .ma a{flex:1;border:0;border-radius:10px;padding:9px 4px;font:600 12.5px var(--body);cursor:pointer;text-align:center;text-decoration:none}
+.mi .ma .p{background:var(--accent);color:#fff}.mi .ma .g{background:var(--bg);color:var(--ink)}
+.cap{grid-column:1/-1;background:var(--card);border-radius:18px;padding:14px}
+.cap pre{white-space:pre-wrap;font:14px/1.5 var(--body);margin:8px 0 10px;background:var(--bg);border-radius:12px;padding:12px;max-height:220px;overflow:auto}
+.cap .ma{display:flex;gap:8px}.cap .ma button,.cap .ma a{border:0;border-radius:12px;padding:10px 14px;font:600 13.5px var(--body);cursor:pointer;text-decoration:none}
+.tg{display:flex;align-items:center;gap:12px;background:#229ED9;color:#fff;border-radius:18px;padding:14px 16px;text-decoration:none;margin-bottom:14px}
+.tg svg{flex:none}.tg b{font:600 16px var(--display);display:block}.tg small{opacity:.9;font-size:12.5px}
+.mzoom{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:16px}.mzoom img{max-width:100%;max-height:100%;border-radius:12px}
 .toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:9;max-width:90%}
 .wide .wrap{max-width:1100px}
 /* landing */
@@ -217,7 +233,7 @@ function startLanding(){
 }
 
 /* ---------- shell ---------- */
-const NAV=[['home','Utama','<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'],['orders','Order','<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['money','Komisen','<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2s1 1.7 3 2 3 .9 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2M12 16v2"/>'],['me','Profil','<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/>']];
+const NAV=[['home','Utama','<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'],['orders','Order','<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['media','Media','<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>'],['money','Komisen','<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2s1 1.7 3 2 3 .9 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2M12 16v2"/>'],['me','Profil','<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/>']];
 async function boot(fresh){
   try{const j=await api('me');ME=j;CSRF=j.csrf}catch(e){return auth(new URLSearchParams(location.search).has('daftar')?'register':'login')}
   $('#nav').hidden=false;
@@ -228,7 +244,7 @@ async function boot(fresh){
 function render(fresh){
   $('#nav').innerHTML=NAV.map(([k,t,i])=>`<button data-t="${k}" ${tab===k?'aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${i}</svg>${t}</button>`).join('');
   $('#nav').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
-  ({home:Home,orders:Orders,money:Money,me:Profile})[tab]($('#main'),fresh);
+  ({home:Home,orders:Orders,media:Media,money:Money,me:Profile})[tab]($('#main'),fresh);
   window.scrollTo(0,0);
 }
 
@@ -300,6 +316,34 @@ async function Orders(el){
   $('#pm').onclick=()=>nav(-1);$('#nm').onclick=()=>nav(1);
   el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{cal.sel=cal.sel===b.dataset.d?'':b.dataset.d;Orders(el)});
   if($('#all'))$('#all').onclick=()=>{cal.sel='';Orders(el)};
+}
+
+/* ---------- media ---------- */
+let mcat='all';
+async function Media(el){
+  el.innerHTML='<p class="sub">Memuatkan…</p>';
+  let j;try{j=await api('media')}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  const fill=c=>{c=c||'';return c.includes('{link}')?c.split('{link}').join(j.link):(c?c+'\n\n👉 '+j.link:j.link)};
+  const cats=Object.entries(j.cats).filter(([k])=>j.rows.some(r=>r.cat===k));
+  const ck=Object.keys(j.cats),rows=j.rows.filter(r=>mcat==='all'||r.cat===mcat).sort((a,b)=>ck.indexOf(a.cat)-ck.indexOf(b.cat));
+  const src=(id,dl)=>`api.php?a=mfile&id=${id}${dl?'&dl=1':''}`;
+  el.innerHTML=`<h1>Media</h1><p class="sub">Bahan siap untuk posting. Caption dah ada link order awak.</p>
+   ${j.tg?`<a class="tg" href="${h(j.tg)}" target="_blank" rel="noopener"><svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#fff"/><path d="m5.5 11.8 11.6-4.5c.5-.2 1 .1.8.9l-2 9.3c-.1.6-.5.8-1 .5l-3-2.2-1.4 1.4c-.2.2-.3.3-.6.3l.2-3.1 5.6-5c.2-.2 0-.3-.4-.1l-6.9 4.3-3-.9c-.6-.2-.6-.6.1-.9z" fill="#229ED9"/></svg><span><b>🎬 Video: join channel Telegram</b><small>Video reaksi penerima &amp; behind the scenes. Tekan lama video → Save to Gallery.</small></span></a>`:''}
+   <div class="mchips" role="group" aria-label="Kategori">${[['all','Semua'],...cats].map(([k,t])=>`<button data-c="${k}" aria-pressed="${mcat===k}">${h(t)}</button>`).join('')}</div>
+   <div class="mgrid">${rows.length?rows.map(r=>r.img?`<div class="mi"><img src="${src(r.id)}" alt="${h(r.title)}" loading="lazy" data-z="${r.id}"><div class="mb"><b>${h(r.title)}</b>
+      <div class="ma"><button class="p" data-sh="${r.id}">Kongsi</button><a class="g" href="${src(r.id,1)}" download>Simpan</a></div>${r.caption?`<div class="ma"><button class="g" data-cp="${r.id}">Salin caption</button></div>`:''}</div></div>`
+     :`<div class="cap"><b style="font:600 15px var(--display)">✍️ ${h(r.title)}</b><pre>${h(fill(r.caption))}</pre><div class="ma"><a class="btn sm" style="margin:0" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(fill(r.caption))}">Kongsi di WhatsApp</a><button class="btn ghost sm" style="margin:0" data-cp="${r.id}">Salin</button></div></div>`).join('')
+     :'<div class="empty" style="grid-column:1/-1">Belum ada bahan dalam kategori ni.</div>'}</div>
+   <p class="hint" style="margin-top:14px">Kongsi terus dari telefon: gambar dan caption dihantar sekali ke WhatsApp, Instagram atau TikTok. Kalau app tak terima caption, tekan "Salin caption" dan tampal sendiri.</p>`;
+  const byId=id=>j.rows.find(r=>r.id===+id);
+  el.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{mcat=b.dataset.c;Media(el)});
+  el.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(fill(byId(b.dataset.cp).caption)).then(()=>toast('Caption disalin'),()=>toast('Tak dapat salin')));
+  el.querySelectorAll('[data-z]').forEach(i=>i.onclick=()=>{const z=document.createElement('div');z.className='mzoom';z.innerHTML=`<img src="${i.src}" alt="">`;z.onclick=()=>z.remove();document.body.appendChild(z)});
+  el.querySelectorAll('[data-sh]').forEach(b=>b.onclick=async()=>{const r=byId(b.dataset.sh),text=fill(r.caption);b.disabled=true;
+    try{const blob=await (await fetch(src(r.id))).blob(),ext=(blob.type.split('/')[1]||'jpg').replace('jpeg','jpg'),file=new File([blob],`100blooms-${r.id}.${ext}`,{type:blob.type});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.clipboard.writeText(text)}catch(e){}await navigator.share({files:[file],text});}
+      else{await navigator.clipboard.writeText(text).catch(()=>{});const a=document.createElement('a');a.href=src(r.id,1);a.download='';document.body.appendChild(a);a.click();a.remove();toast('Gambar dimuat turun, caption disalin')}}
+    catch(e){if(e.name!=='AbortError')toast('Tak dapat kongsi. Guna Simpan + Salin caption.')}b.disabled=false});
 }
 
 /* ---------- commissions & payouts ---------- */
