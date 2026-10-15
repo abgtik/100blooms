@@ -14,7 +14,12 @@ const EXTRA_PHOTO = 10;
 const MAX_EXTRA_CAKE = 10;
 const MAX_PHOTOS = 10;
 const OTHER_CAKE = 'Pilihan lain (ikut stok)';
-const UPLOAD_DIR = __DIR__ . '/../uploads';
+// Customer photos must not be reachable by URL. On Plesk, nginx can serve static files directly and skip
+// .htaccess, so prefer the webspace "private" folder (outside httpdocs) when it exists.
+if (!defined('UPLOAD_DIR')) {
+  $priv = dirname(__DIR__, 2) . '/private';
+  define('UPLOAD_DIR', (is_dir($priv) && is_writable($priv)) ? $priv . '/uploads' : dirname(__DIR__) . '/uploads');
+}
 
 // ---------- catalogue (ids must match the customer app) ----------
 function catalog(): array {

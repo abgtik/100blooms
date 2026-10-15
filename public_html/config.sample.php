@@ -23,5 +23,9 @@ define('TP_DUITNOW_QR', false);
 define('NOTIFY_EMAIL', 'emailawak@contoh.com');
 define('MAIL_FROM', 'order@domainawak.com');
 
+// ---- Folder gambar customer (pilihan) ----
+// Kosongkan untuk automatik: guna folder 'private' di luar httpdocs jika ada (Plesk), jika tidak 'uploads'.
+// define('UPLOAD_DIR', '/home/100blooms.my/private/uploads');
+
 // ---- WhatsApp team (dipaparkan kepada customer) ----
 define('WA_MAIN', '601165862584');

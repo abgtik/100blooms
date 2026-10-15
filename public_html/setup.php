@@ -9,6 +9,8 @@ try {
   $drv = db()->getAttribute(PDO::ATTR_DRIVER_NAME);
   foreach (schema_sql($drv) as $sql) { try { db()->exec($sql); } catch (PDOException $e) { if (stripos($e->getMessage(), 'exist') === false && stripos($e->getMessage(), 'Duplicate') === false) throw $e; } }
   seed_products();
+  if (!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR, 0755, true);
+  if (!is_writable(UPLOAD_DIR)) $msg = 'Folder gambar tidak boleh ditulis: ' . htmlspecialchars(UPLOAD_DIR) . '. Semak kebenaran folder di File Manager.';
   $has = (int)q('SELECT COUNT(*) FROM admins')->fetchColumn();
 } catch (Throwable $e) { $has = -1; $msg = 'Tak dapat sambung ke database. Semak DB_DSN, DB_USER dan DB_PASS dalam config.php. (' . htmlspecialchars($e->getMessage()) . ')'; }
 
