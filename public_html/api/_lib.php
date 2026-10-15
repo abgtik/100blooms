@@ -416,6 +416,35 @@ function fmt_day(string $ymd): string {
   return $D[(int)date('w', $t)] . ', ' . date('j', $t) . ' ' . $Mo[(int)date('n', $t) - 1];
 }
 
+/** Prayer times for $date and the day after: JAKIM e-Solat first, Aladhan (JAKIM method) as a fallback. */
+function solat_fetch(string $zone, string $date): ?array {
+  $tomorrow = date('Y-m-d', strtotime("$date +1 day"));
+  $get = function (string $url, ?array $post = null): ?array {
+    if (defined('SOLAT_MOCK') && SOLAT_MOCK) return json_decode((string)file_get_contents(SOLAT_MOCK), true);
+    $ch = curl_init($url); $o = [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_USERAGENT => '100Blooms/1.0', CURLOPT_HTTPHEADER => ['Accept: application/json']];
+    if ($post) { $o[CURLOPT_POST] = true; $o[CURLOPT_POSTFIELDS] = http_build_query($post); }
+    curl_setopt_array($ch, $o); $r = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    return ($r !== false && $code < 400) ? json_decode((string)$r, true) : null;
+  };
+  $pick = fn(array $p) => ['fajr' => substr($p['fajr'], 0, 5), 'syuruk' => substr($p['syuruk'], 0, 5), 'dhuhr' => substr($p['dhuhr'], 0, 5), 'asr' => substr($p['asr'], 0, 5), 'maghrib' => substr($p['maghrib'], 0, 5), 'isha' => substr($p['isha'], 0, 5)];
+  try {
+    $j = $get('https://www.e-solat.gov.my/index.php?r=esolatApi/takwimsolat&period=duration&zone=' . rawurlencode($zone), ['datestart' => $date, 'dateend' => $tomorrow]);
+    $days = [];
+    foreach ((array)($j['prayerTime'] ?? []) as $p) { $d = DateTimeImmutable::createFromFormat('!d-M-Y', (string)($p['date'] ?? '')); if ($d && !empty($p['fajr'])) $days[$d->format('Y-m-d')] = $pick($p); }
+    if (isset($days[$date])) return ['days' => $days, 'source' => 'JAKIM e-Solat'];
+  } catch (Throwable $e) { error_log('100blooms solat jakim: ' . $e->getMessage()); }
+  try { // fallback: Aladhan with the JAKIM method, at the shop (Jenjarom)
+    $days = [];
+    foreach ([$date, $tomorrow] as $d) {
+      $j = $get('https://api.aladhan.com/v1/timings/' . date('d-m-Y', strtotime($d)) . '?latitude=2.8836&longitude=101.5014&method=17');
+      $t = $j['data']['timings'] ?? null; if (!$t) continue;
+      $days[$d] = ['fajr' => substr($t['Fajr'], 0, 5), 'syuruk' => substr($t['Sunrise'], 0, 5), 'dhuhr' => substr($t['Dhuhr'], 0, 5), 'asr' => substr($t['Asr'], 0, 5), 'maghrib' => substr($t['Maghrib'], 0, 5), 'isha' => substr($t['Isha'], 0, 5)];
+    }
+    if (isset($days[$date])) return ['days' => $days, 'source' => 'Aladhan (kaedah JAKIM)'];
+  } catch (Throwable $e) { error_log('100blooms solat aladhan: ' . $e->getMessage()); }
+  return null;
+}
+
 function bank_qr_path(): ?string { foreach (glob(UPLOAD_DIR . '/_site/bank-qr.*') ?: [] as $f) return $f; return null; }
 // ---------- product codes / retail prices (set in admin → Stok) ----------
 function product_meta(): array {

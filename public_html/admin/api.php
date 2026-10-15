@@ -362,6 +362,18 @@ case 'deluser':
   if ($id === (int)$me['id']) fail('Tak boleh padam akaun sendiri.');
   q('DELETE FROM admins WHERE id=?', [$id]); json_out(['ok' => true]);
 
+case 'solat': // JAKIM e-Solat times for today + tomorrow, fetched once a day on the server and cached
+  need_login();
+  $zone = preg_match('/^[A-Z]{3}\d{2}$/', (string)($_GET['zone'] ?? '')) ? $_GET['zone'] : (string)setting('solat_zone', 'SGR03');
+  $today = date('Y-m-d'); $key = "sc_{$zone}_$today"; // daily cache
+  $cached = json_decode((string)setting($key, ''), true);
+  if (!$cached) {
+    $cached = solat_fetch($zone, $today);
+    if ($cached) { q("DELETE FROM settings WHERE k LIKE 'sc!_%' ESCAPE '!' AND k<>?", [$key]); set_setting($key, json_encode($cached)); }
+  }
+  if (!$cached) fail('Waktu solat tak dapat dimuat sekarang.', 502);
+  json_out(['zone' => $zone, 'days' => $cached['days'], 'source' => $cached['source'], 'now' => date('Y-m-d H:i:s')]);
+
 case 'dash': // ?by=paid (tarikh bayar) | created (tarikh order). Sales = paid, not cancelled orders, grouped by the chosen date.
   need_login();
   $col = ($_GET['by'] ?? 'paid') === 'created' ? 'created_at' : 'paid_at';
