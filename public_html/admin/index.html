@@ -53,7 +53,7 @@ input[type=search]{flex:1;min-width:180px}
 .panel{width:min(560px,100%);height:100%;overflow:auto;background:var(--bg);padding:16px max(16px,env(safe-area-inset-right)) 40px 16px;animation:sl .25s ease}
 @keyframes sl{from{transform:translateX(40px);opacity:0}}
 .steps{display:flex;gap:6px;flex-wrap:wrap}
-.thumbs{display:flex;gap:8px;flex-wrap:wrap}.thumbs a{display:block;width:96px;height:96px;border-radius:10px;overflow:hidden;background:#eee}.thumbs img{width:100%;height:100%;object-fit:cover}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}.tw{position:relative}.tx{position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;border:0;background:var(--ink);color:#fff;font-size:15px;line-height:1;cursor:pointer}.thumbs a{display:block;width:96px;height:96px;border-radius:10px;overflow:hidden;background:#eee}.thumbs img{width:100%;height:100%;object-fit:cover}
 .wishbox{white-space:pre-wrap;background:#fffdf9;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:14.5px}
 .msg{padding:10px 12px;border-radius:10px;font-size:13.5px;margin:8px 0}.msg.bad{background:var(--badb);color:var(--bad)}.msg.ok{background:var(--okb);color:var(--ok)}.msg.warn{background:var(--warnb);color:var(--warn)}
 .login{max-width:380px;margin:12vh auto 0;background:var(--card);border-radius:20px;padding:24px}
@@ -179,7 +179,7 @@ async function Orders(el){
       <div class="kpi"><small>Menunggu bayaran (24 jam)</small><b>${c.pending}</b></div><div class="kpi"><small>Bayaran diterima hari ini</small><b>${rm(c.paid_today_rm)}</b></div>`;
     $('#ol').innerHTML=j.rows.length?j.rows.map(o=>`<button class="ord" data-id="${o.id}">
       <div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">Hantar <b style="color:var(--ink)">${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</div>
-       ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}<div class="m">Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
+       ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}${(o.need||[]).map(t=>`<span class="pg" style="background:var(--warnb);color:var(--warn)">${h(t)}</span>`).join(' ')}<div class="m">Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
       <div class="r"><div class="t">${rm(o.total)}</div><div class="m">Order ${fmtDT(o.created_at)}</div></div></button>`).join('')
       :`<div class="empty">Tiada order${f==='today'?' untuk dihantar hari ini':''}.</div>`;
     document.querySelectorAll('.ord').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,load));
@@ -237,15 +237,21 @@ async function openOrder(id,reload){
      <input type="time" id="ntm" value="${h(o.del_time||'')}" aria-label="Masa khusus"><button class="btn sm" id="sd">Simpan</button></div>
      <p class="mini" style="margin:0">Caj tidak dikira semula. Kutip beza harga (jika ada) secara manual.</p></details></div>
    <div class="card"><h2>Isi hadiah</h2>
-    <div class="rowx"><span>Momen</span><span>${h(OCC_T()[o.occasion]||o.occasion)} · ${h(REL_T()[o.relation]||o.relation)} (${o.gender==='l'?'L':'P'}) · panggil "${h(o.call_name)}"</span></div>
+    ${o.created_by?'':`<div class="rowx"><span>Momen</span><span>${h(OCC_T()[o.occasion]||o.occasion)} · ${h(REL_T()[o.relation]||o.relation)} (${o.gender==='l'?'L':'P'}) · panggil "${h(o.call_name)}"</span></div>`}
     <div class="rowx"><span>Bouquet</span><span><b>${h(CAT.bq[o.bouquet]||o.bouquet)}</b></span></div>
-    <div class="rowx"><span>Balloon</span><span>${h(CAT.bal[o.balloon]||o.balloon)}</span></div>
+    <div class="rowx"><span>Balloon</span><span>${(PM.bal||{})[o.balloon]?.code?`<b>${h(PM.bal[o.balloon].code)}</b> - `:''}${h(CAT.bal[o.balloon]||o.balloon)}</span></div>
     <div class="rowx"><span>Kek</span><span>${h(cakeTxt)}</span></div>
     <div class="rowx"><span>Kek tambahan</span><span>${h(ext)}</span></div>
-    <div class="rowx"><span>Polaroid</span><span>${o.photos.length} gambar</span></div>
-    ${o.photos.length?`<div class="thumbs" style="margin:8px 0">${o.photos.map(n=>`<a href="${ph(n,1)}" title="Muat turun ${h(n)}"><img src="${ph(n)}" alt="Polaroid ${h(n)}" loading="lazy"></a>`).join('')}</div><p class="mini" style="margin:0">Tekan gambar untuk muat turun dan cetak.</p>`:''}
-    <h2 style="margin-top:14px">Wishcard</h2><div class="wishbox" id="wb">${h(o.wish)}${o.sender?`\n\n— ${h(o.sender)}`:''}</div>
-    <div class="bar" style="margin-bottom:0"><button class="btn ghost sm" id="cw">Salin ayat</button><button class="btn ghost sm" id="pw">Cetak kad</button></div></div>
+    <div class="rowx"><span>Polaroid</span><span>${o.photos.length} / ${+o.photo_count} gambar${o.photos.length<+o.photo_count?' <b style="color:var(--warn)">· belum cukup</b>':''}</span></div>
+    ${o.photos.length?`<div class="thumbs" style="margin:8px 0">${o.photos.map(n=>`<span class="tw"><a href="${ph(n,1)}" title="Muat turun ${h(n)}"><img src="${ph(n)}" alt="Polaroid ${h(n)}" loading="lazy"></a><button class="tx" data-pdel="${h(n)}" aria-label="Padam gambar ${h(n)}">×</button></span>`).join('')}</div><p class="mini" style="margin:0">Tekan gambar untuk muat turun dan cetak.</p>`:''}
+    ${o.photos.length<+o.photo_count?`<div class="bar" style="margin:8px 0 0"><input type="file" id="paf" accept="image/*" multiple aria-label="Pilih gambar polaroid"><button class="btn ghost sm" id="pau">Upload polaroid</button></div>`:''}
+    <h2 style="margin-top:14px">Wishcard</h2>
+    <div id="wv"><div class="wishbox" id="wb">${h(o.wish)}${o.sender?`\n\n— ${h(o.sender)}`:''}</div>
+    ${+o.wish_edits?`<p class="mini" style="margin:6px 0 0">Pembeli dah edit ${+o.wish_edits} / 3 kali melalui halaman semak.</p>`:''}
+    <div class="bar" style="margin-bottom:0"><button class="btn ghost sm" id="ew">Edit ayat</button><button class="btn ghost sm" id="cw">Salin ayat</button><button class="btn ghost sm" id="pw">Cetak kad</button></div></div>
+    <div id="we" hidden><textarea id="wt" rows="5" maxlength="320" style="width:100%" aria-label="Ayat wishcard">${h(o.wish==='(Ayat wishcard belum diterima)'?'':o.wish)}</textarea>
+    <label class="fl" style="margin-top:6px">Daripada<input id="ws" maxlength="60" value="${h(o.sender||'')}"></label>
+    <div class="bar" style="margin-bottom:0"><button class="btn sm" id="wsv">Simpan wishcard</button><button class="btn ghost sm" id="wcx">Batal</button></div></div></div>
    <div class="card"><h2>Pembeli</h2>
     <div class="rowx"><span>Nama</span><span>${h(o.b_name)}</span></div>
     <div class="rowx"><span>Sumber</span><span>${o.created_by?'WhatsApp, dimasukkan oleh '+h(o.created_by):'Laman web'}</span></div>
@@ -281,6 +287,10 @@ async function openOrder(id,reload){
   $('#sn').onclick=()=>done(api('update',{method:'POST',body:{id,notes:$('#nn').value}}),'Nota disimpan');
   $('#cw').onclick=()=>{navigator.clipboard.writeText($('#wb').innerText).then(()=>toast('Ayat disalin'),()=>toast('Tak dapat salin'))};
   $('#pw').onclick=()=>{const w=window.open('','_blank');w.document.write(`<!doctype html><title>Wishcard ${h(o.code)}</title><style>@page{size:A6;margin:12mm}body{font:15pt/1.6 Georgia,serif;color:#3b2732;white-space:pre-wrap;display:flex;align-items:center;min-height:90vh}</style><body>${$('#wb').innerHTML}<script>print()<\/script>`);w.document.close()};
+  $('#ew').onclick=()=>{$('#wv').hidden=true;$('#we').hidden=false;$('#wt').focus()};$('#wcx').onclick=()=>{$('#we').hidden=true;$('#wv').hidden=false};
+  $('#wsv').onclick=()=>done(api('wish',{method:'POST',body:{id,wish:$('#wt').value,sender:$('#ws').value}}),'Wishcard disimpan');
+  if($('#pau'))$('#pau').onclick=()=>{const fs=[...$('#paf').files];if(!fs.length)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fs.forEach(f=>fd.append('photo[]',f));done(api('padd',{method:'POST',body:fd}),'Polaroid dimuat naik')};
+  document.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=()=>{if(confirm('Padam gambar polaroid ni?'))done(api('pdel',{method:'POST',body:{id,f:b.dataset.pdel}}),'Gambar dipadam')});
   if($('#rpu'))$('#rpu').onclick=()=>{const f=$('#rpf').files[0];if(!f)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fd.append('file',f);done(api('rphoto',{method:'POST',body:fd}),'Gambar dimuat naik')};
 }
 

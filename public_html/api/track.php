@@ -41,9 +41,9 @@ json_out([
   'balloon' => ['id' => $o['balloon'], 'name' => $C['bal'][$o['balloon']] ?? $o['balloon']],
   'cake' => $o['cake'], 'cake_flavours' => json_decode((string)$o['cake_flavours'], true) ?: [], 'extra_cakes' => $extra,
   'photos' => json_decode((string)$o['photos'], true) ?: [], 'recipient_photo' => in_array($o['status'], ['sampai', 'selesai'], true) ? $o['recipient_photo'] : null,
-  'sender' => $o['sender'], 'total' => (float)$o['total'], 'b_name' => explode(' ', $o['b_name'])[0],
+  'sender' => $o['sender'], 'wish' => $o['wish'] === WISH_NONE ? '' : $o['wish'], 'photo_count' => (int)$o['photo_count'], 'edit' => buyer_edit($o), 'total' => (float)$o['total'], 'b_name' => explode(' ', $o['b_name'])[0],
   'payUrl' => ($o['pay_status'] !== 'paid' && $o['bill_code'] && $o['status'] !== 'batal') ? pay_url($o['bill_code']) : null,
-  'wa' => WA_MAIN,
+  'wa' => WA_MAIN, 'manual' => $o['created_by'] !== null,
   'bank' => ($o['pay_status'] !== 'paid' && $o['status'] !== 'batal' && !$o['bill_code'])
     ? ['text' => setting('bank_text', ''), 'qr' => bank_qr_path() !== null] : null,
 ]);

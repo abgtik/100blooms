@@ -70,7 +70,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 5) return;
+  if ($v >= 6) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -92,13 +92,15 @@ function migrate(PDO $pdo): void {
   $run('ALTER TABLE products ADD COLUMN price DECIMAL(8,2) NULL');
   $run('ALTER TABLE orders ADD COLUMN bq_note VARCHAR(100) NULL');
   $run("ALTER TABLE orders ADD COLUMN pay_mode VARCHAR(10) NOT NULL DEFAULT 'gateway'");
+  // v6: buyer edits the wishcard from the tracking page (limited)
+  $run('ALTER TABLE orders ADD COLUMN wish_edits INT NOT NULL DEFAULT 0');
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','5')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','6')");
 }
 function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare($sql); $s->execute($p); return $s; }
 function setting(string $k, $default = null) { $r = q('SELECT v FROM settings WHERE k=?', [$k])->fetchColumn(); return $r === false ? $default : $r; }
@@ -158,6 +160,42 @@ function progress_text(array $o): string {
   $items = prep_items($o); return 'Penyediaan ' . count(array_intersect_key(jdec($o['prep'] ?? null), $items)) . '/' . count($items);
 }
 
+// ---------- wishcard + polaroids sent in after the order (tracking page and admin) ----------
+const WISH_NONE = '(Ayat wishcard belum diterima)';
+const WISH_EDITS = 3; // edits the buyer gets after the first time the wish is written
+/** What the buyer may still change on the tracking page. Locked once the item is ticked in production or the order has left. */
+function buyer_edit(array $o): array {
+  $p = jdec($o['prep'] ?? null);
+  $gone = in_array($o['status'], ['batal', 'dalam_penghantaran', 'sampai', 'selesai'], true);
+  $first = $o['wish'] === WISH_NONE;
+  $left = $first ? WISH_EDITS : max(0, WISH_EDITS - (int)($o['wish_edits'] ?? 0));
+  $max = (int)$o['photo_count'];
+  return ['wish' => !$gone && !isset($p['wishcard']) && ($first || $left > 0), 'wish_first' => $first, 'wish_left' => $left,
+    'photo' => !$gone && $max > 0 && !isset($p['polaroid']), 'photo_max' => $max];
+}
+/** Adds uploaded polaroids to an order (never more than it paid for). Returns the new list. */
+function add_photos(array $o, array $files): array {
+  $have = jdec($o['photos']); $room = (int)$o['photo_count'] - count($have);
+  if ($room <= 0) fail('Semua ' . (int)$o['photo_count'] . ' gambar polaroid dah ada. Padam satu dulu untuk tukar.');
+  if (count($files) > $room) fail("Boleh tambah $room gambar lagi sahaja.");
+  $dir = UPLOAD_DIR . '/' . $o['code']; if (!is_dir($dir) && !mkdir($dir, 0755, true)) fail('Simpan gambar gagal.', 500);
+  foreach ($files as [$tmp, $ext]) {
+    $name = 'p-' . bin2hex(random_bytes(4)) . '.' . ($ext === 'jpeg' ? 'jpg' : $ext);
+    if (!move_uploaded_file($tmp, "$dir/$name")) fail('Simpan gambar gagal.', 500);
+    $have[] = $name;
+  }
+  q('UPDATE orders SET photos=? WHERE id=?', [json_encode($have), $o['id']]);
+  return $have;
+}
+function remove_photo(array $o, string $f): array {
+  $have = jdec($o['photos']); $f = basename($f);
+  if (!in_array($f, $have, true)) fail('Gambar tidak dijumpai.', 404);
+  $have = array_values(array_diff($have, [$f]));
+  @unlink(UPLOAD_DIR . '/' . $o['code'] . '/' . $f);
+  q('UPDATE orders SET photos=? WHERE id=?', [json_encode($have), $o['id']]);
+  return $have;
+}
+
 function bank_qr_path(): ?string { foreach (glob(UPLOAD_DIR . '/_site/bank-qr.*') ?: [] as $f) return $f; return null; }
 // ---------- product codes / retail prices (set in admin → Stok) ----------
 function product_meta(): array {
@@ -194,7 +232,7 @@ function invoice_text(array $o): string {
   $disc = round($sub + $fees - (float)$o['total'], 2);
   $delName = ['free' => 'Free Delivery (10am-6pm)', 'A' => 'Slot A (9am-12pm)', 'B' => 'Slot B (1pm-4pm)', 'C' => 'Slot C (5pm-8pm)', 'spec' => 'Masa khusus ' . $o['del_time']][$o['del_type']] ?? $delLabel;
   $date = date('l, j F Y', strtotime($o['del_date'])) . ' (' . ($o['del_type'] === 'spec' ? $o['del_time'] : (SLOT_EN[$o['del_type']] ?? '')) . ')';
-  $wish = $o['wish'] === '(Ayat wishcard belum diterima)' ? 'not receive yet' : $o['wish'] . ($o['sender'] ? "\n— " . $o['sender'] : '');
+  $wish = $o['wish'] === WISH_NONE ? 'not receive yet (boleh isi sendiri di Invoice Link bersama gambar polaroid)' : $o['wish'] . ($o['sender'] ? "\n— " . $o['sender'] : '');
   $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
   return "[ Invoice No: {$o['code']} ]\n\nHi, I want to order:\n\n" . implode("\n \n", $items) . " \n \nSubtotal: RM" . $f($sub)
     . "\n\nDelivery: $delName \nDelivery Fee: RM" . $f($fees) . ($extra ? "\n" . implode("\n", $extra) : '')
@@ -261,7 +299,7 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
     $in['occ'] = isset($C['occ'][$in['occ'] ?? '']) ? $in['occ'] : 'saja'; $in['rel'] = isset($C['rel'][$in['rel'] ?? '']) ? $in['rel'] : 'kawan';
     $in['gender'] = in_array($in['gender'] ?? '', ['l', 'p'], true) ? $in['gender'] : 'p';
     if (trim((string)($in['call'] ?? '')) === '') $in['call'] = mb_substr(trim((string)($in['rname'] ?? '')), 0, 24) ?: 'Penerima';
-    if (trim((string)($in['wish'] ?? '')) === '') $in['wish'] = '(Ayat wishcard belum diterima)';
+    if (trim((string)($in['wish'] ?? '')) === '') $in['wish'] = WISH_NONE;
     if (isset($opts['photo_count'])) $photoCount = max($photoCount, min(MAX_PHOTOS, (int)$opts['photo_count']));
   }
   $occ = (string)($in['occ'] ?? ''); $rel = (string)($in['rel'] ?? '');

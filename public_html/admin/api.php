@@ -69,8 +69,8 @@ case 'orders':
   $where = $W ? 'WHERE ' . implode(' AND ', $W) : '';
   $order = $f === 'pending' || $by === 'created_at' ? 'created_at DESC' : "del_date ASC, CASE del_type WHEN 'A' THEN 1 WHEN 'spec' THEN 2 WHEN 'free' THEN 3 WHEN 'B' THEN 4 ELSE 5 END, created_at";
   if ($f === 'all' || $f === 'delivered') $order = 'created_at DESC';
-  $rows = q("SELECT id,code,created_at,pay_status,status,bouquet,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
-  foreach ($rows as &$r) { $r['progress'] = progress_text($r); unset($r['price_lines'], $r['prep'], $r['del_steps']); } unset($r);
+  $rows = q("SELECT id,code,created_at,pay_status,status,bouquet,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher,wish,photos FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
+  foreach ($rows as &$r) { $r['progress'] = progress_text($r); $r['need'] = array_values(array_filter([$r['wish'] === WISH_NONE ? 'Wishcard belum' : null, count(jdec($r['photos'])) < (int)$r['photo_count'] ? 'Polaroid ' . count(jdec($r['photos'])) . '/' . (int)$r['photo_count'] : null])); unset($r['price_lines'], $r['prep'], $r['del_steps'], $r['wish'], $r['photos']); } unset($r);
   $t = date('Y-m-d');
   $counts = [
     'today' => (int)q("SELECT COUNT(*) FROM orders WHERE del_date=? AND pay_status='paid' AND status<>'batal'", [$t])->fetchColumn(),
@@ -172,6 +172,21 @@ case 'rphoto':
   if (!move_uploaded_file($f['tmp_name'], "$dir/$name")) fail('Simpan gambar gagal.', 500);
   q('UPDATE orders SET recipient_photo=?, updated_by=? WHERE id=?', [$name, $m['name'], $o['id']]);
   json_out(['ok' => true, 'name' => $name]);
+
+case 'wish': // staff write / correct the wishcard (no edit limit)
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
+  $wish = str_in($body['wish'] ?? '', 320); if ($wish === '') $wish = WISH_NONE;
+  q('UPDATE orders SET wish=?, sender=?, updated_by=? WHERE id=?', [$wish, str_in($body['sender'] ?? '', 60) ?: null, $m['name'], $o['id']]);
+  json_out(['ok' => true]);
+
+case 'padd': // staff add polaroids received on WhatsApp
+  $m = need_login(); $o = load_order((int)($_POST['id'] ?? 0));
+  $files = collect_photos(); if (!$files) fail('Pilih gambar dulu.');
+  json_out(['ok' => true, 'photos' => add_photos($o, $files)]);
+
+case 'pdel':
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
+  json_out(['ok' => true, 'photos' => remove_photo($o, (string)($body['f'] ?? ''))]);
 
 case 'products':
   need_login();

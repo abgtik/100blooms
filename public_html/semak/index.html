@@ -68,6 +68,11 @@ input:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(-
 .wc::before,.wc::after{content:"";position:absolute;border-radius:50%;background:var(--bg2);opacity:.6}
 .wc::before{width:120px;height:120px;right:-40px;top:-40px}.wc::after{width:90px;height:90px;left:-30px;bottom:-30px}
 .wc > *{position:relative;z-index:1}
+.pola{position:relative}.px{position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;border:0;background:var(--ink);color:#fff;font-size:17px;line-height:1;cursor:pointer}
+.up{margin-top:10px;background:var(--bg);border-radius:16px;padding:12px}
+.wish{white-space:pre-wrap;background:#fffdf9;border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-top:10px;font-size:15px;line-height:1.55}
+.wish .ws{display:block;margin-top:10px;color:var(--soft);font-size:14px}
+textarea{width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(--line);font:inherit;color:inherit;background:#fff;resize:vertical}
 .rp img{width:100%;border-radius:16px;display:block}
 .zoom{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px}.zoom img{max-width:100%;max-height:100%;border-radius:12px}
 .foot{text-align:center;font-size:13px;color:var(--soft);margin-top:18px}
@@ -118,8 +123,9 @@ function show(o){
   const cakeTxt=o.cake_flavours.length?'Pilihan: '+o.cake_flavours.join(' / '):o.cake;
   const ext=Object.entries(o.extra_cakes||{}).map(([k,n])=>`${k} × ${n}`).join(', ');
   const wa='https://wa.me/'+(o.wa||'601165862584')+'?text='+encodeURIComponent(`Hai 100 Blooms, saya nak tukar tarikh delivery untuk order ${o.code}.`);
+  const ed=o.edit||{};
   const delTxt=o.del_type==='spec'&&o.del_time?`Masa khusus ${o.del_time}`:o.del_label;
-  $('#main').innerHTML=`<p class="code">ORDER ${h(o.code)}</p><h1>Hadiah untuk ${h(o.call)}</h1><p class="sub">${h(o.occasion)} · dihantar kepada ${h(o.r_name)}</p>
+  $('#main').innerHTML=`<p class="code">ORDER ${h(o.code)}</p><h1>Hadiah untuk ${h(o.call)}</h1><p class="sub">${o.manual?'Dihantar kepada ':h(o.occasion)+' · dihantar kepada '}${h(o.r_name)}</p>
    ${o.status==='batal'?`<div class="msg bad" style="margin:0 0 14px">Order ini telah dibatalkan. WhatsApp kami jika ada pertanyaan.</div>`:''}
    ${!o.paid&&o.status!=='batal'?`<div class="card"><h2>Bayaran belum diterima</h2><p class="hint" style="margin:0">Order disimpan tapi kami belum terima bayaran. Hadiah hanya disiapkan selepas bayaran berjaya.</p>${o.payUrl?`<a class="btn" href="${h(o.payUrl)}">Bayar sekarang</a>`:''}${!o.payUrl&&o.bank?`<p class="hint" style="margin:12px 0 6px">Jumlah perlu dibayar: <b>RM${Number(o.total).toFixed(2)}</b></p>${o.bank.qr?`<img src="/api/bankqr.php" alt="QR bayaran 100 Blooms" style="display:block;max-width:240px;width:100%;margin:8px auto;border-radius:12px">`:''}${o.bank.text?`<p class="hint" style="white-space:pre-line;text-align:center">${h(o.bank.text)}</p>`:''}<a class="btn" target="_blank" rel="noopener" href="https://wa.me/${o.wa||'601165862584'}?text=${encodeURIComponent('Hai 100 Blooms, saya dah bayar untuk order '+o.code+'. Ini resit saya.')}">Hantar resit melalui WhatsApp</a>`:''}</div>`:''}
    ${o.status!=='batal'?`<section class="card" aria-labelledby="t1"><h2 id="t1">Status hadiah</h2>
@@ -133,12 +139,32 @@ function show(o){
      <div class="item"><div class="pic">${bal?`<img src="${img(bal)}" alt="Balloon ${h(o.balloon.name)}">`:''}</div><small>Balloon</small><b>${h(o.balloon.name)}</b></div>
      <div class="item" style="grid-column:1/-1"><div class="pic" style="aspect-ratio:3/2">${cake?`<img src="${img(cake)}" alt="Kek ${h(o.cake)}" style="object-fit:cover">`:'<span class="hint">Kek Secret Recipe</span>'}</div><small>Kek Secret Recipe</small><b>${h(cakeTxt)}</b>${ext?`<span class="x">+ ${h(ext)}</span>`:''}</div>
     </div>
-    ${o.photos.length?`<h2 style="margin-top:18px">Polaroid (${o.photos.length})</h2><div class="polas">${o.photos.map((f,i)=>`<div class="pola"><img src="${ph(f)}" alt="Polaroid ${i+1}" loading="lazy" data-z></div>`).join('')}</div>`:''}
-    <h2 style="margin-top:16px">Wishcard</h2>
-    <div class="wc" role="img" aria-label="Muka depan wishcard untuk ${h(o.call)}">${FLOWER}<span class="to">Untuk ${h(o.call)}</span>${o.sender?`<span class="from">daripada ${h(o.sender)}</span>`:''}</div>
-    <p class="hint" style="margin:8px 0 0">Isi ucapan kekal rahsia sampai kad dibuka 💌</p></section>
+    ${o.photo_count?`<h2 style="margin-top:18px">Polaroid (${o.photos.length}/${o.photo_count})</h2>
+     ${o.photos.length?`<div class="polas">${o.photos.map((f,i)=>`<div class="pola"><img src="${ph(f)}" alt="Polaroid ${i+1}" loading="lazy" data-z>${ed.photo?`<button class="px" data-pdel="${h(f)}" aria-label="Buang gambar ${i+1}">×</button>`:''}</div>`).join('')}</div>`:''}
+     ${ed.photo&&o.photos.length<o.photo_count?`<div class="up"><p class="hint" style="margin:0 0 8px">${o.photos.length?`Boleh tambah ${o.photo_count-o.photos.length} gambar lagi.`:`Belum ada gambar. Upload ${o.photo_count} gambar untuk dicetak jadi polaroid.`}</p>
+       <label class="btn ghost" style="margin:0" for="pf">📷 Pilih gambar</label><input id="pf" type="file" accept="image/*" multiple hidden><div id="pm"></div></div>`:''}
+     ${ed.photo&&o.photos.length?`<p class="hint" style="margin:6px 0 0">Tekan × untuk tukar gambar. Gambar dikunci selepas polaroid dicetak.</p>`:''}`:''}
+    <h2 style="margin-top:18px">Wishcard</h2>
+    <div class="wc" role="img" aria-label="Wishcard untuk ${h(o.call)}">${FLOWER}<span class="to">Untuk ${h(o.call)}</span>${o.sender?`<span class="from">daripada ${h(o.sender)}</span>`:''}</div>
+    <div id="wv">${o.wish?`<div class="wish">${h(o.wish)}${o.sender?`<span class="ws">— ${h(o.sender)}</span>`:''}</div>`:`<div class="msg warn">Ayat wishcard belum diisi. ${ed.wish?'Tulis di bawah supaya kami boleh siapkan kad.':''}</div>`}
+     ${ed.wish?`<button class="btn ${o.wish?'ghost':''}" id="we">${o.wish?'Edit wishcard':'Tulis wishcard'}</button><p class="hint" style="text-align:center;margin:8px 0 0">${ed.wish_first?'Selepas disimpan, awak boleh edit 3 kali lagi.':`Baki edit: ${ed.wish_left} kali.`}</p>`
+       :o.wish&&o.status!=='batal'?`<p class="hint" style="margin:8px 0 0">${ed.wish_left<=0?'Had edit wishcard dah habis.':'Wishcard dah ditulis oleh team kami.'} WhatsApp kami jika perlu ubah.</p>`:''}</div>
+    <form id="wf" hidden><label for="wt">Ayat wishcard</label><textarea id="wt" rows="6" maxlength="320">${h(o.wish)}</textarea><p class="hint" style="margin:4px 0 0;text-align:right"><span id="wn">0</span>/320</p>
+     <label for="wsd">Daripada</label><input id="wsd" maxlength="60" value="${h(o.sender||'')}" placeholder="Contoh: Abang Long">
+     <div id="wm"></div><button class="btn" id="wsv">Simpan wishcard</button><button class="btn ghost" type="button" id="wcx" style="margin-top:8px">Batal</button>
+     ${!ed.wish_first?`<p class="hint" style="text-align:center;margin:8px 0 0">Simpan akan guna 1 daripada ${ed.wish_left} baki edit.</p>`:''}</form></section>
    ${!['batal','selesai','sampai','dalam_penghantaran'].includes(o.status)?`<a class="btn ghost" href="${wa}" target="_blank" rel="noopener">Minta tukar tarikh delivery</a><p class="hint" style="text-align:center;margin:8px 0 0">Order yang dah dibayar tak boleh di-refund, tapi tarikh boleh ditukar.</p>`:''}
    <p class="foot"><a href="/semak/">Semak order lain</a> · <a href="https://wa.me/601165862584" target="_blank" rel="noopener">WhatsApp kami</a></p>`;
+  const post=async(body,isForm)=>{const r=await fetch('/api/edit.php',isForm?{method:'POST',body}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Tak dapat simpan. Cuba lagi.');return j};
+  const reload=async()=>{const r=await fetch('/api/track.php?c='+encodeURIComponent(o.code)+'&k='+encodeURIComponent(o.k));if(r.ok)show(await r.json())};
+  if($('#we')){$('#we').onclick=()=>{$('#wv').hidden=true;$('#wf').hidden=false;$('#wt').focus();$('#wn').textContent=$('#wt').value.length};
+    $('#wt').oninput=()=>{$('#wn').textContent=$('#wt').value.length};$('#wcx').onclick=()=>{$('#wf').hidden=true;$('#wv').hidden=false};
+    $('#wf').onsubmit=async e=>{e.preventDefault();$('#wsv').disabled=true;$('#wsv').textContent='Menyimpan…';
+      try{await post({c:o.code,k:o.k,a:'wish',wish:$('#wt').value,sender:$('#wsd').value});await reload()}catch(x){$('#wm').innerHTML=`<div class="msg bad" role="alert">${h(x.message)}</div>`;$('#wsv').disabled=false;$('#wsv').textContent='Simpan wishcard'}}}
+  if($('#pf'))$('#pf').onchange=async()=>{const fs=[...$('#pf').files];if(!fs.length)return;if(fs.length>o.photo_count-o.photos.length){$('#pm').innerHTML=`<div class="msg bad">Pilih ${o.photo_count-o.photos.length} gambar sahaja.</div>`;return}
+    const fd=new FormData();fd.append('c',o.code);fd.append('k',o.k);fd.append('a','photo_add');fs.forEach(f=>fd.append('photo[]',f));
+    $('#pm').innerHTML='<p class="hint" style="margin:8px 0 0">Memuat naik…</p>';try{await post(fd,true);await reload()}catch(x){$('#pm').innerHTML=`<div class="msg bad" role="alert">${h(x.message)}</div>`}};
+  document.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=async e=>{e.stopPropagation();if(!confirm('Buang gambar ni?'))return;try{await post({c:o.code,k:o.k,a:'photo_del',f:b.dataset.pdel});await reload()}catch(x){alert(x.message)}});
   document.querySelectorAll('[data-z]').forEach(i=>i.onclick=()=>{const z=document.createElement('div');z.className='zoom';z.innerHTML=`<img src="${i.src}" alt="">`;z.onclick=()=>z.remove();document.body.appendChild(z)});
 }
 
