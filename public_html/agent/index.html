@@ -234,11 +234,28 @@ function render(fresh){
 /* ---------- home ---------- */
 function Home(el,fresh){
   const j=ME,a=j.agent,m=j.money,need=Math.max(0,j.payout_min-m.due);
-  const share=`Nak hantar hadiah surprise? Combo Jimat RM128 dari 100 Blooms: bouquet, kek Secret Recipe, balloon, polaroid dan wishcard, delivery percuma. Order di sini: ${j.link}`;
+  const share=[
+    '🎁 *Nak hantar hadiah surprise?*',
+    '',
+    'Birthday, anniversary, nak pujuk, atau sekadar rindu. Biar 100 Blooms tolong sampaikan 💕',
+    '',
+    '*Combo Jimat RM128* dah lengkap:',
+    '💐 Bouquet pilihan',
+    '🍰 Sepotong kek Secret Recipe',
+    '🎈 Balloon',
+    '📸 Foto polaroid',
+    '💌 Wishcard dengan ucapan awak',
+    '',
+    '🚚 *Delivery PERCUMA* (10 pagi – 6 petang)',
+    '📷 Dapat gambar penerima masa hadiah sampai',
+    '⭐ 5.0 · 680+ ulasan Google',
+    '',
+    '👉 *Order di sini:*',
+    j.link].join('\n');
   el.innerHTML=`${fresh?`<div class="msg ok" style="margin:0 0 14px">Tahniah, awak dah jadi agent! Kongsi link di bawah untuk mula dapat komisen.</div>`:''}
    <h1>Hai, ${h(a.name.split(' ')[0])} 👋</h1><p class="sub">Agent no. <b>${a.id}</b> · komisen ${rm(j.rate)} setiap order dibayar</p>
    <section class="card"><h2>Link order awak</h2><div class="link"><span style="flex:1">${h(j.link.replace(/^https?:\/\//,''))}</span></div>
-    <div class="acts"><button class="btn sm" id="cp">Salin link</button><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(share)}">Kongsi di WhatsApp</a></div>
+    <div class="acts"><a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(share)}">Kongsi di WhatsApp</a><button class="btn ghost sm" id="cs">Salin ayat</button><button class="btn ghost sm" id="cp">Salin link</button></div>
     <p class="hint" style="margin:10px 0 0">Pelanggan yang order melalui link ni dalam 30 hari dikira sebagai order awak.</p></section>
    <section class="card"><div class="row2">
     <div class="stat hero"><small>Baki komisen</small><b>${rm(m.due)}</b></div>
@@ -249,6 +266,7 @@ function Home(el,fresh){
     ${!a.bank_acc&&!a.has_qr?`<div class="msg warn">Lengkapkan maklumat bank atau DuitNow QR di <a href="#" id="gp">Profil</a> supaya kami boleh bayar komisen.</div>`:''}
     <p class="hint" style="margin:12px 0 0">Komisen dibayar setiap Jumaat (10 pagi – 6 petang) bila baki ${rm(j.payout_min)} ke atas.</p></section>
    <section class="card"><h2>Terma agent</h2>${TERMS(j.rate,j.payout_min)}</section>`;
+  $('#cs').onclick=()=>navigator.clipboard.writeText(share).then(()=>toast('Ayat disalin. Tampal di status, IG atau TikTok'),()=>toast('Tak dapat salin'));
   $('#cp').onclick=()=>navigator.clipboard.writeText(j.link).then(()=>toast('Link disalin'),()=>toast('Tak dapat salin'));
   if($('#gp'))$('#gp').onclick=e=>{e.preventDefault();tab='me';render()};
 }
