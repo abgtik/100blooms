@@ -70,7 +70,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 7) return;
+  if ($v >= 8) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -96,13 +96,15 @@ function migrate(PDO $pdo): void {
   $run('ALTER TABLE orders ADD COLUMN wish_edits INT NOT NULL DEFAULT 0');
   // v7: agents, commissions, payouts
   foreach (agent_schema($my ? 'mysql' : 'sqlite') as $sql) $run($sql);
+  // v8: WhatsApp notifications already sent per order (no repeats)
+  $run('ALTER TABLE orders ADD COLUMN wa_log TEXT NULL');
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','7')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','8')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
@@ -272,6 +274,109 @@ function remove_photo(array $o, string $f): array {
   @unlink(UPLOAD_DIR . '/' . $o['code'] . '/' . $f);
   q('UPDATE orders SET photos=? WHERE id=?', [json_encode($have), $o['id']]);
   return $have;
+}
+
+function set_setting(string $k, ?string $v): void { q('DELETE FROM settings WHERE k=?', [$k]); if ($v !== null) q('INSERT INTO settings (k,v) VALUES (?,?)', [$k, $v]); }
+
+/** Everything that happens once an order becomes paid (gateway, sales confirmation or keyed in as paid). */
+function after_paid(int $id): void {
+  $o = q('SELECT * FROM orders WHERE id=?', [$id])->fetch(); if (!$o) return;
+  notify_paid($o);
+  sync_commissions();
+  wa_order($o, 'paid');
+}
+
+// ---------- WhatsApp notifications through Murpati (https://murpati.com/developers/api) ----------
+// Owner sets the API key, sending number and recipients in admin → Pengguna. Messages are queued and sent after the
+// page has answered, so a slow WhatsApp API never delays the customer, the payment webhook or the admin screen.
+const WA_TYPES = ['team_paid' => 'Team: order baru dibayar', 'buyer_paid' => 'Pembeli: bayaran diterima', 'buyer_otw' => 'Pembeli: hadiah dalam perjalanan',
+  'buyer_done' => 'Pembeli: hadiah dah sampai (dengan link gambar penerima)', 'agent_comm' => 'Agent: komisen baru', 'agent_payout' => 'Agent: komisen dibayar', 'agent_welcome' => 'Agent: selamat datang selepas daftar'];
+function wa_cfg(): array {
+  static $c = null; if ($c !== null) return $c;
+  $on = json_decode((string)setting('wa_on', ''), true);
+  return $c = ['key' => (string)setting('wa_key', ''), 'session' => (string)setting('wa_session', ''),
+    'team' => array_values(array_filter(array_map(fn($x) => wa_num($x), explode(',', (string)setting('wa_team', WA_MAIN))))),
+    'on' => is_array($on) ? $on : array_fill_keys(array_keys(WA_TYPES), true)];
+}
+function wa_num(string $p): string { $d = digits($p); if ($d === '') return ''; if (str_starts_with($d, '60')) return $d; return '60' . ltrim($d, '0'); }
+function wa_ready(string $type): bool { $c = wa_cfg(); return $c['key'] !== '' && $c['session'] !== '' && !empty($c['on'][$type]); }
+$GLOBALS['WA_Q'] = [];
+function wa_queue(string $to, string $msg): void {
+  $to = wa_num($to); if (strlen($to) < 10) return;
+  if (!$GLOBALS['WA_Q']) register_shutdown_function('wa_flush');
+  $GLOBALS['WA_Q'][] = [$to, $msg];
+}
+function wa_flush(): void {
+  $q = $GLOBALS['WA_Q']; $GLOBALS['WA_Q'] = []; if (!$q) return;
+  if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
+  foreach ($q as [$to, $msg]) { try { wa_send($to, $msg); } catch (Throwable $e) { error_log('100blooms wa: ' . $e->getMessage()); } }
+}
+/** Sends one text now. Throws on failure; records the latest result for the admin screen. */
+function wa_send(string $to, string $msg): array {
+  $c = wa_cfg(); if ($c['key'] === '' || $c['session'] === '') throw new RuntimeException('WhatsApp belum disediakan.');
+  [$code, $j, $raw] = wa_http('POST', '/v1/messages/send', ['session_id' => $c['session'], 'to' => wa_num($to), 'message' => $msg]);
+  $ok = $code < 400 && !empty($j['success']);
+  set_setting('wa_last', json_encode(['at' => date('Y-m-d H:i:s'), 'to' => substr(wa_num($to), 0, -4) . '****', 'ok' => $ok, 'error' => $ok ? null : ($j['error'] ?? "HTTP $code " . mb_substr($raw, 0, 120))], JSON_UNESCAPED_UNICODE));
+  if (!$ok) throw new RuntimeException('Murpati: ' . ($j['error'] ?? "HTTP $code"));
+  return $j;
+}
+function wa_http(string $method, string $path, ?array $body = null, ?string $key = null): array {
+  if (defined('WA_MOCK') && WA_MOCK) { file_put_contents(WA_MOCK, json_encode([$method, $path, $body], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND); return [200, ['success' => true, 'sessions' => [['session_id' => 'sess_test', 'phone_number' => '601165862584', 'pipeline' => 'unofficial', 'status' => 'connected']]], '']; }
+  $ch = curl_init('https://api.murpati.com' . $path);
+  $h = ['X-API-Key: ' . ($key ?? wa_cfg()['key']), 'Accept: application/json'];
+  $opt = [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15, CURLOPT_CONNECTTIMEOUT => 6];
+  if ($method === 'POST') { $h[] = 'Content-Type: application/json'; $opt[CURLOPT_POST] = true; $opt[CURLOPT_POSTFIELDS] = json_encode($body, JSON_UNESCAPED_UNICODE); }
+  $opt[CURLOPT_HTTPHEADER] = $h; curl_setopt_array($ch, $opt);
+  $r = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+  if ($r === false) throw new RuntimeException('Murpati tidak dapat dihubungi: ' . $err);
+  return [$code, json_decode((string)$r, true) ?: [], (string)$r];
+}
+/** Order events → WhatsApp. Each (order, event) is sent at most once. Never mentions the delivery provider. */
+function wa_order(array $o, string $event): void {
+  try {
+    $log = jdec($o['wa_log'] ?? null); $sent = [];
+    $C = catalog(); $M = product_meta();
+    $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
+    $first = explode(' ', trim($o['b_name']))[0];
+    $day = fmt_day($o['del_date']); $slot = $o['del_type'] === 'spec' ? 'Masa khusus ' . $o['del_time'] : (DELIVERY[$o['del_type']]['label'] ?? '');
+    $need = [];
+    if ($o['wish'] === WISH_NONE) $need[] = 'tulis ayat wishcard';
+    $miss = (int)$o['photo_count'] - count(jdec($o['photos'])); if ($miss > 0) $need[] = "upload $miss gambar polaroid";
+    $add = function (string $key, string $type, string $to, string $msg) use (&$log, &$sent) {
+      if (isset($log[$key]) || !wa_ready($type)) return;
+      wa_queue($to, $msg); $log[$key] = date('Y-m-d H:i:s'); $sent[] = $key;
+    };
+    if ($event === 'paid') {
+      $bal = $C['bal'][$o['balloon']] ?? $o['balloon']; $bc = $M['bal'][$o['balloon']]['code'] ?? '';
+      $ag = $o['agent_ref'] ? q('SELECT id,name,phone FROM agents WHERE id=?', [(int)$o['agent_ref']])->fetch() : null;
+      $team = "🛎️ *Order dibayar* · {$o['code']}\n💰 RM" . number_format((float)$o['total'], 2) . ' · ' . ($o['pay_channel'] ?: '-')
+        . "\n🚚 $day · $slot\n💐 " . ($C['bq'][$o['bouquet']] ?? $o['bouquet']) . ($o['bq_note'] ? " ({$o['bq_note']})" : '') . "\n🎈 " . ($bc ? "$bc - " : '') . $bal . "\n🍰 {$o['cake']}"
+        . "\n👤 Untuk {$o['r_name']} ({$o['r_post']})\n🧾 Pembeli {$o['b_name']} · " . wa_num($o['b_phone'])
+        . ($ag ? "\n🤝 Agent #{$ag['id']} {$ag['name']}" : '') . ($o['voucher'] ? "\n🎟️ Voucher {$o['voucher']}" : '')
+        . ($need ? "\n⚠️ Belum: " . implode(', ', $need) : '') . "\n\n" . SITE_URL . '/admin/';
+      foreach (wa_cfg()['team'] as $i => $t) $add("team$i", 'team_paid', $t, $team);
+      $add('buyer_paid', 'buyer_paid', $o['b_phone'], "Hai $first 🌸\n\nTerima kasih! Bayaran untuk order *{$o['code']}* (RM" . number_format((float)$o['total'], 2) . ") dah kami terima.\n\n"
+        . "💐 Hadiah untuk *{$o['r_name']}*\n🚚 $day · $slot\n\n"
+        . ($need ? '📝 Jangan lupa ' . implode(' dan ', $need) . " di link bawah ya, supaya kami boleh siapkan hadiah.\n\n" : '')
+        . "Semak status order:\n$track\n\n— 100 Blooms");
+      if ($ag) {
+        $c = q('SELECT amount FROM commissions WHERE order_id=?', [$o['id']])->fetchColumn();
+        if ($c !== false) { $due = agent_money((int)$ag['id'])['due'];
+          $add('agent_comm', 'agent_comm', $ag['phone'], "Tahniah {$ag['name']}! 🎉\n\nOrder *{$o['code']}* dari link awak dah dibayar.\n💰 Komisen: *RM" . number_format((float)$c, 2) . "*\n💼 Baki komisen: RM" . number_format($due, 2)
+            . "\n\nKomisen dibayar setiap Jumaat bila baki RM" . number_format(payout_min(), 0) . " ke atas.\n" . SITE_URL . '/agent/'); }
+      }
+    } elseif ($event === 'otw') {
+      $add('buyer_otw', 'buyer_otw', $o['b_phone'], "Hai $first 🚗\n\nHadiah untuk *{$o['r_name']}* sedang dalam perjalanan bersama runner kami 💐\n\nSemak status:\n$track\n\n— 100 Blooms");
+    } elseif ($event === 'delivered') {
+      $add('buyer_done', 'buyer_done', $o['b_phone'], "Hai $first 🎉\n\nHadiah untuk *{$o['r_name']}* dah selamat sampai! 🌸\n\nGambar penerima masa hadiah sampai boleh dilihat di sini:\n$track\n\nTerima kasih kerana memilih 100 Blooms 💕\n— 100 Blooms");
+    }
+    if ($sent) q('UPDATE orders SET wa_log=? WHERE id=?', [json_encode($log), $o['id']]);
+  } catch (Throwable $e) { error_log('100blooms wa_order: ' . $e->getMessage()); }
+}
+function wa_agent(array $ag, string $type, string $msg): void { if (wa_ready($type)) wa_queue($ag['phone'], $msg); }
+function fmt_day(string $ymd): string {
+  $t = strtotime($ymd); $D = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu']; $Mo = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogos', 'Sep', 'Okt', 'Nov', 'Dis'];
+  return $D[(int)date('w', $t)] . ', ' . date('j', $t) . ' ' . $Mo[(int)date('n', $t) - 1];
 }
 
 function bank_qr_path(): ?string { foreach (glob(UPLOAD_DIR . '/_site/bank-qr.*') ?: [] as $f) return $f; return null; }
@@ -621,7 +726,7 @@ function mark_paid(array $o, string $ref, string $channel, float $amount): bool 
   if (abs($amount - (float)$o['total']) > 0.009) { error_log("100blooms: amount mismatch for {$o['code']}: $amount vs {$o['total']}"); return false; }
   $n = q("UPDATE orders SET pay_status='paid', status='baru', paid_at=?, pay_ref=?, pay_channel=? WHERE id=? AND pay_status<>'paid'",
     [date('Y-m-d H:i:s'), mb_substr($ref, 0, 60), mb_substr($channel, 0, 30), $o['id']])->rowCount();
-  if ($n) { notify_paid($o); sync_commissions(); }
+  if ($n) after_paid((int)$o['id']);
   return $n > 0;
 }
 function notify_paid(array $o): void {

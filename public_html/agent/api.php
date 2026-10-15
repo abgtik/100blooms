@@ -76,6 +76,8 @@ case 'register':
   q("INSERT INTO agents ($cols) VALUES (" . implode(',', array_fill(0, count($vals), '?')) . ')', $vals);
   $id = (int)db()->lastInsertId() ?: (int)q('SELECT id FROM agents WHERE email=?', [$email])->fetchColumn();
   start_session($id);
+  wa_agent(['phone' => $phone], 'agent_welcome', "Selamat datang ke Program Agent 100 Blooms, $name! 🌸\n\nNo. agent awak: *$id*\nLink order awak:\n" . link_of($id)
+    . "\n\nKongsi link ni di WhatsApp, status, Instagram atau TikTok. Setiap order yang dibayar melalui link awak = komisen *RM" . number_format(agent_rate_default(), 0) . "* 💰\n\nDashboard agent: " . SITE_URL . '/agent/');
   json_out(['ok' => true, 'id' => $id]);
 
 case 'login':

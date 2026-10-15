@@ -110,7 +110,7 @@ a{color:var(--accent)}
 .opt2{display:flex;gap:8px;flex-wrap:wrap}.opt2 label{display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;font-size:14px;flex:1;min-width:200px}
 .opt2 label:has(input:checked){border-color:var(--accent);background:#fff5f7}
 @media print{body *{visibility:hidden}}
-.pwrap{position:relative;display:block;flex:1 1 160px;min-width:0}.pwrap input{width:100%;padding-right:46px!important}.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:none;color:var(--soft);cursor:pointer;display:grid;place-items:center;border-radius:10px;padding:0}.eye:hover{color:var(--ink)}.eye:focus-visible{outline:3px solid var(--accent);outline-offset:0}
+.pwrap{position:relative;display:block;min-width:0}.bar>.pwrap{flex:1 1 160px}.pwrap input{width:100%;padding-right:46px!important}.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:none;color:var(--soft);cursor:pointer;display:grid;place-items:center;border-radius:10px;padding:0}.eye:hover{color:var(--ink)}.eye:focus-visible{outline:3px solid var(--accent);outline-offset:0}
 </style>
 </head>
 <body>
@@ -583,6 +583,17 @@ async function Acc(el){
     <div class="bar"><input type="file" id="qrf" accept="image/jpeg,image/png" aria-label="Gambar QR"><button class="btn ghost sm" id="qru">Muat naik QR</button></div>
     <textarea id="bkt" rows="3" maxlength="300" placeholder="Contoh: Maybank 5123 4567 8901 (100 Blooms Enterprise)" aria-label="Maklumat akaun bank" style="width:100%">${h(ps.bank_text||'')}</textarea>
     <button class="btn sm" id="bks" style="margin-top:8px">Simpan maklumat akaun</button></div>`;}
+  if(ME.role==='owner'){const w=await api('waset');users+=`<div class="card" id="wac"><h2>Notifikasi WhatsApp (Murpati)</h2>
+    <p class="mini" style="margin-top:0">Mesej automatik kepada team, pembeli dan agent. API key dari Murpati → Settings (pelan Pro ke atas).</p>
+    <label class="fl">API key ${w.has_key?`<span class="mini">· disimpan (${h(w.key_hint)})</span>`:''}<input id="wak" type="password" autocomplete="off" placeholder="${w.has_key?'Biarkan kosong untuk kekalkan':'sk_...'}"></label>
+    <div class="bar" style="margin:8px 0"><button class="btn ghost sm" id="was">Simpan key &amp; cari nombor</button>${w.has_key?'<button class="btn ghost sm" id="wax">Buang key</button>':''}</div>
+    <label class="fl">Nombor yang menghantar<select id="wan"><option value="${h(w.session)}">${w.session?h(w.session):'Simpan key dulu, kemudian pilih nombor'}</option></select></label>
+    <label class="fl" style="margin-top:8px">Nombor team yang terima notifikasi order (pisah dengan koma)<input id="wat" value="${h(w.team)}" placeholder="601165862584, 60143467099"></label>
+    <div style="margin:10px 0 4px"><b class="mini" style="color:var(--ink)">Hantar mesej bila:</b></div>
+    ${Object.entries(w.types).map(([k,t])=>`<label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" data-wa="${k}" ${w.on[k]?'checked':''} style="width:auto"> ${h(t)}</label>`).join('')}
+    <button class="btn sm" id="wasv" style="margin-top:10px">Simpan tetapan</button>
+    <div class="bar" style="margin:14px 0 0"><input id="wtn" placeholder="No. untuk ujian, cth 0123456789" aria-label="Nombor ujian"><button class="btn ghost sm" id="wts">Hantar mesej ujian</button></div>
+    <p class="mini" id="wal" style="margin:8px 0 0">${w.last?`Mesej terakhir ${fmtDT(w.last.at)} ke ${h(w.last.to)}: ${w.last.ok?'<b style="color:var(--ok)">berjaya</b>':`<b style="color:var(--bad)">gagal</b> (${h(w.last.error||'')})`}`:'Belum ada mesej dihantar.'}</p></div>`;}
   if(ME.role==='owner')users+=`<div class="card"><h2>Notifikasi email</h2><p class="mini" style="margin-top:0">Hantar email ujian ke alamat NOTIFY_EMAIL dalam config.php.</p><button class="btn ghost sm" id="tm">Hantar email ujian</button> <span class="mini" id="tmr"></span></div>`;
   el.innerHTML=users+`<div class="card"><h2>Tukar password saya</h2><div class="bar"><input id="po" type="password" placeholder="Password lama" aria-label="Password lama" autocomplete="current-password"><input id="pn" type="password" placeholder="Password baru (min 8)" aria-label="Password baru" autocomplete="new-password"><button class="btn sm" id="pc">Tukar</button></div></div>`;
   if($('#ua'))$('#ua').onclick=async()=>{try{await api('adduser',{method:'POST',body:{name:$('#un').value,email:$('#ue').value,pw:$('#up').value,role:$('#ur').value}});toast('Pengguna ditambah');Acc(el)}catch(e){toast(e.message)}};
@@ -590,6 +601,16 @@ async function Acc(el){
   if($('#tm'))$('#tm').onclick=async()=>{$('#tmr').textContent='Menghantar…';try{const j=await api('testmail',{method:'POST'});$('#tmr').textContent=j.ok?`Server dah hantar ke ${j.to} (dari ${j.from}). Semak inbox dan spam.`:'Server gagal hantar email (fungsi mail() ditolak hosting).'}catch(e){$('#tmr').textContent=e.message}};
   if($('#qru'))$('#qru').onclick=async()=>{const f=$('#qrf').files[0];if(!f)return toast('Pilih gambar QR dulu');const fd=new FormData();fd.append('file',f);try{await api('qrup',{method:'POST',body:fd});const im=$('#qrp');im.src='../api/bankqr.php?t='+Date.now();im.style.display='block';toast('QR disimpan')}catch(e){toast(e.message)}};
   if($('#bks'))$('#bks').onclick=async()=>{try{await api('payset',{method:'POST',body:{bank_text:$('#bkt').value}});toast('Maklumat akaun disimpan')}catch(e){toast(e.message)}};
+  if($('#wac')){
+    const sess=async()=>{try{const r=await api('wasess');const cur=$('#wan').value;$('#wan').innerHTML=r.rows.length?r.rows.map(x=>`<option value="${h(x.id)}" ${x.id===cur?'selected':''}>${h(x.phone||x.id)}${x.name?' · '+h(x.name):''} · ${x.pipeline==='official'?'API rasmi':'peranti biasa'}${x.status?' · '+h(x.status):''}</option>`).join(''):'<option value="">Tiada nombor disambung dalam Murpati</option>'}catch(e){toast(e.message)}};
+    $('#was').onclick=async()=>{const k=$('#wak').value.trim();try{if(k)await api('waset',{method:'POST',body:{key:k}});$('#wak').value='';await sess();toast('Pilih nombor, kemudian Simpan tetapan')}catch(e){toast(e.message)}};
+    if($('#wax'))$('#wax').onclick=async()=>{if(!confirm('Buang API key? Notifikasi WhatsApp akan berhenti.'))return;await api('waset',{method:'POST',body:{clear_key:1}});Acc(el)};
+    $('#wasv').onclick=async()=>{const on={};el.querySelectorAll('[data-wa]').forEach(c=>on[c.dataset.wa]=c.checked);
+      try{await api('waset',{method:'POST',body:{session:$('#wan').value,team:$('#wat').value,on}});toast('Tetapan WhatsApp disimpan')}catch(e){toast(e.message)}};
+    $('#wts').onclick=async()=>{$('#wts').disabled=true;try{await api('watest',{method:'POST',body:{to:$('#wtn').value}});toast('Mesej ujian dihantar. Semak WhatsApp.')}catch(e){toast(e.message)}$('#wts').disabled=false;
+      const w=await api('waset');if(w.last)$('#wal').innerHTML=`Mesej terakhir ${fmtDT(w.last.at)} ke ${h(w.last.to)}: ${w.last.ok?'<b style="color:var(--ok)">berjaya</b>':`<b style="color:var(--bad)">gagal</b> (${h(w.last.error||'')})`}`};
+    if(/^sess_|^official:/.test($('#wan').value))sess();
+  }
   $('#pc').onclick=async()=>{try{await api('passwd',{method:'POST',body:{old:$('#po').value,new:$('#pn').value}});toast('Password ditukar');$('#po').value=$('#pn').value=''}catch(e){toast(e.message)}};
 }
 /* show / hide password: adds an eye button to every password field, including ones rendered later */

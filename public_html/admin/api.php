@@ -121,7 +121,8 @@ case 'update':
   $set[] = 'updated_by=?'; $P[] = $m['name']; $P[] = $o['id'];
   q('UPDATE orders SET ' . implode(',', $set) . ' WHERE id=?', $P);
   if (($body['status'] ?? '') !== 'batal') refresh_status($o['id']);
-  if (!empty($body['mark_paid']) || isset($body['status'])) sync_commissions(); // agent commission on payment; dropped if cancelled before payout
+  if (!empty($body['mark_paid']) && $o['pay_status'] !== 'paid') after_paid((int)$o['id']); // email, agent commission, WhatsApp
+  elseif (isset($body['status'])) sync_commissions(); // commission dropped if cancelled before payout
   json_out(['ok' => true]);
 
 case 'prep': // tick / untick a production checklist item
@@ -147,7 +148,9 @@ case 'dstep': // advance delivery by exactly one step
   $set = 'del_steps=?'; $P = [json_encode($d, JSON_UNESCAPED_UNICODE)];
   if ($step === 'booked' && isset($body['url'])) { $u = trim((string)$body['url']); if ($u !== '' && !preg_match('#^https://#i', $u)) fail('Link mesti bermula dengan https://'); $set .= ', lalamove_url=?'; $P[] = mb_substr($u, 0, 300) ?: null; }
   q("UPDATE orders SET $set, updated_by=? WHERE id=?", [...$P, $m['name'], $o['id']]);
-  json_out(['ok' => true, 'status' => refresh_status($o['id'])['status']]);
+  $fresh = refresh_status($o['id']);
+  if ($step === 'picked') wa_order($fresh, 'otw'); elseif ($step === 'delivered') wa_order($fresh, 'delivered');
+  json_out(['ok' => true, 'status' => $fresh['status']]);
 
 case 'dundo': // undo the last delivery step
   $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
@@ -246,6 +249,8 @@ case 'payout': // owner: record that the agent's whole unpaid balance has been t
     q('UPDATE commissions SET payout_id=? WHERE payout_id IS NULL AND id IN (' . implode(',', array_map('intval', array_column($cs, 'id'))) . ')', [$pid]);
     $pdo->commit();
   } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+  if ($ag = q('SELECT * FROM agents WHERE id=?', [$id])->fetch())
+    wa_agent($ag, 'agent_payout', "Hai {$ag['name']} 💸\n\nKomisen *RM" . number_format($due, 2) . "* dah dibayar ke akaun awak.\nRujukan: $ref\n\nTerima kasih kerana bersama 100 Blooms! Teruskan kongsi link awak 🌸\n" . SITE_URL . '/agent/');
   json_out(['ok' => true, 'amount' => $due]);
 
 case 'showcase': // owner: recipient photos for the agent sign-up page
@@ -262,6 +267,34 @@ case 'showpic':
   need_login(); $f = basename((string)($_GET['f'] ?? ''));
   if (!in_array($f, showcase_files(), true)) { http_response_code(404); exit; }
   header('Content-Type: image/jpeg'); header('Cache-Control: private, max-age=600'); readfile(UPLOAD_DIR . '/_site/' . $f); exit;
+
+case 'waset': // owner: WhatsApp (Murpati) settings; the API key is never sent back in full
+  need_owner();
+  if ($post) {
+    if (isset($body['key']) && trim((string)$body['key']) !== '') set_setting('wa_key', trim((string)$body['key']));
+    if (!empty($body['clear_key'])) { set_setting('wa_key', null); set_setting('wa_session', null); }
+    if (isset($body['session'])) set_setting('wa_session', preg_replace('/[^A-Za-z0-9_:.-]/', '', (string)$body['session']) ?: null);
+    if (isset($body['team'])) set_setting('wa_team', implode(',', array_filter(array_map('wa_num', explode(',', (string)$body['team'])))));
+    if (isset($body['on']) && is_array($body['on'])) set_setting('wa_on', json_encode(array_map(fn($k) => !empty($body['on'][$k]), array_combine(array_keys(WA_TYPES), array_keys(WA_TYPES)))));
+    json_out(['ok' => true]);
+  }
+  $k = (string)setting('wa_key', ''); $c = wa_cfg();
+  json_out(['has_key' => $k !== '', 'key_hint' => $k !== '' ? substr($k, 0, 3) . '…' . substr($k, -4) : '', 'session' => $c['session'], 'team' => implode(', ', $c['team']),
+    'on' => $c['on'], 'types' => WA_TYPES, 'last' => json_decode((string)setting('wa_last', ''), true)]);
+
+case 'wasess': // owner: numbers connected in Murpati, to pick the sending number
+  need_owner(); $key = (string)setting('wa_key', ''); if ($key === '') fail('Simpan API key dulu.');
+  [$code, $j, $raw] = wa_http('GET', '/v1/sessions', null, $key);
+  if ($code >= 400) fail('Murpati: ' . ($j['error'] ?? "HTTP $code"));
+  $list = $j['sessions'] ?? $j['data'] ?? (array_is_list($j) ? $j : []);
+  json_out(['rows' => array_values(array_map(fn($x) => ['id' => $x['session_id'] ?? $x['id'] ?? '', 'phone' => $x['phone_number'] ?? $x['phone'] ?? '', 'pipeline' => $x['pipeline'] ?? $x['type'] ?? '',
+    'status' => $x['status'] ?? '', 'name' => $x['name'] ?? $x['label'] ?? ''], array_filter((array)$list, 'is_array')))]);
+
+case 'watest': // owner: send a test message now
+  need_owner(); $to = wa_num((string)($body['to'] ?? '')); if (strlen($to) < 10) fail('Isi nombor WhatsApp yang sah.');
+  try { wa_send($to, "✅ Ujian notifikasi 100 Blooms.\nKalau awak terima mesej ni, notifikasi WhatsApp dah berfungsi."); }
+  catch (Throwable $e) { fail($e->getMessage(), 502); }
+  json_out(['ok' => true]);
 
 case 'agset': // owner: default commission + minimum payout
   need_owner();
@@ -430,7 +463,7 @@ case 'manual': // sales team keys in an order taken on WhatsApp
   } catch (Throwable $e) { error_log('100blooms manual: ' . $e->getMessage()); fail('Order tak dapat disimpan. Cuba lagi.', 500); }
   $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
   $inv = invoice_text($o);
-  if ($mode === 'paid') { notify_paid($o); sync_commissions(); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => true, 'track_url' => $track, 'invoice' => $inv]); }
+  if ($mode === 'paid') { after_paid((int)$o['id']); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => true, 'track_url' => $track, 'invoice' => $inv]); }
   if ($mode === 'invoice') json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'mode' => 'invoice', 'track_url' => $track, 'invoice' => $inv, 'has_qr' => bank_qr_path() !== null]);
   try { [$bill, $url] = pay_create($o); q('UPDATE orders SET bill_code=? WHERE id=?', [$bill, $o['id']]); }
   catch (Throwable $e) { error_log('100blooms manual bill: ' . $e->getMessage()); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'payUrl' => null, 'track_url' => $track, 'warn' => 'Order disimpan tapi link bayaran gagal dicipta: ' . mb_substr($e->getMessage(), 0, 150)]); }
