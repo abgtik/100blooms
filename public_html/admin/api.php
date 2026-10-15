@@ -560,7 +560,22 @@ case 'calendar':
     WHERE $col>=? AND $col<=? AND status<>'batal' ORDER BY $col", [$by === 'del' ? $lo : "$lo 00:00:00", $by === 'del' ? $hi : "$hi 23:59:59"])->fetchAll();
   $days = [];
   foreach ($rows as $r) { $d = substr($by === 'del' ? $r['del_date'] : $r['created_at'], 0, 10); $days[$d][] = $r; }
+  try { // Orderla orders (history, and anything still being taken there): by delivery date when known, else order date
+    $lc = $by === 'del' ? 'COALESCE(del_date, DATE(created_at))' : 'DATE(created_at)';
+    foreach (q("SELECT id, code_id, invoice_no, created_at, del_date, status, pay_status, total, name, receiver, items FROM legacy_orders
+        WHERE $lc BETWEEN ? AND ? AND (status IS NULL OR status<>'cancelled') ORDER BY created_at", [$lo, $hi])->fetchAll() as $r) {
+      $d = $by === 'del' ? ($r['del_date'] ?: substr($r['created_at'], 0, 10)) : substr($r['created_at'], 0, 10);
+      $days[$d][] = ['src' => 'orderla', 'lid' => (int)$r['id'], 'code' => $r['invoice_no'] ?: $r['code_id'], 'pay_status' => $r['pay_status'] === 'paid' ? 'paid' : 'pending',
+        'ol_status' => $r['status'], 'no_del' => !$r['del_date'], 'r_name' => $r['receiver'] ?: '-', 'b_name' => $r['name'], 'items' => $r['items'], 'total' => (float)$r['total']];
+    }
+  } catch (Throwable $e) {}
   json_out(['m' => $m, 'by' => $by, 'days' => $days]);
+
+case 'legacy': // one Orderla order, read-only
+  need_login();
+  $r = q('SELECT * FROM legacy_orders WHERE id=?', [(int)($_GET['id'] ?? 0)])->fetch(); if (!$r) fail('Order tidak dijumpai.', 404);
+  unset($r['raw']); $r['extra'] = json_decode((string)$r['extra'], true) ?: [];
+  json_out(['order' => $r]);
 
 case 'quote': // live price preview for the manual order form
   need_login();
