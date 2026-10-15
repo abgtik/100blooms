@@ -71,7 +71,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 9) return;
+  if ($v >= 10) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -102,13 +102,15 @@ function migrate(PDO $pdo): void {
   // v9: media library for agents (posters, product & customer photos, reviews, ready captions)
   $run("CREATE TABLE IF NOT EXISTS media (id " . ($my ? 'INT UNSIGNED AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT') . ", cat VARCHAR(12) NOT NULL, title VARCHAR(100) NOT NULL, caption TEXT NULL, file VARCHAR(160) NULL, active TINYINT NOT NULL DEFAULT 1, sort INT NOT NULL DEFAULT 0, created_at DATETIME NOT NULL)$tail");
   if ($v < 9) media_seed($pdo);
+  // v10: the agents' "Produk" tab becomes "Iklan" — ready-made ad posters replace the plain bouquet photos (hidden, not deleted)
+  if ($v < 10) media_ads($pdo);
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','9')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','10')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
@@ -245,7 +247,7 @@ function save_jpeg(string $tmp, string $dest, int $max = 900, int $q = 82): void
 }
 
 // ---------- media library for agents ----------
-const MEDIA_CATS = ['poster' => 'Poster', 'produk' => 'Produk', 'pelanggan' => 'Pelanggan sebenar', 'ulasan' => 'Ulasan', 'caption' => 'Caption'];
+const MEDIA_CATS = ['poster' => 'Poster', 'produk' => 'Iklan', 'pelanggan' => 'Pelanggan sebenar', 'ulasan' => 'Ulasan', 'caption' => 'Caption'];
 /** Starter content so the agent Media tab is useful on day one (uses images already in the app). Captions use {link} for the agent's own link. */
 function media_seed(PDO $pdo): void {
   if ((int)$pdo->query('SELECT COUNT(*) FROM media')->fetchColumn() > 0) return;
@@ -267,6 +269,25 @@ function media_seed(PDO $pdo): void {
     $st->execute(['pelanggan', 'Penerima ' . ucfirst(strtok(basename($f), '-')), "🌸 Senyuman macam ni yang buat kami semangat setiap hari.\n\nNak bagi kejutan yang sama pada orang tersayang?$tail", 'asset:assets/img/bouquet/' . basename($f), $i++, $now]);
   foreach (glob(__DIR__ . '/../assets/img/testi/*.webp') ?: [] as $f)
     $st->execute(['ulasan', 'Ulasan Google', "⭐ *5.0 · 680+ ulasan Google*\n\nTerima kasih semua yang percayakan 100 Blooms untuk sampaikan rasa sayang 💕$tail", 'asset:assets/img/testi/' . basename($f), $i++, $now]);
+}
+/** Ad posters for agents (no phone numbers on them; the caption carries the agent's own {link}). Hides the old plain bouquet photos — the owner can switch them back on in Admin → Media. */
+function media_ads(PDO $pdo): void {
+  $pdo->exec("UPDATE media SET active=0 WHERE cat='produk' AND file LIKE 'asset:assets/img/bouquet/%'");
+  $tail = "\n\n*Combo Jimat RM128* · 🚚 Delivery PERCUMA (10 pagi – 6 petang)\n\n👉 Order di sini:\n{link}";
+  $ads = [
+    ['glam-rossa', 'Iklan Glam & Rossa', "🌹 *Satu set hadiah lengkap, terus ke pintu dia.*\n\nPilih Glam atau Rossa, siap dengan sepotong kek Secret Recipe, balloon, polaroid dan wishcard.\n📷 Gambar penerima diambil sebagai kenangan.$tail"],
+    ['tak-dapat-datang', 'Iklan Tak dapat datang', "📍 *Tak dapat datang? Biar kami yang sampaikan.*\n\nBirthday, anniversary atau nak minta maaf — dia dapat hadiah di depan pintu, awak dapat gambar senyuman dia.$tail"],
+    ['semua-item', 'Iklan Semua 5 item', "🎁 *Buka satu kotak, dapat lima kejutan.*\n\n💐 Bouquet · 🍰 Sepotong kek Secret Recipe · 🎈 Balloon · 📸 Polaroid · 💌 Wishcard$tail"],
+    ['hampir-terlupa', 'Iklan Hampir terlupa', "😳 *Alamak, esok birthday dia!*\n\nTak sempat cari hadiah? Satu tempahan, kami siapkan set lengkap dan hantar terus ke pintu dia.$tail"],
+  ];
+  $has = $pdo->prepare('SELECT COUNT(*) FROM media WHERE file=?');
+  $st = $pdo->prepare('INSERT INTO media (cat,title,caption,file,active,sort,created_at) VALUES (?,?,?,?,1,?,?)'); $now = date('Y-m-d H:i:s');
+  foreach ($ads as $i => [$k, $t, $c]) {
+    $f = "asset:assets/img/iklan/$k.webp";
+    if (!is_file(__DIR__ . "/../assets/img/iklan/$k.webp")) continue;
+    $has->execute([$f]); if ((int)$has->fetchColumn() > 0) continue;
+    $st->execute(['produk', $t, $c, $f, $i, $now]);
+  }
 }
 function media_path(string $file): ?string {
   if (str_starts_with($file, 'asset:')) { $p = realpath(__DIR__ . '/../' . substr($file, 6)); $root = realpath(__DIR__ . '/../assets'); return $p && $root && str_starts_with($p, $root) ? $p : null; }
