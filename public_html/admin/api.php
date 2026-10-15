@@ -334,6 +334,67 @@ case 'tgset':
   if ($u !== '' && !preg_match('#^https://t\.me/[A-Za-z0-9_+/-]+$#', $u)) fail('Link mesti bermula dengan https://t.me/');
   set_setting('tg_link', $u ?: null); json_out(['ok' => true]);
 
+case 'olset': // owner: Orderla API credentials (orderla.my/admin/manage-api); the token is never sent back
+  need_owner();
+  if ($post) {
+    if (!empty($body['clear'])) { set_setting('ol_token', null); json_out(['ok' => true]); }
+    $e = strtolower(trim((string)($body['email'] ?? ''))); if (!filter_var($e, FILTER_VALIDATE_EMAIL)) fail('Email tidak sah.');
+    set_setting('ol_email', $e); if (trim((string)($body['token'] ?? '')) !== '') set_setting('ol_token', trim((string)$body['token']));
+    json_out(['ok' => true]);
+  }
+  $agg = q('SELECT COUNT(*) n, MIN(created_at) a, MAX(created_at) b, COALESCE(SUM(CASE WHEN ' . OL_PAID . ' THEN total END),0) s FROM legacy_orders')->fetch();
+  json_out(['email' => (string)setting('ol_email', ''), 'has_token' => (string)setting('ol_token', '') !== '', 'count' => (int)$agg['n'], 'first' => $agg['a'], 'last' => $agg['b'], 'sales' => (float)$agg['s'],
+    'synced' => setting('ol_synced')]);
+
+case 'oltest': // fetch the last 30 days and report what fields Orderla sends (names only, no customer data)
+  need_owner();
+  try { $j = orderla_get('/orders', ['start_date' => date('Y-m-d', strtotime('-30 days')), 'end_date' => date('Y-m-d')]); } catch (Throwable $e) { fail($e->getMessage(), 502); }
+  $orders = (array)($j['orders'] ?? []); $keys = []; $extra = []; $guess = ['date' => 0, 'receiver' => 0];
+  foreach ($orders as $o) { foreach (array_keys((array)$o) as $k) $keys[$k] = 1; $x = ol_extra((array)$o); foreach (array_keys($x) as $k) $extra[$k] = ($extra[$k] ?? 0) + 1;
+    [$d, $r] = ol_guess($x, (string)($o['notes'] ?? '')); if ($d) $guess['date']++; if ($r) $guess['receiver']++; }
+  arsort($extra);
+  json_out(['count' => count($orders), 'msg' => $j['msg'] ?? null, 'keys' => array_keys($keys), 'extra' => array_slice($extra, 0, 60, true), 'guess' => $guess]);
+
+case 'olimport': // one month per call (the page loops 2021-01 → now, so no request runs too long)
+  need_owner(); @set_time_limit(120);
+  $m = (string)($body['m'] ?? ''); if (!preg_match('/^\d{4}-\d{2}$/', $m)) fail('Bulan tidak sah.');
+  try { $j = orderla_get('/orders', ['start_date' => "$m-01", 'end_date' => date('Y-m-t', strtotime("$m-01"))]); } catch (Throwable $e) { fail($e->getMessage(), 502); }
+  $c = ['new' => 0, 'updated' => 0, 'skip' => 0];
+  foreach ((array)($j['orders'] ?? []) as $o) $c[ol_upsert((array)$o)]++;
+  set_setting('ol_synced', date('Y-m-d H:i:s'));
+  json_out(['ok' => true, 'm' => $m] + $c);
+
+case 'customers': // everyone who has paid, across the new system and Orderla history, grouped by WhatsApp number
+  need_login();
+  $agg = [];
+  $add = function (?string $ph, string $name, string $at, float $tot, string $src) use (&$agg) {
+    $k = wa_num((string)$ph); if (strlen($k) < 10) return;
+    $a = &$agg[$k]; $a = ($a ?? ['phone' => $k, 'name' => $name, 'n' => 0, 'rm' => 0.0, 'first' => $at, 'last' => $at, 'src' => []]);
+    $a['n']++; $a['rm'] += $tot; if ($at < $a['first']) $a['first'] = $at; if ($at >= $a['last']) { $a['last'] = $at; if ($name !== '') $a['name'] = $name; } $a['src'][$src] = 1;
+  };
+  foreach (q("SELECT b_phone, b_name, COALESCE(paid_at, created_at) t, total FROM orders WHERE pay_status='paid' AND status<>'batal'")->fetchAll() as $r) $add($r['b_phone'], (string)$r['b_name'], $r['t'], (float)$r['total'], 'baru');
+  foreach (q('SELECT phone, name, created_at, total FROM legacy_orders WHERE ' . OL_PAID)->fetchAll() as $r) $add($r['phone'], (string)$r['name'], $r['created_at'], (float)$r['total'], 'orderla');
+  $rows = array_values($agg); foreach ($rows as &$r) { $r['rm'] = round($r['rm'], 2); $r['src'] = array_keys($r['src']); } unset($r);
+  $sort = (string)($_GET['sort'] ?? 'last');
+  usort($rows, fn($a, $b) => $sort === 'rm' ? $b['rm'] <=> $a['rm'] : ($sort === 'n' ? $b['n'] <=> $a['n'] : strcmp($b['last'], $a['last'])));
+  if (($_GET['csv'] ?? '') === '1') {
+    header('Content-Type: text/csv; charset=utf-8'); header('Content-Disposition: attachment; filename="100blooms-pelanggan-' . date('Ymd') . '.csv"');
+    $out = fopen('php://output', 'w'); fwrite($out, "\xEF\xBB\xBF"); fputcsv($out, ['Nama', 'WhatsApp', 'Bil. order', 'Jumlah RM', 'Order pertama', 'Order terakhir', 'Sumber']);
+    foreach ($rows as $r) fputcsv($out, [$r['name'], $r['phone'], $r['n'], $r['rm'], substr($r['first'], 0, 10), substr($r['last'], 0, 10), implode('+', $r['src'])]); fclose($out); exit;
+  }
+  json_out(['rows' => $rows, 'total' => count($rows)]);
+
+case 'lastyear': // gifts sent around this week in past years: a ready reason to message the buyer again
+  need_login();
+  $out = [];
+  foreach ([1, 2, 3, 4, 5] as $y) {
+    $a = date('Y-m-d', strtotime("-$y year -1 day")); $b = date('Y-m-d', strtotime("-$y year +7 days"));
+    foreach (q('SELECT code_id code, name, phone, receiver, items, COALESCE(del_date, DATE(created_at)) d FROM legacy_orders WHERE ' . OL_PAID . ' AND COALESCE(del_date, DATE(created_at)) BETWEEN ? AND ? ORDER BY d', [$a, $b])->fetchAll() as $r) $out[] = $r + ['years' => $y, 'src' => 'orderla'];
+    foreach (q("SELECT code, b_name name, b_phone phone, r_name receiver, bouquet items, del_date d FROM orders WHERE pay_status='paid' AND status<>'batal' AND del_date BETWEEN ? AND ? ORDER BY del_date", [$a, $b])->fetchAll() as $r) $out[] = $r + ['years' => $y, 'src' => 'baru'];
+  }
+  foreach ($out as &$r) $r['phone'] = wa_num((string)$r['phone']); unset($r);
+  json_out(['rows' => array_slice($out, 0, 80)]);
+
 case 'agset': // owner: default commission + minimum payout
   need_owner();
   $rate = max(0, min(500, (float)($body['rate'] ?? AGENT_RATE))); $min = max(0, min(5000, (float)($body['payout_min'] ?? PAYOUT_MIN)));
@@ -416,7 +477,9 @@ case 'dash': // ?by=paid (tarikh bayar) | created (tarikh order). Sales = paid, 
   need_login();
   $col = ($_GET['by'] ?? 'paid') === 'created' ? 'created_at' : 'paid_at';
   $now = time(); $t = date('Y-m-d', $now); $m0 = date('Y-m-01', $now);
-  $rows = q("SELECT $col AS d, total FROM orders WHERE pay_status='paid' AND status<>'batal' AND $col>=?", [date('Y-m-01', strtotime('-23 months', strtotime($m0))) . ' 00:00:00'])->fetchAll();
+  $since = date('Y-m-01', strtotime('-23 months', strtotime($m0))) . ' 00:00:00';
+  $rows = q("SELECT $col AS d, total FROM orders WHERE pay_status='paid' AND status<>'batal' AND $col>=?", [$since])->fetchAll();
+  try { $rows = array_merge($rows, q('SELECT created_at AS d, total FROM legacy_orders WHERE ' . OL_PAID . ' AND created_at>=?', [$since])->fetchAll()); } catch (Throwable $e) {} // Orderla history
   $pts = array_map(fn($r) => [strtotime($r['d']), (float)$r['total']], $rows);
   $sum = function (int $from, int $to) use ($pts) { $n = 0; $s = 0.0; foreach ($pts as [$ts, $v]) if ($ts >= $from && $ts <= $to) { $n++; $s += $v; } return ['n' => $n, 's' => round($s, 2)]; };
   $cmp = fn(int $a, int $b, int $pa, int $pb) => $sum($a, $b) + ['prev' => $sum($pa, $pb)];

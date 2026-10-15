@@ -222,14 +222,14 @@ async function boot(){
   try{const j=await api('me');ME=j.user;CSRF=j.csrf;if(j.pmeta)PM=j.pmeta;if(j.status_label)Object.assign(ST,j.status_label);GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
 }
 function render(){
-  const T=[['dash','Dashboard'],['orders','Order'],['new','＋ Order'],['cal','Kalendar'],['report','Report'],['vouch','Voucher'],['agent','Agent'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
+  const T=[['dash','Dashboard'],['orders','Order'],['new','＋ Order'],['cal','Kalendar'],['report','Report'],['vouch','Voucher'],['agent','Agent'],['cust','Pelanggan'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
   $('#app').innerHTML=`<header><h1>100 Blooms Admin</h1><div class="solatw" id="solw"></div><div class="hr"><div class="skin"><button id="skb" aria-label="Tukar tema" aria-haspopup="true" aria-expanded="false" title="Tukar tema">🎨</button></div><div class="who">${h(ME.name)}<br>${ME.role==='owner'?'Owner':'Staff'} · <a href="#" id="lo">Log keluar</a></div></div></header>
    <nav class="tabs" aria-label="Menu">${T.map(([k,t])=>`<button class="tab" data-t="${k}" aria-pressed="${tab===k}">${t}</button>`).join('')}</nav><main id="main"></main>`;
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
   $('#skb').onclick=e=>{e.stopPropagation();skinMenu()};
   solatInit();
   $('#lo').onclick=async e=>{e.preventDefault();await api('logout',{method:'POST'}).catch(()=>{});ME=null;login()};
-  ({dash:Dash,new:NewOrder,cal:Cal,report:Report,orders:Orders,vouch:Vouchers,agent:Agents,stock:Stock,dates:Dates,acc:Acc})[tab]($('#main'));
+  ({dash:Dash,new:NewOrder,cal:Cal,report:Report,orders:Orders,vouch:Vouchers,agent:Agents,cust:Customers,stock:Stock,dates:Dates,acc:Acc})[tab]($('#main'));
 }
 
 /* ---------- orders ---------- */
@@ -634,6 +634,33 @@ async function Agents(el){
     try{await api('showcase',{method:'POST',body:fd});toast('Gambar dimuat naik');$('#scf').value='';scLoad()}catch(e){toast(e.message)}$('#scu').disabled=false};
   if($('#gs'))$('#gs').onclick=async()=>{try{await api('agset',{method:'POST',body:{rate:$('#gr').value,payout_min:$('#gm').value}});toast('Tetapan disimpan');Agents(el)}catch(e){toast(e.message)}};
 }
+/* ---------- customers (new system + Orderla history) ---------- */
+let cu={q:'',sort:'last',lim:100};
+const fuMsg=r=>{const first=(r.name||'').split(' ')[0]||'';const when=r.years>1?`${r.years} tahun lepas`:'Tahun lepas';
+  return `Hai ${first} 🌸\n\n${when}, pada minggu yang sama, awak hantar hadiah${r.receiver?` kepada ${r.receiver}`:''} melalui 100 Blooms. Semoga senyuman hari tu masih diingat 😊\n\nNak buat kejutan lagi tahun ni? Combo Jimat RM128, lengkap dengan bouquet, sepotong kek, balloon, polaroid dan wishcard. Delivery PERCUMA (10 pagi – 6 petang).\n\n👉 ${ME.site||location.origin}\n\n— 100 Blooms`};
+async function Customers(el){
+  el.innerHTML='<div class="empty">Memuatkan…</div>';
+  let j,ly;try{[j,ly]=await Promise.all([api('customers',{params:{sort:cu.sort}}),api('lastyear')])}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  const wa=(p,t)=>`https://wa.me/${p}${t?'?text='+encodeURIComponent(t):''}`;
+  const draw=()=>{const t=cu.q.toLowerCase(),rows=j.rows.filter(r=>!t||(r.name||'').toLowerCase().includes(t)||r.phone.includes(t.replace(/\D/g,'')||'#'));
+    $('#cul').innerHTML=rows.slice(0,cu.lim).map(r=>`<div class="rowx"><span><b style="color:var(--ink)">${h(r.name||'-')}</b> ${r.src.includes('orderla')?'<span class="pill" style="background:var(--infob);color:var(--info)">Orderla</span>':''}<br>
+      <span class="mini">${r.n} order · ${rm(r.rm)} · terakhir ${new Date(r.last.slice(0,10)+'T00:00').toLocaleDateString('ms-MY',{day:'numeric',month:'short',year:'numeric'})}${r.n>1?` · pertama ${r.first.slice(0,4)}`:''}</span></span><span><a class="btn ghost sm" href="${wa(r.phone)}" target="_blank" rel="noopener">WhatsApp</a></span></div>`).join('')
+      +(rows.length>cu.lim?`<button class="btn ghost sm" id="cum" style="margin-top:10px">Tunjuk lagi (${rows.length-cu.lim})</button>`:'')||'<p class="mini">Tiada pelanggan.</p>';
+    if($('#cum'))$('#cum').onclick=()=>{cu.lim+=200;draw()};$('#cuc').textContent=rows.length.toLocaleString()};
+  const tot=j.rows.reduce((a,r)=>a+r.rm,0),rep=j.rows.filter(r=>r.n>1).length;
+  el.innerHTML=`<div class="kpis"><div class="kpi"><small>Pelanggan (pernah bayar)</small><b>${j.total.toLocaleString()}</b></div><div class="kpi"><small>Pelanggan ulang beli</small><b>${rep.toLocaleString()}</b><div class="mini">${j.total?Math.round(rep/j.total*100):0}% daripada semua</div></div><div class="kpi"><small>Jumlah jualan sepanjang masa</small><b>${rm(Math.round(tot))}</b></div></div>
+   <div class="card"><h2>🎁 Minggu ni, tahun-tahun lepas</h2><p class="mini" style="margin-top:0">Pelanggan yang hantar hadiah sekitar minggu ni pada tahun lepas (kemungkinan birthday atau anniversary yang sama). Tekan WhatsApp untuk hantar ayat follow-up yang dah siap.</p>
+    ${ly.rows.length?ly.rows.map(r=>`<div class="rowx"><span><b style="color:var(--ink)">${h(r.name||'-')}</b>${r.receiver?` → ${h(r.receiver)}`:''}<br><span class="mini">${fmtD(r.d)} ${r.years>1?`(${r.years} tahun lepas)`:'(tahun lepas)'} · ${h((r.items||'').slice(0,70))}</span></span>
+      <span>${r.phone?`<a class="btn sm" href="${wa(r.phone,fuMsg(r))}" target="_blank" rel="noopener">WhatsApp</a>`:''}</span></div>`).join(''):'<p class="mini">Tiada order pada minggu yang sama tahun-tahun lepas. (Import data Orderla di tab Pengguna untuk isi bahagian ni.)</p>'}</div>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">Senarai pelanggan <span class="mini">(<span id="cuc"></span>)</span></h2>
+     <div class="bar" style="margin:0"><div class="seg" role="group" aria-label="Susun ikut">${[['last','Terkini'],['rm','Paling banyak belanja'],['n','Paling kerap']].map(([k,t])=>`<button data-cs="${k}" aria-pressed="${cu.sort===k}">${t}</button>`).join('')}</div>
+     <a class="btn ghost sm" href="api.php?a=customers&csv=1&sort=${cu.sort}">Muat turun CSV</a></div></div>
+    <input type="search" id="cuq" value="${h(cu.q)}" placeholder="Cari nama atau nombor" aria-label="Cari pelanggan" style="margin:10px 0 4px;width:100%">
+    <div id="cul"></div></div>`;
+  draw();
+  $('#cuq').oninput=e=>{cu.q=e.target.value;cu.lim=100;draw()};
+  el.querySelectorAll('[data-cs]').forEach(b=>b.onclick=()=>{cu.sort=b.dataset.cs;Customers(el)});
+}
 async function Vouchers(el){
   el.innerHTML='<div class="empty">Memuatkan…</div>';
   let j;try{j=await api('vouchers')}catch(e){el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
@@ -707,6 +734,13 @@ async function Acc(el){
     <button class="btn sm" id="wasv" style="margin-top:10px">Simpan tetapan</button>
     <div class="bar" style="margin:14px 0 0"><input id="wtn" placeholder="No. untuk ujian, cth 0123456789" aria-label="Nombor ujian"><button class="btn ghost sm" id="wts">Hantar mesej ujian</button></div>
     <p class="mini" id="wal" style="margin:8px 0 0">${w.last?`Mesej terakhir ${fmtDT(w.last.at)} ke ${h(w.last.to)}: ${w.last.ok?'<b style="color:var(--ok)">berjaya</b>':`<b style="color:var(--bad)">gagal</b> (${h(w.last.error||'')})`}`:'Belum ada mesej dihantar.'}</p></div>`;}
+  if(ME.role==='owner'){const o=await api('olset');users+=`<div class="card" id="olc"><h2>Import data dari Orderla</h2>
+    <p class="mini" style="margin-top:0">Tarik semua order lama dari Orderla (2021 hingga sekarang) ke sistem ni. Data lama disimpan berasingan: tiada WhatsApp dihantar, tiada komisen, dan order semasa tak terusik. Order yang sama tak akan masuk dua kali.</p>
+    ${o.count?`<div class="msg ok" style="margin:0 0 10px">${o.count.toLocaleString()} order Orderla dalam sistem (${o.first.slice(0,7)} – ${o.last.slice(0,7)}), jualan dibayar ${rm(o.sales)}.${o.synced?` Sync terakhir ${fmtDT(o.synced)}.`:''}</div>`:''}
+    <div class="bar" style="margin:0"><input id="ole" type="email" value="${h(o.email)}" placeholder="X-User-Email" aria-label="Email Orderla" style="flex:1"><input id="olt" type="password" placeholder="${o.has_token?'Token disimpan (biar kosong)':'X-User-Token'}" aria-label="Token Orderla" autocomplete="off" style="flex:1"><button class="btn ghost sm" id="ols">Simpan</button></div>
+    <p class="mini" style="margin:6px 0 0">Dapatkan di orderla.my → Manage API (pelan PRO). Token disimpan di server sahaja.</p>
+    <div class="bar" style="margin:10px 0 0"><button class="btn ghost sm" id="olx">Uji sambungan</button><button class="btn sm" id="oli">Import semua (2021 – sekarang)</button><button class="btn ghost sm" id="olr">Sync 2 bulan terakhir</button></div>
+    <div id="olo"></div></div>`;}
   if(ME.role==='owner')users+=`<div class="card"><h2>Notifikasi email</h2><p class="mini" style="margin-top:0">Hantar email ujian ke alamat NOTIFY_EMAIL dalam config.php.</p><button class="btn ghost sm" id="tm">Hantar email ujian</button> <span class="mini" id="tmr"></span></div>`;
   el.innerHTML=users+`<div class="card"><h2>Tukar password saya</h2><div class="bar"><input id="po" type="password" placeholder="Password lama" aria-label="Password lama" autocomplete="current-password"><input id="pn" type="password" placeholder="Password baru (min 8)" aria-label="Password baru" autocomplete="new-password"><button class="btn sm" id="pc">Tukar</button></div></div>`;
   if($('#ua'))$('#ua').onclick=async()=>{try{await api('adduser',{method:'POST',body:{name:$('#un').value,email:$('#ue').value,pw:$('#up').value,role:$('#ur').value}});toast('Pengguna ditambah');Acc(el)}catch(e){toast(e.message)}};
@@ -723,6 +757,20 @@ async function Acc(el){
     $('#wts').onclick=async()=>{$('#wts').disabled=true;try{await api('watest',{method:'POST',body:{to:$('#wtn').value}});toast('Mesej ujian dihantar. Semak WhatsApp.')}catch(e){toast(e.message)}$('#wts').disabled=false;
       const w=await api('waset');if(w.last)$('#wal').innerHTML=`Mesej terakhir ${fmtDT(w.last.at)} ke ${h(w.last.to)}: ${w.last.ok?'<b style="color:var(--ok)">berjaya</b>':`<b style="color:var(--bad)">gagal</b> (${h(w.last.error||'')})`}`};
     if(/^sess_|^official:/.test($('#wan').value))sess();
+  }
+  if($('#olc')){
+    const out=t=>$('#olo').innerHTML=t;
+    $('#ols').onclick=async()=>{try{await api('olset',{method:'POST',body:{email:$('#ole').value,token:$('#olt').value}});$('#olt').value='';toast('Disimpan');Acc(el)}catch(e){toast(e.message)}};
+    $('#olx').onclick=async()=>{out('<p class="mini">Menghubungi Orderla…</p>');try{const r=await api('oltest');
+      out(`<div class="msg ok">Sambungan berjaya. ${r.count} order dalam 30 hari lepas.</div><p class="mini" style="margin:8px 0 4px"><b>Medan tambahan dijumpai</b> (nama sahaja): ${Object.entries(r.extra).map(([k,n])=>`${h(k)} <span style="opacity:.6">(${n})</span>`).join(' · ')||'tiada'}</p>
+        <p class="mini" style="margin:0">Tarikh hantar dikenal pasti dalam ${r.guess.date}/${r.count} order · nama penerima dalam ${r.guess.receiver}/${r.count} order. Kalau angka ni rendah, screenshot kotak ni dan hantar kepada Claude untuk dihalusi.</p>`)}catch(e){out(`<div class="msg bad">${h(e.message)}</div>`)}};
+    const run=async months=>{const btns=['#oli','#olr','#olx'].map(x=>$(x));btns.forEach(b=>b.disabled=true);let tot={new:0,updated:0},i=0;
+      for(const m of months){i++;out(`<p class="mini">Mengimport ${m} (${i}/${months.length})… ${tot.new} baru, ${tot.updated} dikemas kini</p><div style="height:8px;background:var(--bg);border-radius:9px;overflow:hidden"><div style="height:100%;width:${Math.round(i/months.length*100)}%;background:var(--accent)"></div></div>`);
+        try{const r=await api('olimport',{method:'POST',body:{m}});tot.new+=r.new;tot.updated+=r.updated}catch(e){out(`<div class="msg bad">Berhenti di ${m}: ${h(e.message)}. Tekan Import semula untuk sambung (data yang dah masuk tak berganda).</div>`);btns.forEach(b=>b.disabled=false);return}}
+      btns.forEach(b=>b.disabled=false);toast('Import selesai');out(`<div class="msg ok">Selesai: ${tot.new} order baru, ${tot.updated} dikemas kini. Lihat tab Pelanggan dan Dashboard.</div>`)};
+    const monthsFrom=(y,m)=>{const a=[],n=new Date();for(let d=new Date(y,m-1,1);d<=n;d.setMonth(d.getMonth()+1))a.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));return a};
+    $('#oli').onclick=()=>{if(confirm('Import semua order Orderla dari Januari 2021? Proses ni ambil beberapa minit. Jangan tutup halaman.'))run(monthsFrom(2021,1))};
+    $('#olr').onclick=()=>{const n=new Date(),p=new Date(n.getFullYear(),n.getMonth()-1,1);run(monthsFrom(p.getFullYear(),p.getMonth()+1))};
   }
   $('#pc').onclick=async()=>{try{await api('passwd',{method:'POST',body:{old:$('#po').value,new:$('#pn').value}});toast('Password ditukar');$('#po').value=$('#pn').value=''}catch(e){toast(e.message)}};
 }

@@ -71,7 +71,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 10) return;
+  if ($v >= 11) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -104,13 +104,15 @@ function migrate(PDO $pdo): void {
   if ($v < 9) media_seed($pdo);
   // v10: the agents' "Produk" tab becomes "Iklan" — ready-made ad posters replace the plain bouquet photos (hidden, not deleted)
   if ($v < 10) media_ads($pdo);
+  // v11: orders imported from Orderla (2021 onwards), kept apart from live orders
+  $run(legacy_schema($my));
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','10')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','11')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
@@ -300,6 +302,86 @@ function media_serve(array $m, bool $download = false): void {
   if ($download) header('Content-Disposition: attachment; filename="100blooms-' . preg_replace('/[^a-z0-9]+/', '-', strtolower($m['title'])) . '-' . $m['id'] . '.' . explode('/', $mime)[1] . '"');
   readfile($p); exit;
 }
+
+// ---------- Orderla import (https://guides.orderla.my/orderla-pro/orderla.my-api) ----------
+function legacy_schema(bool $my): string {
+  $id = $my ? 'INT UNSIGNED AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'; $big = $my ? 'MEDIUMTEXT' : 'TEXT';
+  $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
+  return "CREATE TABLE IF NOT EXISTS legacy_orders (id $id, src VARCHAR(12) NOT NULL DEFAULT 'orderla', code_id VARCHAR(60) NOT NULL UNIQUE, invoice_no VARCHAR(40) NULL,
+    created_at DATETIME NOT NULL, status VARCHAR(20) NULL, pay_status VARCHAR(20) NULL, total DECIMAL(10,2) NOT NULL DEFAULT 0,
+    name VARCHAR(150) NULL, phone VARCHAR(30) NULL, email VARCHAR(150) NULL, address VARCHAR(500) NULL, postcode VARCHAR(10) NULL,
+    items TEXT NULL, del_date DATE NULL, receiver VARCHAR(150) NULL, extra TEXT NULL, raw $big NULL, imported_at DATETIME NOT NULL)$tail";
+}
+/** GET from the Orderla user API with the owner's saved credentials. */
+function orderla_get(string $path, array $q = []): array {
+  $email = (string)setting('ol_email', ''); $token = (string)setting('ol_token', '');
+  if ($email === '' || $token === '') throw new RuntimeException('Simpan email dan token Orderla dulu.');
+  if (defined('OL_MOCK') && OL_MOCK) { $j = json_decode((string)file_get_contents(OL_MOCK), true); return $j ?: []; }
+  $ch = curl_init('https://orderla.my/api/app/user' . $path . ($q ? '?' . http_build_query($q) : ''));
+  curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 60, CURLOPT_CONNECTTIMEOUT => 10,
+    CURLOPT_HTTPHEADER => ['X-User-Email: ' . $email, 'X-User-Token: ' . $token, 'Accept: application/json']]);
+  $r = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+  if ($r === false) throw new RuntimeException('Orderla tidak dapat dihubungi: ' . $err);
+  if ($code === 401 || $code === 403) throw new RuntimeException('Orderla menolak email/token (HTTP ' . $code . '). Semak di orderla.my/admin/manage-api.');
+  $j = json_decode((string)$r, true);
+  if ($code >= 400 || !is_array($j)) throw new RuntimeException('Orderla HTTP ' . $code . ': ' . mb_substr(strip_tags((string)$r), 0, 160));
+  return $j;
+}
+/** Collects label → value pairs from fields the public API docs don't describe (custom questions, booking date & slot...). */
+function ol_extra(array $o): array {
+  $known = array_flip(['form_id','code_id','user_id','to_user_sale_person_id','by_merchant_id','invoice_no','subtotal','delivery_fee','tax_percent','tax','rounding_adjustment','discount','total',
+    'payment_status','paid_with','payment_method','status','notes','seller_notes','has_deducted_inventory','name','email','phone_no','country_code','unit_no','address','postcode','weight','form_title','created_at','updated_at','order_list']);
+  $out = [];
+  $walk = function ($v, string $path) use (&$walk, &$out) {
+    if (is_array($v)) {
+      $lab = $v['label'] ?? $v['question'] ?? $v['title'] ?? $v['field_name'] ?? $v['name'] ?? null;
+      $val = $v['value'] ?? $v['answer'] ?? $v['response'] ?? null;
+      if (is_string($lab) && (is_scalar($val) && $val !== '')) { $out[mb_substr($lab, 0, 80)] = mb_substr((string)$val, 0, 500); return; }
+      foreach ($v as $k => $x) $walk($x, $path === '' ? (string)$k : "$path.$k");
+    } elseif (is_scalar($v) && $v !== '' && $v !== null && !is_bool($v)) $out[$path] = mb_substr((string)$v, 0, 500);
+  };
+  foreach ($o as $k => $v) if (!isset($known[$k])) $walk($v, (string)$k);
+  $dt = $o['additional_charges']['delivery_type']['name'] ?? null; if ($dt) $out['Delivery'] = (string)$dt;
+  return $out;
+}
+/** Best guesses from the extra fields: delivery date and receiver name. */
+function ol_guess(array $extra, string $notes): array {
+  $date = null; $recv = null;
+  foreach ($extra as $k => $v) {
+    $lk = strtolower($k);
+    if (!$recv && preg_match('/receiver|recipient|penerima/', $lk) && (preg_match('/name|nama/', $lk) || preg_match('/^(receiver|recipient|penerima)$/', $lk))) $recv = $v;
+    if (!$date && preg_match('/date|tarikh|slot|booking|appointment|delivery/', $lk)) {
+      if (preg_match('/(\d{4}-\d{2}-\d{2})/', $v, $m)) $date = $m[1];
+      elseif (preg_match('/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/', $v, $m) && ($t = strtotime($m[1]))) $date = date('Y-m-d', $t);
+      elseif (preg_match('#(\d{1,2})/(\d{1,2})/(\d{4})#', $v, $m)) $date = sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+    }
+  }
+  if (!$recv && preg_match('/Receiver Name:\s*\n?\s*([^\n]+)/i', $notes, $m)) $recv = trim($m[1]);
+  if (!$date && preg_match('/Date & Time Slot:\s*\n?\s*[A-Za-z]+,\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})/i', $notes, $m) && ($t = strtotime($m[1]))) $date = date('Y-m-d', $t);
+  return [$date, $recv ? mb_substr($recv, 0, 150) : null];
+}
+/** Insert or refresh one Orderla order. Returns 'new' | 'updated' | 'skip'. */
+function ol_upsert(array $o): string {
+  $code = (string)($o['code_id'] ?? ''); if ($code === '') return 'skip';
+  $items = implode('; ', array_map(function ($it) {
+    $v = ''; if (!empty($it['variants']) && is_array($it['variants'])) $v = ' (' . implode(', ', array_filter(array_map(fn($x) => is_array($x) ? ($x['name'] ?? $x['value'] ?? '') : (string)$x, $it['variants']))) . ')';
+    return ((int)($it['quantity'] ?? 1)) . 'x ' . ($it['name'] ?? '?') . $v;
+  }, (array)($o['order_list'] ?? [])));
+  $extra = ol_extra($o); [$del, $recv] = ol_guess($extra, (string)($o['notes'] ?? '') . "\n" . (string)($o['seller_notes'] ?? ''));
+  $phone = trim((string)($o['country_code'] ?? '') . (string)($o['phone_no'] ?? ''));
+  $row = ['invoice_no' => mb_substr((string)($o['invoice_no'] ?? ''), 0, 40), 'created_at' => date('Y-m-d H:i:s', strtotime((string)($o['created_at'] ?? 'now')) ?: time()),
+    'status' => mb_substr((string)($o['status'] ?? ''), 0, 20), 'pay_status' => mb_substr((string)($o['payment_status'] ?? ''), 0, 20), 'total' => (float)($o['total'] ?? 0),
+    'name' => mb_substr((string)($o['name'] ?? ''), 0, 150), 'phone' => $phone !== '' ? wa_num($phone) : null, 'email' => mb_substr((string)($o['email'] ?? ''), 0, 150),
+    'address' => mb_substr(trim(($o['unit_no'] ?? '') . ' ' . ($o['address'] ?? '')), 0, 500), 'postcode' => mb_substr((string)($o['postcode'] ?? ''), 0, 10),
+    'items' => mb_substr($items, 0, 3000), 'del_date' => $del, 'receiver' => $recv, 'extra' => json_encode($extra, JSON_UNESCAPED_UNICODE), 'raw' => json_encode($o, JSON_UNESCAPED_UNICODE), 'imported_at' => date('Y-m-d H:i:s')];
+  $have = q('SELECT id FROM legacy_orders WHERE code_id=?', [$code])->fetchColumn();
+  if ($have) { q('UPDATE legacy_orders SET ' . implode(',', array_map(fn($k) => "$k=?", array_keys($row))) . ' WHERE id=?', [...array_values($row), $have]); return 'updated'; }
+  $row = ['src' => 'orderla', 'code_id' => $code] + $row;
+  q('INSERT INTO legacy_orders (' . implode(',', array_keys($row)) . ') VALUES (' . implode(',', array_fill(0, count($row), '?')) . ')', array_values($row));
+  return 'new';
+}
+/** Orderla rows that count as sales. */
+const OL_PAID = "pay_status='paid' AND (status IS NULL OR status<>'cancelled')";
 
 // ---------- wishcard + polaroids sent in after the order (tracking page and admin) ----------
 const WISH_NONE = '(Ayat wishcard belum diterima)';
