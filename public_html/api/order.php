@@ -7,19 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') fail('POST sahaja.', 405);
 $in = json_decode((string)($_POST['data'] ?? ''), true);
 if (!is_array($in)) fail('Data order tidak lengkap. Muat semula halaman dan cuba lagi.');
 
-// collect + verify uploaded photos before touching the database
-$files = [];
-if (!empty($_FILES['photo']['name']) && is_array($_FILES['photo']['name'])) {
-  foreach ($_FILES['photo']['name'] as $i => $_) {
-    $err = $_FILES['photo']['error'][$i]; if ($err === UPLOAD_ERR_NO_FILE) continue;
-    if ($err !== UPLOAD_ERR_OK) fail('Satu gambar gagal dimuat naik (saiz terlalu besar?). Cuba gambar lain.');
-    $tmp = $_FILES['photo']['tmp_name'][$i];
-    if ($_FILES['photo']['size'][$i] > 8 * 1024 * 1024) fail('Setiap gambar mesti bawah 8MB.');
-    $info = @getimagesize($tmp);
-    if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) fail('Fail gambar tidak sah. Guna JPG atau PNG.');
-    $files[] = [$tmp, image_type_to_extension($info[2], false)];
-  }
-}
+$files = collect_photos(); // verified before touching the database
 
 try {
   $r = build_order($in, count($files));
@@ -36,17 +24,7 @@ try {
     $o['total'] = 1; $o['notes'] = 'ORDER UJIAN RM1. Jangan hantar.';
   }
 
-  // photos → uploads/<code>/
-  $saved = [];
-  if ($files) {
-    $dir = UPLOAD_DIR . '/' . $o['code'];
-    if (!is_dir($dir) && !mkdir($dir, 0755, true)) throw new RuntimeException('Tak dapat cipta folder uploads');
-    foreach ($files as $i => [$tmp, $ext]) {
-      $name = 'p' . ($i + 1) . '.' . ($ext === 'jpeg' ? 'jpg' : $ext);
-      if (!move_uploaded_file($tmp, "$dir/$name") && !rename($tmp, "$dir/$name")) throw new RuntimeException('Simpan gambar gagal');
-      $saved[] = $name;
-    }
-  }
+  $saved = save_photos($o['code'], $files);
   $o['photos'] = json_encode($saved);
 
   $cols = array_keys($o);

@@ -70,7 +70,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 3) return;
+  if ($v >= 4) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -85,13 +85,15 @@ function migrate(PDO $pdo): void {
   $run('ALTER TABLE orders ADD COLUMN prep TEXT NULL');
   $run('ALTER TABLE orders ADD COLUMN del_steps TEXT NULL');
   $run('ALTER TABLE orders ADD COLUMN lalamove_url VARCHAR(300) NULL');
+  // v4: who keyed in the order (null = customer via website)
+  $run('ALTER TABLE orders ADD COLUMN created_by VARCHAR(100) NULL');
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','3')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','4')");
 }
 function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare($sql); $s->execute($p); return $s; }
 function setting(string $k, $default = null) { $r = q('SELECT v FROM settings WHERE k=?', [$k])->fetchColumn(); return $r === false ? $default : $r; }
@@ -199,7 +201,9 @@ function voucher_apply(array $L, array $v, int $photoCount, float $setSubtotal) 
 }
 
 // ---------- order validation + pricing (authoritative; the app only previews) ----------
-function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null): array {
+/** $opts (admin only): override → skip stock, closing-time, closed-date and zone checks; adjust → [amount, label] extra price line. */
+function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null, array $opts = []): array {
+  $ov = !empty($opts['override']);
   $now = $now ?? new DateTimeImmutable('now');
   $C = catalog(); $off = off_items(); $E = [];
   $occ = (string)($in['occ'] ?? ''); $rel = (string)($in['rel'] ?? '');
@@ -209,11 +213,11 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null)
   if ($gender === '') $E[] = 'Jantina penerima belum dipilih.';
   $call = str_in($in['call'] ?? '', 24); if ($call === '') $E[] = 'Panggilan belum diisi.';
 
-  $bq = (string)($in['bq'] ?? ''); if (!isset($C['bq'][$bq]) || in_array($bq, $off['bq'], true)) $E[] = 'Bouquet tidak tersedia.';
-  $bal = (string)($in['bal'] ?? ''); if (!isset($C['bal'][$bal]) || in_array($bal, $off['bal'], true)) $E[] = 'Balloon tidak tersedia.';
+  $bq = (string)($in['bq'] ?? ''); if (!isset($C['bq'][$bq]) || (!$ov && in_array($bq, $off['bq'], true))) $E[] = 'Bouquet tidak tersedia.';
+  $bal = (string)($in['bal'] ?? ''); if (!isset($C['bal'][$bal]) || (!$ov && in_array($bal, $off['bal'], true))) $E[] = 'Balloon tidak tersedia.';
   $cakes = array_merge($C['cake_free'], $C['cake_up']);
   $cake = (string)($in['cake'] ?? '');
-  if (!in_array($cake, $cakes, true) || in_array($cake, $off['cake'], true)) $E[] = 'Perisa kek tidak tersedia.';
+  if (!in_array($cake, $cakes, true) || (!$ov && in_array($cake, $off['cake'], true))) $E[] = 'Perisa kek tidak tersedia.';
   $otherFl = [];
   if ($cake === OTHER_CAKE) {
     foreach (array_slice((array)($in['otherFl'] ?? []), 0, 5) as $f) { $f = str_in($f, 40); if ($f !== '') $otherFl[] = $f; }
@@ -234,7 +238,8 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null)
   $rphone = str_in($in['rphone'] ?? '', 20); if (strlen(digits($rphone)) < 9) $E[] = 'Nombor telefon penerima tidak sah.';
   $raddr = str_in($in['raddr'] ?? '', 300); if (mb_strlen($raddr) < 8) $E[] = 'Alamat penerima terlalu pendek.';
   $rpost = digits((string)($in['rpost'] ?? '')); $zone = zone_of($rpost);
-  if ($zone === 'out') $E[] = 'Poskod di luar kawasan penghantaran.';
+  if (!preg_match('/^\d{5}$/', $rpost)) $E[] = 'Poskod mesti 5 digit.';
+  elseif ($zone === 'out' && !$ov) $E[] = 'Poskod di luar kawasan penghantaran.';
   $bname = str_in($in['bname'] ?? '', 80); if ($bname === '') $E[] = 'Nama awak belum diisi.';
   $bphone = str_in($in['bphone'] ?? '', 20); if (strlen(digits($bphone)) < 9) $E[] = 'Nombor WhatsApp awak tidak sah.';
 
@@ -244,17 +249,17 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null)
   $d = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
   if (!$d || $d->format('Y-m-d') !== $date || $date < $today) $E[] = 'Tarikh penghantaran tidak sah.';
   elseif ($date > $now->modify('+120 days')->format('Y-m-d')) $E[] = 'Tarikh terlalu jauh. Maksimum 120 hari dari hari ini.';
-  elseif (in_array($date, blocked_dates(), true)) $E[] = 'Tarikh ini penuh / ditutup. Sila pilih tarikh lain.';
+  elseif (!$ov && in_array($date, blocked_dates(), true)) $E[] = 'Tarikh ini penuh / ditutup. Sila pilih tarikh lain.';
   if (!isset(DELIVERY[$del])) $E[] = 'Pilihan penghantaran tidak sah.';
   else {
     $isToday = $date === $today;
-    if ($isToday && DELIVERY[$del]['close'] !== null && $hr >= DELIVERY[$del]['close']) $E[] = 'Slot ini dah ditutup untuk hari ini.';
+    if (!$ov && $isToday && DELIVERY[$del]['close'] !== null && $hr >= DELIVERY[$del]['close']) $E[] = 'Slot ini dah ditutup untuk hari ini.';
     if ($del === 'spec') {
       if (!preg_match('/^(\d{2}):(\d{2})$/', $time, $m)) $E[] = 'Masa khusus belum dipilih.';
       else {
         $t = (int)$m[1] + (int)$m[2] / 60;
         if ($t < 9 || $t > 22) $E[] = 'Masa khusus hanya antara 9 pagi hingga 10 malam.';
-        elseif ($isToday && $t < $hr + 5) $E[] = 'Masa khusus perlu ditempah sekurang-kurangnya 5 jam awal.';
+        elseif (!$ov && $isToday && $t < $hr + 5) $E[] = 'Masa khusus perlu ditempah sekurang-kurangnya 5 jam awal.';
       }
     } else $time = '';
   }
@@ -278,7 +283,9 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null)
     if (is_string($r)) return ['errors' => [$r]];
     [$L, $discount] = $r; $vcode = $v['code'];
   }
+  if (!empty($opts['adjust']) && (float)$opts['adjust'][0] != 0) $L[] = [str_in($opts['adjust'][1] ?: 'Pelarasan harga', 80), round((float)$opts['adjust'][0], 2)];
   $total = round(array_sum(array_column($L, 1)), 2);
+  if ($total < 1) return ['errors' => ['Jumlah mesti sekurang-kurangnya RM1.']];
 
   return ['order' => [
     'occasion' => $occ, 'relation' => $rel, 'gender' => $gender, 'call_name' => $call,
@@ -293,6 +300,34 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null)
   ]];
 }
 
+/** Validates uploaded photo[] files. Returns [[tmp, ext], …] or fails the request. */
+function collect_photos(): array {
+  $files = [];
+  if (!empty($_FILES['photo']['name']) && is_array($_FILES['photo']['name'])) {
+    foreach ($_FILES['photo']['name'] as $i => $_) {
+      $err = $_FILES['photo']['error'][$i]; if ($err === UPLOAD_ERR_NO_FILE) continue;
+      if ($err !== UPLOAD_ERR_OK) fail('Satu gambar gagal dimuat naik (saiz terlalu besar?). Cuba gambar lain.');
+      $tmp = $_FILES['photo']['tmp_name'][$i];
+      if ($_FILES['photo']['size'][$i] > 8 * 1024 * 1024) fail('Setiap gambar mesti bawah 8MB.');
+      $info = @getimagesize($tmp);
+      if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) fail('Fail gambar tidak sah. Guna JPG atau PNG.');
+      $files[] = [$tmp, image_type_to_extension($info[2], false)];
+    }
+  }
+  return $files;
+}
+function save_photos(string $code, array $files): array {
+  $saved = [];
+  if (!$files) return $saved;
+  $dir = UPLOAD_DIR . '/' . $code;
+  if (!is_dir($dir) && !mkdir($dir, 0755, true)) throw new RuntimeException('Tak dapat cipta folder uploads');
+  foreach ($files as $i => [$tmp, $ext]) {
+    $name = 'p' . ($i + 1) . '.' . ($ext === 'jpeg' ? 'jpg' : $ext);
+    if (!move_uploaded_file($tmp, "$dir/$name") && !rename($tmp, "$dir/$name")) throw new RuntimeException('Simpan gambar gagal');
+    $saved[] = $name;
+  }
+  return $saved;
+}
 function new_code(): string {
   $a = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
   for ($i = 0; $i < 10; $i++) {

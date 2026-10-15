@@ -258,8 +258,8 @@ case 'reportcsv':
     $d = substr((string)$o[$by], 0, 10); $series[$d] = ($series[$d] ?? 0) + $v;
     $inc('bouquet', $C['bq'][$o['bouquet']] ?? $o['bouquet'], $v); $inc('balloon', $C['bal'][$o['balloon']] ?? $o['balloon'], $v);
     $inc('occasion', $C['occ'][$o['occasion']] ?? $o['occasion'], $v); $inc('cake', $o['cake'], $v);
-    $inc('del', $DL[$o['del_type']] ?? $o['del_type'], $v); $inc('zone', $o['zone'] === 'plus20' ? 'Zon merah (+RM20)' : 'Zon biru (percuma)', $v);
-    $inc('area', substr($o['r_post'], 0, 2) . 'xxx', $v); $inc('source', $o['agent_ref'] ? 'Agent: ' . $o['agent_ref'] : 'Terus (tanpa agent)', $v);
+    $inc('del', $DL[$o['del_type']] ?? $o['del_type'], $v); $inc('zone', $o['zone'] === 'plus20' ? 'Zon merah (+RM20)' : ($o['zone'] === 'out' ? 'Luar kawasan (kes khas)' : 'Zon biru (percuma)'), $v);
+    $inc('area', substr($o['r_post'], 0, 2) . 'xxx', $v); $inc('source', $o['agent_ref'] ? 'Agent: ' . $o['agent_ref'] : (!empty($o['created_by']) ? 'WhatsApp (sales team)' : 'Laman web (terus)'), $v);
     if (!empty($o['voucher'])) $inc('voucher', $o['voucher'], $v);
   }
   foreach ($rank as &$r) { uasort($r, fn($x, $y) => $y[0] <=> $x[0] ?: $y[1] <=> $x[1]); $r = array_map(fn($k, $x) => ['name' => (string)$k, 'n' => $x[0], 'sales' => round($x[1], 2)], array_keys($r), $r); } unset($r);
@@ -278,6 +278,41 @@ case 'calendar':
   $days = [];
   foreach ($rows as $r) { $d = substr($by === 'del' ? $r['del_date'] : $r['created_at'], 0, 10); $days[$d][] = $r; }
   json_out(['m' => $m, 'by' => $by, 'days' => $days]);
+
+case 'quote': // live price preview for the manual order form
+  need_login();
+  $d = is_array($body['data'] ?? null) ? $body['data'] : [];
+  $r = build_order($d, max(0, (int)($body['photos'] ?? 0)), null, ['override' => !empty($d['override']), 'adjust' => [(float)($d['adj_amt'] ?? 0), (string)($d['adj_label'] ?? '')]]);
+  if (isset($r['errors'])) json_out(['errors' => $r['errors']]);
+  json_out(['lines' => json_decode($r['order']['price_lines'], true), 'total' => $r['order']['total'], 'zone' => $r['order']['zone']]);
+
+case 'manual': // sales team keys in an order taken on WhatsApp
+  $m = need_login();
+  $d = json_decode((string)($_POST['data'] ?? ''), true); if (!is_array($d)) fail('Data tidak lengkap.');
+  $files = collect_photos();
+  $r = build_order($d, count($files), null, ['override' => !empty($d['override']), 'adjust' => [(float)($d['adj_amt'] ?? 0), (string)($d['adj_label'] ?? '')]]);
+  if (isset($r['errors'])) fail(implode(' ', $r['errors']), 422);
+  $mode = ($d['pay_mode'] ?? '') === 'paid' ? 'paid' : 'link';
+  $payRef = str_in($d['pay_ref'] ?? '', 60);
+  if ($mode === 'paid' && $payRef === '') fail('Isi rujukan bayaran (contoh no. transaksi atau "tunai").');
+  $o = $r['order'];
+  $o['code'] = new_code(); $o['token'] = bin2hex(random_bytes(12)); $o['created_at'] = date('Y-m-d H:i:s');
+  $ref = preg_replace('/[^A-Za-z0-9]/', '', (string)($d['ref'] ?? '')); $o['agent_ref'] = $ref !== '' ? substr($ref, 0, 20) : null;
+  $o['created_by'] = $m['name'];
+  $note = trim('Order WhatsApp oleh ' . $m['name'] . (!empty($d['override']) ? ' (had waktu/kawasan diabaikan)' : '') . '. ' . str_in($d['notes'] ?? '', 500));
+  $o['notes'] = $note;
+  if ($mode === 'paid') { $o['pay_status'] = 'paid'; $o['status'] = 'baru'; $o['paid_at'] = date('Y-m-d H:i:s'); $o['pay_channel'] = 'Manual (' . $m['name'] . ')'; $o['pay_ref'] = $payRef; }
+  try {
+    $o['photos'] = json_encode(save_photos($o['code'], $files));
+    $cols = array_keys($o);
+    q('INSERT INTO orders (' . implode(',', $cols) . ') VALUES (' . implode(',', array_fill(0, count($cols), '?')) . ')', array_values($o));
+    $o['id'] = (int)db()->lastInsertId();
+  } catch (Throwable $e) { error_log('100blooms manual: ' . $e->getMessage()); fail('Order tak dapat disimpan. Cuba lagi.', 500); }
+  $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
+  if ($mode === 'paid') { notify_paid($o); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => true, 'track_url' => $track]); }
+  try { [$bill, $url] = pay_create($o); q('UPDATE orders SET bill_code=? WHERE id=?', [$bill, $o['id']]); }
+  catch (Throwable $e) { error_log('100blooms manual bill: ' . $e->getMessage()); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'payUrl' => null, 'track_url' => $track, 'warn' => 'Order disimpan tapi link bayaran gagal dicipta: ' . mb_substr($e->getMessage(), 0, 150)]); }
+  json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'payUrl' => $url, 'track_url' => $track]);
 
 case 'vouchers':
   need_login();
