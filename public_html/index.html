@@ -737,7 +737,8 @@ const SCR={
   el.innerHTML=`<div class="done"><div class="tick"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></div>
    <h1>Terima kasih, ${h(R.buyer||'awak')}!</h1>
    <p class="sub">Bayaran diterima untuk order <b>${h(R.code)}</b>. Hadiah untuk ${h(R.call||'dia')} akan dihantar pada ${fmtDate(R.date)}. Kami akan WhatsApp awak gambar penerima bila hadiah sampai.</p>
-   <p class="note">Simpan kod order ni. Untuk tukar tarikh delivery, WhatsApp kami dengan kod order.</p>
+   <a class="btn" href="/semak/?c=${encodeURIComponent(R.code)}&k=${encodeURIComponent(R.k||'')}" style="display:block;flex:none;width:100%;text-align:center;text-decoration:none">Semak status order</a>
+   <p class="note">Simpan kod order ni. Awak boleh semak status hadiah bila-bila masa di 100blooms.my/semak dengan kod order dan nombor WhatsApp awak.</p>
    <button class="btn ghost" id="again" style="flex:none;width:100%">Hantar hadiah lain</button></div>`;
   $('#again').onclick=()=>{history.replaceState(null,'',location.pathname);S=blank();dir=1;render();};
  }
@@ -867,7 +868,7 @@ async function submitOrder(){
 }
 async function checkReturn(code,k,tries){
   try{const r=await fetch('api/status.php?code='+encodeURIComponent(code)+'&k='+encodeURIComponent(k));const j=await r.json();
-    if(r.ok){window.RESULT=j;if(j.paid){S=blank();save();}S.step=STEPS.indexOf('done');render();
+    if(r.ok){window.RESULT=Object.assign(j,{k});if(j.paid){S=blank();save();}S.step=STEPS.indexOf('done');render();
       if(!j.paid&&tries<8)setTimeout(()=>checkReturn(code,k,tries+1),tries<3?3000:6000);return;}}catch(e){}
   window.RESULT={code};S.step=STEPS.indexOf('done');render();
 }

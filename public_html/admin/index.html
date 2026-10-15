@@ -176,14 +176,15 @@ async function openOrder(id,reload){
     <div class="bar" style="margin-bottom:0"><button class="btn ghost sm" id="cw">Salin ayat</button><button class="btn ghost sm" id="pw">Cetak kad</button></div></div>
    <div class="card"><h2>Pembeli</h2>
     <div class="rowx"><span>Nama</span><span>${h(o.b_name)}</span></div>
-    <div class="rowx"><span>WhatsApp</span><span><a href="${wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}, ini 100 Blooms tentang order ${o.code}.`)}" target="_blank" rel="noopener">${h(o.b_phone)}</a></span></div>
+    <div class="rowx"><span>WhatsApp</span><span><a href="${wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}, ini 100 Blooms tentang order ${o.code}. Semak status hadiah di sini: ${o.track_url}`)}" target="_blank" rel="noopener">${h(o.b_phone)}</a></span></div>
+    <div class="rowx"><span>Link semak order</span><span><a href="${h(o.track_url)}" target="_blank" rel="noopener">Buka</a> · <a href="#" id="ct">Salin</a></span></div>
     ${o.agent_ref?`<div class="rowx"><span>Link agent</span><span>${h(o.agent_ref)}</span></div>`:''}</div>
    <div class="card"><h2>Harga</h2>${o.price_lines.map(([l,p])=>`<div class="rowx"><span>${h(l)}</span><span>${p?rm(p):'Percuma'}</span></div>`).join('')}
     <div class="rowx" style="font-weight:700"><span style="color:var(--ink)">Jumlah</span><span>${rm(o.total)}</span></div></div>
    <div class="card"><h2>Gambar penerima</h2>
     ${o.recipient_photo?`<div class="thumbs" style="margin-bottom:8px"><a href="${ph(o.recipient_photo,1)}"><img src="${ph(o.recipient_photo)}" alt="Gambar penerima"></a></div>`:'<p class="mini" style="margin-top:0">Belum ada. Runner upload gambar penerima di sini, kemudian hantar kepada pembeli.</p>'}
     <div class="bar" style="margin:0"><input type="file" id="rpf" accept="image/*" aria-label="Pilih gambar penerima"><button class="btn sm" id="rpu">Upload</button>
-    ${o.recipient_photo?`<a class="btn ghost sm" style="text-decoration:none" href="${wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}! Hadiah untuk ${o.call_name} dah selamat sampai 🌸 Ini gambar penerima. Terima kasih pilih 100 Blooms!`)}" target="_blank" rel="noopener">WhatsApp pembeli</a>`:''}</div></div>
+    ${o.recipient_photo?`<a class="btn ghost sm" style="text-decoration:none" href="${wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}! Hadiah untuk ${o.call_name} dah selamat sampai 🌸 Gambar penerima ada di sini: ${o.track_url} Terima kasih pilih 100 Blooms!`)}" target="_blank" rel="noopener">WhatsApp pembeli</a>`:''}</div></div>
    <div class="card"><h2>Nota dalaman</h2><textarea id="nn" rows="3" style="width:100%" placeholder="Contoh: perisa kek ditukar, customer minta call dulu">${h(o.notes||'')}</textarea>
     <button class="btn ghost sm" id="sn" style="margin-top:8px">Simpan nota</button></div>
   </div></div>`;
@@ -196,6 +197,7 @@ async function openOrder(id,reload){
   if($('#mp'))$('#mp').onclick=()=>{const r=prompt('Rujukan bayaran (contoh: no. transaksi bank)');if(r!==null)done(api('update',{method:'POST',body:{id,mark_paid:1,pay_ref:r||'manual'}}),'Ditanda dibayar')};
   if($('#cn'))$('#cn').onclick=()=>{if(confirm('Batalkan order '+o.code+'?'))done(api('update',{method:'POST',body:{id,status:'batal'}}),'Order dibatalkan')};
   $('#sd').onclick=()=>done(api('update',{method:'POST',body:{id,del_date:$('#nd').value,del_type:$('#nt').value,del_time:$('#ntm').value}}),'Tarikh dikemas kini');
+  $('#ct').onclick=e=>{e.preventDefault();navigator.clipboard.writeText(o.track_url).then(()=>toast('Link disalin'),()=>toast('Tak dapat salin'))};
   $('#sn').onclick=()=>done(api('update',{method:'POST',body:{id,notes:$('#nn').value}}),'Nota disimpan');
   $('#cw').onclick=()=>{navigator.clipboard.writeText($('#wb').innerText).then(()=>toast('Ayat disalin'),()=>toast('Tak dapat salin'))};
   $('#pw').onclick=()=>{const w=window.open('','_blank');w.document.write(`<!doctype html><title>Wishcard ${h(o.code)}</title><style>@page{size:A6;margin:12mm}body{font:15pt/1.6 Georgia,serif;color:#3b2732;white-space:pre-wrap;display:flex;align-items:center;min-height:90vh}</style><body>${$('#wb').innerHTML}<script>print()<\/script>`);w.document.close()};

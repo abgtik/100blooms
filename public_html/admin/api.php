@@ -73,6 +73,7 @@ case 'orders':
 case 'order':
   need_login();
   $o = q('SELECT * FROM orders WHERE id=?', [(int)($_GET['id'] ?? 0)])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404);
+  $o['track_url'] = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
   unset($o['token']);
   foreach (['cake_flavours', 'extra_cakes', 'photos', 'price_lines'] as $k) $o[$k] = json_decode((string)$o[$k], true);
   json_out(['order' => $o]);

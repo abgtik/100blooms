@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Semak Order · 100 Blooms</title>
+<meta name="theme-color" content="#fbeef0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+:root{--bg:#fbeef0;--bg2:#f6dbe1;--ink:#3b2732;--soft:#7d6370;--card:#fff;--line:#ecd6dc;--accent:#d94f74;--ok:#2f8f63;--okb:#e3f4ea;--warn:#a8691b;--warnb:#fbefd9;--bad:#b6404f;--badb:#f8e0e3;
+  --display:"Fredoka",ui-rounded,system-ui,sans-serif;--body:"Figtree",system-ui,-apple-system,sans-serif;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-webkit-tap-highlight-color:transparent}
+.wrap{max-width:460px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-left)) 60px}
+a{color:var(--accent)}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:18px;text-decoration:none;color:inherit}
+.brand svg{width:34px;height:34px}.brand b{font:600 20px var(--display)}
+h1{font:600 26px/1.15 var(--display);margin:0 0 6px;text-wrap:balance}
+h2{font:600 17px var(--display);margin:0 0 12px}
+.sub{color:var(--soft);margin:0 0 18px;font-size:14px}
+.card{background:var(--card);border-radius:22px;padding:18px;margin-bottom:14px}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 6px}
+input{width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(--line);font:inherit;color:inherit;background:#fff}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn{display:block;width:100%;border:0;border-radius:16px;padding:14px;margin-top:16px;font:600 16px var(--display);background:var(--accent);color:#fff;cursor:pointer;text-align:center;text-decoration:none}
+.btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+.btn:disabled{opacity:.5}
+.msg{padding:11px 13px;border-radius:12px;font-size:13.5px;margin-top:12px}.msg.bad{background:var(--badb);color:var(--bad)}.msg.warn{background:var(--warnb);color:var(--warn)}.msg.ok{background:var(--okb);color:var(--ok)}
+.hint{font-size:12.5px;color:var(--soft)}
+.code{font:600 13px var(--body);letter-spacing:.04em;color:var(--soft)}
+/* timeline */
+.tl{list-style:none;margin:4px 0 0;padding:0;position:relative}
+.tl li{position:relative;padding:0 0 18px 38px;min-height:30px}
+.tl li:last-child{padding-bottom:0}
+.tl li::before{content:"";position:absolute;left:12px;top:26px;bottom:-2px;width:2px;background:var(--line)}
+.tl li:last-child::before{display:none}
+.tl li.done::before{background:var(--accent)}
+.tl .dot{position:absolute;left:0;top:0;width:26px;height:26px;border-radius:50%;background:#fff;border:2px solid var(--line);display:grid;place-items:center}
+.tl li.done .dot{background:var(--accent);border-color:var(--accent)}
+.tl li.now .dot{border-color:var(--accent);box-shadow:0 0 0 5px color-mix(in srgb,var(--accent) 18%,transparent);animation:pulse 1.8s ease-in-out infinite}
+.tl li.now .dot::after{content:"";width:9px;height:9px;border-radius:50%;background:var(--accent)}
+@keyframes pulse{50%{box-shadow:0 0 0 9px color-mix(in srgb,var(--accent) 6%,transparent)}}
+.tl b{display:block;font:600 15px var(--display)}
+.tl li:not(.done):not(.now) b{color:var(--soft);font-weight:500}
+.tl small{color:var(--soft);font-size:12.5px}
+.del{display:flex;gap:12px;align-items:center;background:var(--bg);border-radius:16px;padding:12px 14px;margin-top:14px}
+.del svg{flex:none;width:26px;height:26px}
+.del b{font:600 15px var(--display);display:block}
+/* items */
+.items{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.item{background:var(--bg);border-radius:18px;padding:8px 8px 10px;text-align:center}
+.item .pic{aspect-ratio:4/5;border-radius:12px;background:#fff;display:grid;place-items:center;overflow:hidden;margin-bottom:6px}
+.item .pic img{width:100%;height:100%;object-fit:contain}
+.item small{display:block;color:var(--soft);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.item b{font:600 14px var(--display);display:block;line-height:1.25}
+.item .x{font-size:12px;color:var(--soft);display:block;margin-top:2px}
+.polas{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x mandatory}
+.pola{flex:none;width:118px;background:#fff;padding:6px 6px 20px;border-radius:4px;box-shadow:0 8px 18px -10px rgba(0,0,0,.35);scroll-snap-align:start}
+.pola:nth-child(odd){transform:rotate(-2deg)}.pola:nth-child(even){transform:rotate(2deg)}
+.pola img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#eee}
+/* wishcard front */
+.wc{position:relative;aspect-ratio:3/2;border-radius:16px;overflow:hidden;background:linear-gradient(150deg,#fff6f8 0%,#fbe1e8 100%);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;padding:16px}
+.wc svg{width:54px;height:54px;margin-bottom:4px}
+.wc .to{font:600 22px var(--display);color:var(--accent)}
+.wc .from{font-size:13px;color:var(--soft)}
+.wc::before,.wc::after{content:"";position:absolute;border-radius:50%;background:var(--bg2);opacity:.6}
+.wc::before{width:120px;height:120px;right:-40px;top:-40px}.wc::after{width:90px;height:90px;left:-30px;bottom:-30px}
+.wc > *{position:relative;z-index:1}
+.rp img{width:100%;border-radius:16px;display:block}
+.zoom{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px}.zoom img{max-width:100%;max-height:100%;border-radius:12px}
+.foot{text-align:center;font-size:13px;color:var(--soft);margin-top:18px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="brand" href="/" aria-label="100 Blooms laman utama">
+    <svg viewBox="0 0 100 100" aria-hidden="true"><g fill="#d94f74"><ellipse cx="50" cy="26" rx="14" ry="22"/><ellipse cx="50" cy="74" rx="14" ry="22"/><ellipse cx="26" cy="50" rx="22" ry="14"/><ellipse cx="74" cy="50" rx="22" ry="14"/></g><circle cx="50" cy="50" r="12" fill="#ffd36e"/></svg>
+    <b>100 Blooms</b></a>
+  <main id="main"></main>
+</div>
+<script src="/assets/img.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtD=s=>s?new Date(s+'T00:00').toLocaleDateString('ms-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'-';
+const fmtDT=s=>s?new Date(s.replace(' ','T')).toLocaleString('ms-MY',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
+const img=p=>p?'/'+p.replace(/^\//,''):'';
+const FLOWER='<svg viewBox="0 0 100 100" aria-hidden="true"><g fill="#d94f74"><ellipse cx="50" cy="26" rx="14" ry="22"/><ellipse cx="50" cy="74" rx="14" ry="22"/><ellipse cx="26" cy="50" rx="22" ry="14"/><ellipse cx="74" cy="50" rx="22" ry="14"/></g><g fill="#f19bb2" transform="rotate(45 50 50)"><ellipse cx="50" cy="28" rx="11" ry="18"/><ellipse cx="50" cy="72" rx="11" ry="18"/><ellipse cx="28" cy="50" rx="18" ry="11"/><ellipse cx="72" cy="50" rx="18" ry="11"/></g><circle cx="50" cy="50" r="12" fill="#ffd36e"/></svg>';
+const TICK='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>';
+
+function form(err,code,phone){
+  $('#main').innerHTML=`<h1>Semak order awak</h1><p class="sub">Masukkan kod order dan nombor WhatsApp yang awak guna masa order.</p>
+   <form class="card" id="f" novalidate>
+    <label for="c">Kod order</label><input id="c" autocomplete="off" autocapitalize="characters" placeholder="Contoh: HB261015-GZTJ" value="${h(code||'')}">
+    <label for="p">Nombor WhatsApp awak</label><input id="p" type="tel" inputmode="tel" autocomplete="tel" placeholder="01X-XXX XXXX" value="${h(phone||'')}">
+    ${err?`<div class="msg bad" role="alert">${h(err)}</div>`:''}
+    <button class="btn" id="go">Semak order</button>
+    <p class="hint" style="margin:12px 0 0">Kod order ada di halaman "Terima kasih" selepas bayar, dan dalam mesej WhatsApp daripada team kami.</p></form>
+   <p class="foot">Perlukan bantuan? <a href="https://wa.me/601165862584" target="_blank" rel="noopener">WhatsApp kami</a></p>`;
+  $('#f').onsubmit=async e=>{e.preventDefault();const c=$('#c').value.trim(),p=$('#p').value.trim();
+    if(!c||!p)return form('Isi kod order dan nombor WhatsApp.',c,p);
+    $('#go').disabled=true;$('#go').textContent='Menyemak…';
+    try{const r=await fetch('/api/track.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:c,phone:p})});const j=await r.json();
+      if(!r.ok)return form(j.error||'Tak dapat semak sekarang.',c,p);
+      history.replaceState(null,'','?c='+encodeURIComponent(j.code)+'&k='+encodeURIComponent(j.k));show(j);}
+    catch(x){form('Tiada sambungan internet. Cuba lagi.',c,p)}};
+}
+
+function show(o){
+  const I=window.IMG||{};
+  const steps=[['Order diterima',fmtDT(o.created_at)],['Bayaran diterima',fmtDT(o.paid_at)],['Hadiah sedang disiapkan','Team kami sedang susun bouquet, kek dan balloon'],['Dalam penghantaran','Runner dalam perjalanan ke penerima'],['Hadiah dah sampai','Terima kasih kerana memilih 100 Blooms']];
+  const idx=o.status==='batal'?-1:!o.paid?0:({baru:1,disiapkan:2,dalam_penghantaran:3,selesai:4}[o.status]??1);
+  const ph=f=>`/api/photo.php?c=${encodeURIComponent(o.code)}&k=${encodeURIComponent(o.k)}&f=${encodeURIComponent(f)}`;
+  const bq=(I[o.bouquet.id]||{}).bq, bal=(I.bal||{})[o.balloon.id], cake=(I.cake||{})[o.cake];
+  const cakeTxt=o.cake_flavours.length?'Pilihan: '+o.cake_flavours.join(' / '):o.cake;
+  const ext=Object.entries(o.extra_cakes||{}).map(([k,n])=>`${k} × ${n}`).join(', ');
+  const wa='https://wa.me/'+(o.wa||'601165862584')+'?text='+encodeURIComponent(`Hai 100 Blooms, saya nak tukar tarikh delivery untuk order ${o.code}.`);
+  const delTxt=o.del_type==='spec'&&o.del_time?`Masa khusus ${o.del_time}`:o.del_label;
+  $('#main').innerHTML=`<p class="code">ORDER ${h(o.code)}</p><h1>Hadiah untuk ${h(o.call)}</h1><p class="sub">${h(o.occasion)} · dihantar kepada ${h(o.r_name)}</p>
+   ${o.status==='batal'?`<div class="msg bad" style="margin:0 0 14px">Order ini telah dibatalkan. WhatsApp kami jika ada pertanyaan.</div>`:''}
+   ${!o.paid&&o.status!=='batal'?`<div class="card"><h2>Bayaran belum diterima</h2><p class="hint" style="margin:0">Order disimpan tapi kami belum terima bayaran. Hadiah hanya disiapkan selepas bayaran berjaya.</p>${o.payUrl?`<a class="btn" href="${h(o.payUrl)}">Bayar sekarang</a>`:''}</div>`:''}
+   ${o.status!=='batal'?`<section class="card" aria-labelledby="t1"><h2 id="t1">Status hadiah</h2>
+    <ol class="tl">${steps.map(([t,s],i)=>`<li class="${i<idx||(i===idx&&i===4)?'done':i===idx?'now':''}"><span class="dot">${i<idx||(i===idx&&i===4)?TICK:''}</span><b>${t}</b>${(i<=idx&&s)?`<small>${h(s)}</small>`:''}</li>`).join('')}</ol>
+    <div class="del"><svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+     <div><b>${fmtD(o.del_date)}</b><span class="hint">${h(delTxt)}</span></div></div></section>`:''}
+   ${o.recipient_photo?`<section class="card rp" aria-labelledby="t4"><h2 id="t4">Saat hadiah sampai 🌸</h2><img src="${ph(o.recipient_photo)}" alt="Gambar penerima dengan hadiah" data-z><p class="hint" style="margin:8px 0 0">Tekan gambar untuk besarkan, kemudian tekan lama untuk simpan.</p></section>`:''}
+   <section class="card" aria-labelledby="t2"><h2 id="t2">Isi hadiah awak</h2>
+    <div class="items">
+     <div class="item"><div class="pic">${bq?`<img src="${img(bq)}" alt="Bouquet ${h(o.bouquet.name)}">`:''}</div><small>Bouquet</small><b>${h(o.bouquet.name)}</b></div>
+     <div class="item"><div class="pic">${bal?`<img src="${img(bal)}" alt="Balloon ${h(o.balloon.name)}">`:''}</div><small>Balloon</small><b>${h(o.balloon.name)}</b></div>
+     <div class="item" style="grid-column:1/-1"><div class="pic" style="aspect-ratio:3/2">${cake?`<img src="${img(cake)}" alt="Kek ${h(o.cake)}" style="object-fit:cover">`:'<span class="hint">Kek Secret Recipe</span>'}</div><small>Kek Secret Recipe</small><b>${h(cakeTxt)}</b>${ext?`<span class="x">+ ${h(ext)}</span>`:''}</div>
+    </div>
+    ${o.photos.length?`<h2 style="margin-top:18px">Polaroid (${o.photos.length})</h2><div class="polas">${o.photos.map((f,i)=>`<div class="pola"><img src="${ph(f)}" alt="Polaroid ${i+1}" loading="lazy" data-z></div>`).join('')}</div>`:''}
+    <h2 style="margin-top:16px">Wishcard</h2>
+    <div class="wc" role="img" aria-label="Muka depan wishcard untuk ${h(o.call)}">${FLOWER}<span class="to">Untuk ${h(o.call)}</span>${o.sender?`<span class="from">daripada ${h(o.sender)}</span>`:''}</div>
+    <p class="hint" style="margin:8px 0 0">Isi ucapan kekal rahsia sampai kad dibuka 💌</p></section>
+   ${o.status!=='batal'&&o.status!=='selesai'?`<a class="btn ghost" href="${wa}" target="_blank" rel="noopener">Minta tukar tarikh delivery</a><p class="hint" style="text-align:center;margin:8px 0 0">Order yang dah dibayar tak boleh di-refund, tapi tarikh boleh ditukar.</p>`:''}
+   <p class="foot"><a href="/semak/">Semak order lain</a> · <a href="https://wa.me/601165862584" target="_blank" rel="noopener">WhatsApp kami</a></p>`;
+  document.querySelectorAll('[data-z]').forEach(i=>i.onclick=()=>{const z=document.createElement('div');z.className='zoom';z.innerHTML=`<img src="${i.src}" alt="">`;z.onclick=()=>z.remove();document.body.appendChild(z)});
+}
+
+(async()=>{
+  const P=new URLSearchParams(location.search);
+  if(P.get('c')&&P.get('k')){
+    $('#main').innerHTML='<p class="sub">Memuatkan order…</p>';
+    try{const r=await fetch('/api/track.php?c='+encodeURIComponent(P.get('c'))+'&k='+encodeURIComponent(P.get('k')));const j=await r.json();if(r.ok)return show(j);form(j.error,P.get('c'))}catch(e){form('Tiada sambungan internet.',P.get('c'))}
+  } else form('',P.get('c')||'');
+})();
+</script>
+</body>
+</html>
