@@ -406,6 +406,7 @@ let CAT={now:null,t0:Date.now(),blocked:[],off:{bq:[],bal:[],cake:[]}};
 const myNow=()=>CAT.now?new Date(new Date(CAT.now).getTime()+(Date.now()-CAT.t0)):new Date();
 const isOff=(t,id)=>(CAT.off[t]||[]).includes(id);
 const isBlocked=d=>CAT.blocked.includes(d);
+try{const t=new URLSearchParams(location.search).get('test');if(t)sessionStorage.setItem('hb_test',t);}catch(e){}
 try{const r=new URLSearchParams(location.search).get('ref');if(r&&/^[A-Za-z0-9]{1,20}$/.test(r))localStorage.setItem('hb_ref',r);}catch(e){}
 try{const s=JSON.parse(localStorage.getItem('hb_state')||'null'); if(s){S=Object.assign(blank(),s,{photos:[]});}}catch(e){}
 if(S.extraCake&&!Object.keys(S.extraCakes||{}).length){S.extraCakes={'Pilihan lain (ikut stok)':S.extraCake};}
@@ -713,6 +714,7 @@ const SCR={
     <div class="field"><label for="bname">Nama awak</label><input id="bname" type="text" value="${h(S.bname)}"></div>
     <div class="field"><label for="bphone">Nombor WhatsApp awak</label><input id="bphone" type="tel" inputmode="tel" value="${h(S.bphone)}"><span class="hint">Kami hantar resit dan gambar penerima ke nombor ni.</span></div></div>`;
   const chk=()=>foot('Bayar '+rm(total()),S.bname.trim()&&S.bphone.replace(/\D/g,'').length>=9);
+  try{if(sessionStorage.getItem('hb_test'))el.insertAdjacentHTML('afterbegin','<div class="status warn"><b>Mod ujian:</b> jika kod ujian betul, bayaran sebenar hanya RM1 dan order ditanda ORDER UJIAN.</div>')}catch(e){}
   el.insertAdjacentHTML('beforeend','<p class="hint" style="text-align:center;margin:0">Bayar dengan DuitNow QR atau FPX (online banking) melalui halaman bayaran yang selamat.</p>');
   ['bname','bphone'].forEach(k=>$('#'+k).oninput=e=>{S[k]=e.target.value;chk();save()});chk();
  },
@@ -852,6 +854,7 @@ async function submitOrder(){
     $('#retry').onclick=()=>{$('#perr').innerHTML='';$('#pst').textContent='Cuba sekali lagi…';submitOrder()};$('#bk2').onclick=()=>{dir=-1;S.step=STEPS.indexOf('sum');render()};};
   const d=Object.assign({},S);delete d.photos;delete d.step;
   try{d.ref=localStorage.getItem('hb_ref')||''}catch(e){}
+  try{d.test=sessionStorage.getItem('hb_test')||''}catch(e){}
   d.call=callName();
   const fd=new FormData();fd.append('data',JSON.stringify(d));
   S.photos.forEach((u,i)=>fd.append('photo[]',dataUrlToBlob(u),'p'+(i+1)+'.jpg'));

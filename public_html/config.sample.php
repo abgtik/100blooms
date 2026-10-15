@@ -36,5 +36,9 @@ define('MAIL_FROM', 'order@domainawak.com');
 // Kosongkan untuk automatik: guna folder 'private' di luar httpdocs jika ada (Plesk), jika tidak 'uploads'.
 // define('UPLOAD_DIR', '/home/100blooms.my/private/uploads');
 
+// ---- Mod ujian (pilihan) ----
+// Buka https://domain/?test=KOD untuk buat order RM1. Padam baris ini atau kosongkan untuk matikan.
+// define('TEST_KEY', 'tukar-kepada-kod-rahsia-anda');
+
 // ---- WhatsApp team (dipaparkan kepada customer) ----
 define('WA_MAIN', '601165862584');

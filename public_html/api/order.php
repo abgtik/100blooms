@@ -30,6 +30,11 @@ try {
   $o['created_at'] = date('Y-m-d H:i:s');
   $ref = preg_replace('/[^A-Za-z0-9]/', '', (string)($in['ref'] ?? ''));
   $o['agent_ref'] = $ref !== '' ? substr($ref, 0, 20) : null;
+  // Test mode: owner opens the site with ?test=<TEST_KEY>; the whole order is charged RM1 and labelled.
+  if (defined('TEST_KEY') && TEST_KEY !== '' && is_string($in['test'] ?? null) && hash_equals(TEST_KEY, $in['test'])) {
+    $o['price_lines'] = json_encode([['UJIAN SISTEM (bukan order sebenar)', 1]], JSON_UNESCAPED_UNICODE);
+    $o['total'] = 1; $o['notes'] = 'ORDER UJIAN RM1. Jangan hantar.';
+  }
 
   // photos → uploads/<code>/
   $saved = [];
