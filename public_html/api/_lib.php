@@ -160,7 +160,6 @@ function progress_text(array $o): string {
 
 function bank_qr_path(): ?string { foreach (glob(UPLOAD_DIR . '/_site/bank-qr.*') ?: [] as $f) return $f; return null; }
 // ---------- product codes / retail prices (set in admin → Stok) ----------
-const RETAIL = ['cake' => 25, 'balloon' => 10, 'polaroid' => 20]; // shown on the WhatsApp invoice; the set price stays BASE_PRICE
 function product_meta(): array {
   static $m = null; if ($m !== null) return $m;
   $m = ['bq' => [], 'bal' => [], 'cake' => []];
@@ -168,28 +167,25 @@ function product_meta(): array {
   return $m;
 }
 const SLOT_EN = ['free' => '10:00 AM – 6:00 PM', 'A' => '9:00 AM – 12:00 PM', 'B' => '1:00 PM – 4:00 PM', 'C' => '5:00 PM – 8:00 PM'];
-/** WhatsApp invoice in the shop's usual format: retail item prices, then a discount down to the set price. */
+/** WhatsApp invoice in the shop's usual layout, priced the same way as the website (Combo Jimat set + add-ons). */
 function invoice_text(array $o): string {
   $C = catalog(); $M = product_meta(); $f = fn($n) => number_format((float)$n, 2, '.', '');
   $lines = json_decode((string)$o['price_lines'], true) ?: [];
   $bqName = $C['bq'][$o['bouquet']] ?? $o['bouquet']; $balName = $C['bal'][$o['balloon']] ?? $o['balloon'];
   $balCode = $M['bal'][$o['balloon']]['code'] ?? ''; $bqCode = $M['bq'][$o['bouquet']]['code'] ?? '';
   $cakeTxt = $o['cake'] === OTHER_CAKE ? implode(' / ', json_decode((string)$o['cake_flavours'], true) ?: []) . ' (ikut stok)' : $o['cake'];
-  $photos = max(1, (int)$o['photo_count']);
-  $bqPrice = $M['bq'][$o['bouquet']]['price'] ?? null;
-  if ($bqPrice === null) $bqPrice = BASE_PRICE - RETAIL['cake'] - RETAIL['balloon'] - RETAIL['polaroid']; // no retail price set: no discount shown
   $items = []; $sub = 0;
   $add = function (string $t, float $p, int $n = 1, string $sublines = '') use (&$items, &$sub, $f) { $items[] = "↳ $n x $t (" . $f($p) . " x $n = " . $f($p * $n) . ")" . ($sublines !== '' ? "\n        $sublines" : ''); $sub += $p * $n; };
-  $add(($bqCode ? "$bqCode - " : '') . "$bqName Bouquet", $bqPrice, 1, $o['bq_note'] ? '1 x ' . $o['bq_note'] : '');
-  $add("Secret Recipe Slice Cake ( $cakeTxt )", RETAIL['cake']);
-  $add('Balloon Foil ( ' . ($balCode ? "$balCode - " : '') . "$balName )", RETAIL['balloon']);
-  $add('Polaroid photo', RETAIL['polaroid'], 1);
+  $set = ['1 x ' . ($bqCode ? "$bqCode - " : '') . "$bqName Bouquet" . ($o['bq_note'] ? " - {$o['bq_note']}" : ''),
+    "1 x Balloon Foil ( " . ($balCode ? "$balCode - " : '') . "$balName )",
+    "1 x Secret Recipe Slice Cake ( $cakeTxt )", '1 x Polaroid photo', '1 x Wishcard'];
+  $add('Combo Jimat', (float)($lines[0][1] ?? BASE_PRICE), 1, implode("\n        ", $set));
   $fees = 0; $delLabel = ''; $extra = [];
   foreach (array_slice($lines, 1) as [$label, $amt]) { // everything after the set line
     $amt = (float)$amt;
     if (str_starts_with($label, 'Upgrade kek')) $add($label, $amt);
     elseif (str_starts_with($label, 'Kek tambahan')) $add($label, $amt);
-    elseif (str_starts_with($label, 'Polaroid tambahan')) { $n = (int)preg_replace('/\D/', '', $label) ?: 1; $add('Polaroid photo (tambahan)', EXTRA_PHOTO, $n); }
+    elseif (str_starts_with($label, 'Polaroid tambahan')) { $n = (int)preg_replace('/\D/', '', $label) ?: 1; $add('Polaroid tambahan', EXTRA_PHOTO, $n); }
     elseif (str_starts_with($label, '🎁')) $items[] = '↳ 1 x ' . $label . ' (FREE)';
     elseif (isset(DELIVERY[$o['del_type']]) && str_starts_with($label, DELIVERY[$o['del_type']]['label'])) { $delLabel = $label; $fees += $amt; }
     elseif (str_starts_with($label, 'Caj kawasan')) { $fees += $amt; $extra[] = "$label: RM" . $f($amt); }
@@ -202,7 +198,7 @@ function invoice_text(array $o): string {
   $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
   return "[ Invoice No: {$o['code']} ]\n\nHi, I want to order:\n\n" . implode("\n \n", $items) . " \n \nSubtotal: RM" . $f($sub)
     . "\n\nDelivery: $delName \nDelivery Fee: RM" . $f($fees) . ($extra ? "\n" . implode("\n", $extra) : '')
-    . "\n\nDiscount: RM" . $f(-$disc) . "\n\nTotal:\nRM" . $f($o['total'])
+    . ($disc > 0 ? "\n\nDiscount" . ($o['voucher'] ? " ({$o['voucher']})" : '') . ": RM" . $f(-$disc) : '') . "\n\nTotal:\nRM" . $f($o['total'])
     . "\n \nName:\n{$o['b_name']}\n\nPhone Number:\n" . '60' . norm_phone($o['b_phone']) . "\n\nAddress:\n\n{$o['r_addr']}\n\nPostcode:\n{$o['r_post']}"
     . "\n\nReceiver Name:\n{$o['r_name']}\n\nReceiver Phone Number:\n{$o['r_phone']}\n\nWishcard (FREE):\n$wish\n\nDate & Time Slot:\n$date"
     . "\n\n[ Invoice Link: $track ]";
