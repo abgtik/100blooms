@@ -13,7 +13,7 @@
   --display:"Fredoka",ui-rounded,system-ui,sans-serif;--body:"Figtree",system-ui,-apple-system,sans-serif;color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-webkit-tap-highlight-color:transparent}
-.wrap{max-width:520px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-left)) 96px}
+.wrap{max-width:520px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-left)) 110px}
 a{color:var(--accent)}
 .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
@@ -37,10 +37,11 @@ input:focus-visible,button:focus-visible,a:focus-visible,select:focus-visible{ou
 .stat.hero{background:linear-gradient(140deg,var(--accent),var(--accent2));color:#fff}.stat.hero small{color:#ffe3ea}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 /* bottom nav */
-nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 8px max(6px,env(safe-area-inset-bottom));z-index:5}
-nav button{flex:1;max-width:130px;border:0;background:none;font:600 12px var(--body);color:var(--soft);padding:6px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border-radius:12px}
+nav{position:fixed;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));background:#4a2330;border-radius:22px;display:flex;justify-content:center;gap:4px;padding:7px;z-index:5;box-shadow:0 10px 28px -8px rgba(74,35,48,.55);max-width:520px;margin:0 auto}
+nav button{flex:1;max-width:130px;border:0;background:none;font:600 12px var(--body);color:#e9c6d1;padding:7px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border-radius:16px;transition:background .15s,color .15s}
 nav button svg{width:22px;height:22px}
-nav button[aria-current=page]{color:var(--accent);background:var(--bg)}
+nav button:hover{color:#fff}
+nav button[aria-current=page]{color:#fff;background:var(--accent)}
 /* calendar */
 .calh{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.calh b{font:600 17px var(--display)}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
@@ -64,17 +65,17 @@ nav button[aria-current=page]{color:var(--accent);background:var(--bg)}
 .ck{display:flex;gap:10px;align-items:flex-start;font-weight:500;font-size:14px}.ck input{width:20px;height:20px;flex:none;margin-top:1px}
 .qr{max-width:200px;border-radius:12px;border:1px solid var(--line);display:block;margin:6px 0 10px}
 .empty{text-align:center;color:var(--soft);padding:18px 6px;font-size:14px}
-.toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:9;max-width:90%}
+.toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:9;max-width:90%}
 .wide .wrap{max-width:1100px}
 /* landing */
-.hero{background:#4a2330;color:#fff;border-radius:26px;padding:26px 22px;margin-bottom:16px;overflow:hidden}
+.lhero{background:#4a2330;color:#fff;border-radius:26px;padding:26px 22px;margin-bottom:16px;overflow:hidden}
 .eyebrow{font:700 11.5px var(--body);letter-spacing:.12em;text-transform:uppercase;color:#f59ab2;margin:0 0 8px}
-.hero h1{font:700 clamp(27px,4.4vw,40px)/1.12 var(--display);color:#fff;max-width:900px;margin:0 0 10px}
-.hero p{color:#f3dfe5;max-width:560px;margin:0 0 18px;font-size:15.5px}
+.lhero h1{font:700 clamp(27px,4.4vw,40px)/1.12 var(--display);color:#fff;max-width:900px;margin:0 0 10px}
+.lhero p{color:#f3dfe5;max-width:560px;margin:0 0 18px;font-size:15.5px}
 .pics{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px;margin-bottom:18px}
 .pics img{flex:none;width:150px;height:188px;object-fit:cover;border-radius:16px;scroll-snap-align:start;background:#5d3040}
-.hero .cta{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.hero .cta .btn{width:auto;margin:0;padding:13px 22px}
-.hero .cta a.lk{color:#f3dfe5;font-size:14px}
+.lhero .cta{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.lhero .cta .btn{width:auto;margin:0;padding:13px 22px}
+.lhero .cta a.lk{color:#f3dfe5;font-size:14px}
 .sec{background:var(--card);border-radius:24px;padding:22px 20px;margin-bottom:16px}
 .sec h2{font:700 22px/1.2 var(--display);margin:0 0 8px}.sec .lead{color:var(--soft);max-width:640px;margin:0 0 18px}
 .big{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px 20px;margin-bottom:18px}
@@ -96,7 +97,7 @@ nav button[aria-current=page]{color:var(--accent);background:var(--bg)}
 .two{display:grid;grid-template-columns:1fr;gap:16px}@media (min-width:860px){.two{grid-template-columns:1.1fr .9fr;align-items:start}}
 #daftar{scroll-margin-top:16px}
 @media (prefers-color-scheme:dark){:root{--bg:#1d1517;--bg2:#3a2229;--ink:#f5e9ec;--soft:#c6a9b2;--card:#2a1d21;--line:#47323a;--field:#211719;--okb:#183a2a;--ok:#7fd3a7;--warnb:#3d2d14;--warn:#f0c27a;--badb:#43202a;--bad:#ff9aa9;--infob:#1d2c44;--info:#9cc2ff}
-  .hero{background:#4a2330}.btn.ghost{background:var(--field)}nav{background:var(--card)!important}}
+  .lhero{background:#4a2330}.btn.ghost{background:var(--field)}nav{background:#4a2330!important}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .pwrap{position:relative;display:block;flex:1 1 160px;min-width:0}.pwrap input{width:100%;padding-right:46px!important}.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:none;color:var(--soft);cursor:pointer;display:grid;place-items:center;border-radius:10px;padding:0}.eye:hover{color:var(--ink)}.eye:focus-visible{outline:3px solid var(--accent);outline-offset:0}
 </style>
@@ -161,7 +162,7 @@ const PER_DAY={bday:Math.round(34.4e6/365),sel:Math.round(7.4e6/365),birth:Math.
 const near=(n,step)=>'~'+(Math.round(n/step)*step).toLocaleString('en-MY');
 function landing(){
   const r=INFO.rate,min=INFO.payout_min,wk=Math.floor(r*30/7/10)*10;
-  return `<section class="hero" aria-labelledby="hh"><p class="eyebrow">Program agent 100 Blooms</p>
+  return `<section class="lhero" aria-labelledby="hh"><p class="eyebrow">Program agent 100 Blooms</p>
     <h1 id="hh">Jual hadiah yang buat orang senyum, dapat ${rm(r)} setiap order.</h1>
     <p>Tak perlu stok, tak perlu hantar sendiri. Kongsi link awak, team 100 Blooms siapkan dan hantar hadiah tu sampai ke tangan penerima.</p>
     ${INFO.pics&&INFO.pics.length?`<div class="pics">${INFO.pics.map((u,i)=>`<img src="${h(u)}" alt="Penerima hadiah 100 Blooms ${i+1}" loading="${i<4?'eager':'lazy'}">`).join('')}</div>`:''}
