@@ -240,6 +240,15 @@ textarea{min-height:150px;resize:vertical;line-height:1.6}
 .testi h3{font-size:16px;margin:4px 0 8px;display:flex;justify-content:space-between;align-items:baseline}.testi h3 span{font-size:12px;font-weight:600;color:#b07a2a}
 .trow{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;margin:0 -2px 6px}.trow img{flex:none;height:260px;width:auto;border-radius:14px;scroll-snap-align:start;box-shadow:0 2px 10px rgba(0,0,0,.08);cursor:zoom-in}
 .zoom{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px}.zoom img{max-width:100%;max-height:100%;border-radius:12px}
+.hqbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:6px;padding:7px 16px;background:var(--ink,#3b2732);color:#fff;font:500 13px var(--body,system-ui)}
+.hqbar b{font-weight:700}.hqbar .sp{flex:1}.hqbar a{color:#fff}
+.hqlog{position:fixed;inset:0;z-index:100;background:rgba(40,20,30,.55);display:grid;place-items:center;padding:16px}
+.hqcard{background:var(--card,#fff);border-radius:22px;padding:22px 20px;width:100%;max-width:380px;display:flex;flex-direction:column;gap:8px;text-align:center;box-shadow:0 24px 60px -20px rgba(0,0,0,.4)}
+.hqcard input{width:100%;font:inherit;font-size:16px;padding:12px 14px;border:1.5px solid var(--line,#e6d6dc);border-radius:14px;background:var(--card,#fff);color:inherit}.hqcard input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.hqcard .field{text-align:left}.hqcard h2{margin:4px 0 0}
+.hqpw{position:relative}.hqpw input{width:100%;padding-right:46px}.hqpw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;font-size:18px;cursor:pointer;padding:6px}
+.hqinv summary{cursor:pointer;font-weight:600;padding:6px 0}.hqinv pre{white-space:pre-wrap;font:13px/1.45 ui-monospace,Menlo,monospace;background:var(--bg2,#fbeef0);border-radius:14px;padding:12px;max-height:340px;overflow:auto;margin:6px 0 0}
+.hqwa{background:#1fa855!important;border-color:#1fa855!important}
 </style>
 
 </head>
@@ -401,6 +410,8 @@ const zoneFee=()=>zoneOf(S.rpost)==='plus20'?20:0;
 const blank=()=>({voucher:'',vinfo:null,step:0,occ:null,rel:null,gender:null,call:'',callCustom:'',bq:null,bal:null,cake:null,extraCake:0,extraCakes:{},photos:[],
   otherFl:[],wishPick:null,wish:'',rname:'',rphone:'',raddr:'',rpost:'',date:'',del:'free',time:'',bname:'',bphone:'',sender:''});
 let S=blank(), dir=1;
+/* Sales HQ mode (/sales/): same page, signed-in team member, ends with a WhatsApp invoice for the buyer */
+const HQ=window.HQ_MODE?{user:null,csrf:''}:null,SKEY=HQ?'hb_hq_state':'hb_state';
 /* server state: Malaysia time, closed dates, out-of-stock items (api/catalog.php) */
 let CAT={now:null,t0:Date.now(),blocked:[],off:{bq:[],bal:[],cake:[]}};
 const myNow=()=>CAT.now?new Date(new Date(CAT.now).getTime()+(Date.now()-CAT.t0)):new Date();
@@ -409,10 +420,10 @@ const isBlocked=d=>CAT.blocked.includes(d);
 try{const t=new URLSearchParams(location.search).get('test');if(t)sessionStorage.setItem('hb_test',t);}catch(e){}
 // agent link (?ref=101): kept 30 days; the most recent agent link wins
 try{const r=new URLSearchParams(location.search).get('ref');if(r&&/^[0-9]{1,9}$/.test(r))localStorage.setItem('hb_ref',r+'|'+Date.now());}catch(e){}
-function getRef(){try{const [r,t]=(localStorage.getItem('hb_ref')||'').split('|');if(r&&(!t||Date.now()-t<30*864e5))return r}catch(e){}return ''}
-try{const s=JSON.parse(localStorage.getItem('hb_state')||'null'); if(s){S=Object.assign(blank(),s,{photos:[]});}}catch(e){}
+function getRef(){if(HQ)return '';try{const [r,t]=(localStorage.getItem('hb_ref')||'').split('|');if(r&&(!t||Date.now()-t<30*864e5))return r}catch(e){}return ''}
+try{const s=JSON.parse(localStorage.getItem(SKEY)||'null'); if(s){S=Object.assign(blank(),s,{photos:[]});}}catch(e){}
 if(S.extraCake&&!Object.keys(S.extraCakes||{}).length){S.extraCakes={'Pilihan lain (ikut stok)':S.extraCake};}
-const save=()=>{try{const c=Object.assign({},S,{photos:[]});localStorage.setItem('hb_state',JSON.stringify(c))}catch(e){}};
+const save=()=>{try{const c=Object.assign({},S,{photos:[]});localStorage.setItem(SKEY,JSON.stringify(c))}catch(e){}};
 
 const $=s=>document.querySelector(s);
 const h=(s)=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -724,9 +735,9 @@ const SCR={
    <div class="sum"><h2>Maklumat awak</h2>
     <div class="field"><label for="bname">Nama awak</label><input id="bname" type="text" value="${h(S.bname)}"></div>
     <div class="field"><label for="bphone">Nombor WhatsApp awak</label><input id="bphone" type="tel" inputmode="tel" value="${h(S.bphone)}"><span class="hint">Kami hantar resit dan gambar penerima ke nombor ni.</span></div></div>`;
-  const chk=()=>foot('Bayar '+rm(total()),S.bname.trim()&&S.bphone.replace(/\D/g,'').length>=9);
+  const chk=()=>foot((HQ?'Simpan & sediakan invoice · ':'Bayar ')+rm(total()),S.bname.trim()&&S.bphone.replace(/\D/g,'').length>=9);
   try{if(sessionStorage.getItem('hb_test'))el.insertAdjacentHTML('afterbegin','<div class="status warn"><b>Mod ujian:</b> jika kod ujian betul, bayaran sebenar hanya RM1 dan order ditanda ORDER UJIAN.</div>')}catch(e){}
-  el.insertAdjacentHTML('beforeend','<p class="hint" style="text-align:center;margin:0">Bayar dengan DuitNow QR atau FPX (online banking) melalui halaman bayaran yang selamat.</p>');
+  el.insertAdjacentHTML('beforeend',HQ?'<p class="hint" style="text-align:center;margin:0">🧑‍💼 Mod Sales HQ: order disimpan atas nama awak, kemudian hantar invoice (dengan link bayaran) ke WhatsApp pembeli.</p>':'<p class="hint" style="text-align:center;margin:0">Bayar dengan DuitNow QR atau FPX (online banking) melalui halaman bayaran yang selamat.</p>');
   ['bname','bphone'].forEach(k=>$('#'+k).oninput=e=>{S[k]=e.target.value;chk();save()});chk();
   const vap=$('#vap');if(vap){const go=async()=>{const c=$('#vc').value.trim();if(!c)return;vap.disabled=true;vap.textContent='…';
     const ref=getRef();
@@ -741,7 +752,7 @@ const SCR={
  pay(el){
   $('#back').disabled=true;$('#foot').innerHTML='';
   el.innerHTML=`<div class="done"><div class="tick" style="background:var(--bg2)"><span class="typing" aria-label="sedang memproses"><i></i><i></i><i></i></span></div>
-   <h1>Sedang simpan order awak…</h1><p class="sub" id="pst">Jangan tutup halaman ni. Awak akan dibawa ke halaman bayaran sekejap lagi.</p><div id="perr" style="width:100%"></div></div>`;
+   <h1>${HQ?'Sedang simpan order…':'Sedang simpan order awak…'}</h1><p class="sub" id="pst">${HQ?'Invoice WhatsApp akan disediakan sekejap lagi.':'Jangan tutup halaman ni. Awak akan dibawa ke halaman bayaran sekejap lagi.'}</p><div id="perr" style="width:100%"></div></div>`;
   submitOrder();
  },
  done(el){
@@ -880,6 +891,7 @@ async function submitOrder(){
   const fd=new FormData();fd.append('data',JSON.stringify(d));
   S.photos.forEach((u,i)=>fd.append('photo[]',dataUrlToBlob(u),'p'+(i+1)+'.jpg'));
   let r,j;
+  if(HQ)return hqSubmit(fd,err);
   try{r=await fetch('api/order.php',{method:'POST',body:fd});j=await r.json().catch(()=>({}));}
   catch(e){return err('Tiada sambungan internet. Semak sambungan dan cuba lagi.');}
   if(j.payUrl){try{localStorage.setItem('hb_last',JSON.stringify({code:j.code}))}catch(e){}$('#pst').textContent='Membuka halaman bayaran…';location.href=j.payUrl;return;}
@@ -893,12 +905,57 @@ async function checkReturn(code,k,tries){
   window.RESULT={code};S.step=STEPS.indexOf('done');render();
 }
 
+/* ---------- Sales HQ ---------- */
+async function hqSubmit(fd,err){
+  let r,j;
+  try{r=await fetch('admin/api.php?a=hqorder',{method:'POST',body:fd,headers:{'X-CSRF':HQ.csrf},credentials:'same-origin'});j=await r.json().catch(()=>({}));}
+  catch(e){return err('Tiada sambungan internet. Semak sambungan dan cuba lagi.');}
+  if(r.status===401||r.status===419){submitting=false;hqLogin(()=>{$('#perr').innerHTML='';submitOrder()});return err('Sesi tamat. Log masuk semula, kemudian tekan Cuba lagi.');}
+  if(!j.code)return err(j.error||'Order tak dapat disimpan. Cuba lagi.');
+  submitting=false;S=blank();save();hqDone(j);
+}
+function hqDone(j){
+  const wa=`https://wa.me/${j.b_phone}?text=${encodeURIComponent(j.invoice)}`;
+  $('#back').disabled=true;$('#foot').innerHTML='';
+  $('#main').innerHTML=`<div class="done"><div class="tick"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+    <h1>Order ${h(j.code)} disimpan</h1><p class="sub">Jumlah <b>${rm(j.total)}</b> · ${h(j.b_name)} (+${h(j.b_phone)})<br>Langkah terakhir: hantar invoice ke WhatsApp pembeli.</p>
+    ${j.warn?`<div class="status warn" style="width:100%">${h(j.warn)}</div>`:''}
+    <a class="btn hqwa" href="${h(wa)}" target="_blank" rel="noopener" style="display:block;flex:none;width:100%;text-decoration:none;text-align:center">📲 Hantar invoice ke WhatsApp pembeli</a>
+    <button class="btn ghost" id="hqcp" style="flex:none;width:100%">Salin invoice</button>
+    <details class="hqinv" style="width:100%;text-align:left"><summary>Lihat invoice</summary><pre>${h(j.invoice)}</pre></details>
+    <button class="btn ghost" id="hqnew" style="flex:none;width:100%">＋ Order baru</button>
+    <p class="hint" style="margin:0">Status bayaran dikemas kini sendiri bila pembeli bayar online. Bayaran QR bank: sahkan di <a href="admin/" target="_blank" rel="noopener">admin</a>.</p></div>`;
+  $('#hqcp').onclick=async()=>{try{await navigator.clipboard.writeText(j.invoice);$('#hqcp').textContent='✓ Invoice disalin'}catch(e){$('.hqinv').open=true}};
+  $('#hqnew').onclick=()=>{S=blank();save();dir=1;render();scrollTo(0,0)};
+}
+function hqBar(){
+  let b=document.getElementById('hqbar');if(!b){b=document.createElement('div');b.id='hqbar';b.className='hqbar';document.body.prepend(b);}
+  b.innerHTML=HQ.user?`🧑‍💼 <b>Sales HQ</b> · ${h(HQ.user.name)} <span class="sp"></span><a href="admin/" target="_blank" rel="noopener">Admin</a> · <a href="#" id="hqout">Log keluar</a>`:'🧑‍💼 <b>Sales HQ</b> · belum log masuk';
+  const o=document.getElementById('hqout');if(o)o.onclick=async e=>{e.preventDefault();try{await fetch('admin/api.php?a=logout',{method:'POST',headers:{'X-CSRF':HQ.csrf},credentials:'same-origin'})}catch(x){}HQ.user=null;hqBar();hqLogin()};
+}
+async function hqMe(){try{const r=await fetch('admin/api.php?a=me',{credentials:'same-origin'});if(!r.ok)return false;const j=await r.json();HQ.user=j.user;HQ.csrf=j.csrf;hqBar();return true}catch(e){return false}}
+function hqLogin(then){
+  const L=$('#layer');
+  L.innerHTML=`<div class="hqlog" role="dialog" aria-modal="true" aria-labelledby="hqlt"><form id="hqf" class="hqcard" novalidate>
+    <div style="font-size:34px;line-height:1">🧑‍💼</div><h2 id="hqlt">Log masuk Sales HQ</h2><p class="hint" style="margin:0 0 6px">Guna akaun admin awak sendiri. Setiap order disimpan atas nama awak.</p>
+    <div class="field"><label for="hqe">Email</label><input id="hqe" type="email" autocomplete="username" required></div>
+    <div class="field"><label for="hqp">Password</label><div class="hqpw"><input id="hqp" type="password" autocomplete="current-password" required><button type="button" id="hqeye" aria-label="Tunjuk password" aria-pressed="false">👁</button></div></div>
+    <div id="hqerr"></div><button class="btn" type="submit" style="flex:none;width:100%">Log masuk</button></form></div>`;
+  $('#hqeye').onclick=()=>{const i=$('#hqp'),on=i.type==='password';i.type=on?'text':'password';$('#hqeye').setAttribute('aria-pressed',on);$('#hqeye').setAttribute('aria-label',on?'Sembunyi password':'Tunjuk password')};
+  $('#hqf').onsubmit=async e=>{e.preventDefault();$('#hqerr').innerHTML='';
+    try{const r=await fetch('admin/api.php?a=login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({email:$('#hqe').value,pw:$('#hqp').value})});const j=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(j.error||'Log masuk gagal.');await hqMe();L.innerHTML='';then&&then();}
+    catch(x){$('#hqerr').innerHTML=`<div class="status bad">${h(x.message)}</div>`}};
+  setTimeout(()=>$('#hqe').focus(),50);
+}
+
 /* ---------- boot ---------- */
 if(STEPS[S.step]==='done'||STEPS[S.step]==='pay')S.step=STEPS.indexOf('sum');
 (async()=>{
   try{const r=await fetch('api/catalog.php',{cache:'no-store'});if(r.ok){const j=await r.json();CAT=Object.assign(CAT,j,{t0:Date.now()});}}catch(e){}
   const P=new URLSearchParams(location.search);
-  if(P.get('r')&&P.get('k')){checkReturn(P.get('r'),P.get('k'),0);}
+  if(HQ){hqBar();if(!(await hqMe()))hqLogin();render();}
+  else if(P.get('r')&&P.get('k')){checkReturn(P.get('r'),P.get('k'),0);}
   else render();
   setTimeout(()=>$('#splash').classList.add('gone'),900);
 })();

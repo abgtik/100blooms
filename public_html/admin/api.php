@@ -605,7 +605,7 @@ case 'reportcsv':
     $inc('bouquet', $C['bq'][$o['bouquet']] ?? $o['bouquet'], $v); $inc('balloon', $C['bal'][$o['balloon']] ?? $o['balloon'], $v);
     $inc('occasion', $C['occ'][$o['occasion']] ?? $o['occasion'], $v); $inc('cake', $o['cake'], $v);
     $inc('del', $DL[$o['del_type']] ?? $o['del_type'], $v); $inc('zone', $o['zone'] === 'plus20' ? 'Zon merah (+RM20)' : ($o['zone'] === 'out' ? 'Luar kawasan (kes khas)' : 'Zon biru (percuma)'), $v);
-    $inc('area', substr($o['r_post'], 0, 2) . 'xxx', $v); $inc('source', $o['agent_ref'] ? 'Agent: ' . $o['agent_ref'] : (!empty($o['created_by']) ? 'WhatsApp (sales team)' : 'Laman web (terus)'), $v);
+    $inc('area', substr($o['r_post'], 0, 2) . 'xxx', $v); $inc('source', $o['agent_ref'] ? 'Agent: ' . $o['agent_ref'] : (!empty($o['created_by']) ? 'Sales HQ: ' . $o['created_by'] : 'Laman web (terus)'), $v);
     if (!empty($o['voucher'])) $inc('voucher', $o['voucher'], $v);
   }
   $olN = 0; $olS = 0.0;
@@ -704,6 +704,29 @@ case 'manual': // sales team keys in an order taken on WhatsApp
   try { [$bill, $url] = pay_create($o); q('UPDATE orders SET bill_code=? WHERE id=?', [$bill, $o['id']]); }
   catch (Throwable $e) { error_log('100blooms manual bill: ' . $e->getMessage()); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'payUrl' => null, 'track_url' => $track, 'warn' => 'Order disimpan tapi link bayaran gagal dicipta: ' . mb_substr($e->getMessage(), 0, 150)]); }
   json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'payUrl' => $url, 'track_url' => $track, 'invoice' => $inv . "\n\n[ Pay online (DuitNow / FPX): $url ]"]);
+
+case 'hqorder': // Sales HQ page (/sales/): customer order flow, saved under this team member, payment link + WhatsApp invoice for the buyer
+  $m = need_login(); if (!$post) fail('POST sahaja.', 405);
+  $d = json_decode((string)($_POST['data'] ?? ''), true); if (!is_array($d)) fail('Data order tidak lengkap.');
+  $files = collect_photos();
+  $r = build_order($d, count($files));
+  if (isset($r['errors'])) fail(implode(' ', $r['errors']), 422);
+  $o = $r['order'];
+  $o['code'] = new_code(); $o['token'] = bin2hex(random_bytes(12)); $o['created_at'] = date('Y-m-d H:i:s');
+  $o['agent_ref'] = null; $o['created_by'] = $m['name']; $o['pay_mode'] = 'gateway';
+  $o['notes'] = trim('Order Sales HQ oleh ' . $m['name'] . '.');
+  try {
+    $o['photos'] = json_encode(save_photos($o['code'], $files));
+    $cols = array_keys($o);
+    q('INSERT INTO orders (' . implode(',', $cols) . ') VALUES (' . implode(',', array_fill(0, count($cols), '?')) . ')', array_values($o));
+    $o['id'] = (int)db()->lastInsertId();
+  } catch (Throwable $e) { error_log('100blooms hqorder: ' . $e->getMessage()); fail('Order tak dapat disimpan. Cuba lagi.', 500); }
+  $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
+  $url = null; $warn = null;
+  try { [$bill, $url] = pay_create($o); q('UPDATE orders SET bill_code=? WHERE id=?', [$bill, $o['id']]); }
+  catch (Throwable $e) { error_log('100blooms hqorder bill: ' . $e->getMessage()); $warn = 'Link bayaran online gagal dicipta. Pembeli masih boleh bayar melalui QR bank di Invoice Link.'; }
+  $inv = invoice_text($o) . ($url ? "\n\n[ Pay online (DuitNow / FPX / Card): $url ]" : '');
+  json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'b_phone' => wa_num((string)$o['b_phone']), 'b_name' => $o['b_name'], 'track_url' => $track, 'payUrl' => $url, 'invoice' => $inv, 'warn' => $warn]);
 
 case 'vouchers':
   need_login();

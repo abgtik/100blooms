@@ -244,7 +244,7 @@ function login(err){
   $('#le').focus();
 }
 async function boot(){
-  try{const j=await api('me');ME=j.user;CSRF=j.csrf;if(j.pmeta)PM=j.pmeta;if(j.status_label)Object.assign(ST,j.status_label);GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
+  try{const j=await api('me');ME=j.user;ME.site=j.site;CSRF=j.csrf;if(j.pmeta)PM=j.pmeta;if(j.status_label)Object.assign(ST,j.status_label);GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
 }
 function render(){
   const T=[['dash','Dashboard'],['orders','Order'],['new','＋ Order'],['cal','Kalendar'],['report','Report'],['vouch','Voucher'],['agent','Agent'],['cust','Pelanggan'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
@@ -415,7 +415,7 @@ function NewOrder(el){
   const C=CAT,lab=(t,k,n)=>{const c=(PM[t]||{})[k];return (c&&c.code?c.code+' - ':'')+n};
   const optc=(t,o)=>Object.entries(o).map(([k,n])=>[k,lab(t,k,n)]).sort((a,b)=>{const ca=(PM[t]||{})[a[0]]?.code||'',cb=(PM[t]||{})[b[0]]?.code||'';return (!ca-!cb)||(ca||a[1]).localeCompare(cb||b[1],undefined,{numeric:true})}).map(([k,n])=>`<option value="${h(k)}">${h(n)}</option>`).join('');
   const cakes=[...C.cake_free,...C.cake_up],tom=new Date(Date.now()+864e5);
-  el.innerHTML=`<form id="nf" novalidate>
+  el.innerHTML=`<div class="msg ok" style="margin:0 0 12px">🧑‍💼 <b>Page order Sales HQ</b>: sama macam page customer, order disimpan atas nama awak dan diakhiri invoice WhatsApp ke pembeli. <a href="../sales/" target="_blank" rel="noopener">Buka page Sales HQ ↗</a> <span class="mini">(link: ${h((ME.site||location.origin)+"/sales/")})</span></div><form id="nf" novalidate>
    <div class="card"><h2>Item</h2><div class="fgrid">
     <label class="fl">Bouquet<select id="f_bq">${optc('bq',C.bq)}</select></label>
     <label class="fl">Wrapping / nota bouquet<input id="f_bqn" placeholder="Contoh: Red + Black (Normal)"></label>
