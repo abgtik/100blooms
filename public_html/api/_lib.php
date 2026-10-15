@@ -377,7 +377,7 @@ function ol_guess(array $extra, string $notes): array {
 }
 /** Insert or refresh one Orderla order. Returns 'new' | 'updated' | 'skip'. */
 function ol_upsert(array $o): string {
-  $code = (string)($o['code_id'] ?? ''); if ($code === '') return 'skip';
+  $code = (string)($o['code_id'] ?? ''); if ($code === '' || setting('olx_' . substr(md5($code), 0, 20))) return 'skip'; // olx_ = deleted by the owner
   $items = implode('; ', array_map(function ($it) {
     $v = ''; if (!empty($it['variants']) && is_array($it['variants'])) $v = ' (' . implode(', ', array_filter(array_map(fn($x) => is_array($x) ? ($x['name'] ?? $x['value'] ?? '') : (string)$x, $it['variants']))) . ')';
     return ((int)($it['quantity'] ?? 1)) . 'x ' . ($it['name'] ?? '?') . $v;

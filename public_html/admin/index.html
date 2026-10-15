@@ -90,12 +90,14 @@ a{color:var(--accent)}
 .hbar .n{color:var(--soft);font-size:12.5px}
 .ranks{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
 .rt{width:100%;border-collapse:collapse;font-size:13.5px}.rt td{padding:5px 0;border-bottom:1px dashed var(--line)}.rt td+td{text-align:right;font-variant-numeric:tabular-nums;color:var(--soft);white-space:nowrap;padding-left:8px}
-.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.cal .hd{font-size:11.5px;color:var(--soft);text-align:center;font-weight:700;padding:4px 0}
-.cal button{min-height:78px;border:1.5px solid transparent;background:var(--card);border-radius:12px;padding:6px;text-align:left;font:inherit;color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:3px;overflow:hidden}
-.cal button.out{visibility:hidden}.cal button.today{border-color:var(--accent)}.cal button[aria-pressed=true]{background:var(--ink);color:var(--card)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--line)}
+.cal .hd{font-size:11.5px;color:var(--soft);text-align:center;font-weight:700;padding:6px 0;background:var(--bg);border-bottom:1px solid var(--line)}
+.cal>*:not(:nth-child(7n)){box-shadow:inset -1px 0 0 var(--line)}
+.cal button{min-height:78px;border:0;border-bottom:1px solid var(--line);background:var(--card);border-radius:0;padding:6px;text-align:left;font:inherit;color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.cal button.out{background:var(--bg);cursor:default}.cal button.today{outline:2px solid var(--accent);outline-offset:-3px;border-radius:6px}.cal button:not(.out):hover{background:var(--bg)}.cal button[aria-pressed=true]{background:var(--ink);color:var(--card)}
 .cal .d{font-weight:700;font-size:13px}.cal .c{font:600 12px var(--body);background:var(--accent);color:var(--on);border-radius:99px;padding:1px 7px;align-self:flex-start}
 .cal .c.pend{background:var(--warnb);color:var(--warn)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}.btn.danger:hover{background:var(--badb)}
 @media (max-width:560px){.cal button{min-height:56px;padding:4px}.cal .d{font-size:12px}.cal .lbl{display:none}}
 
 .wf{display:flex;flex-direction:column;gap:6px}
@@ -232,6 +234,19 @@ function render(){
   ({dash:Dash,new:NewOrder,cal:Cal,report:Report,orders:Orders,vouch:Vouchers,agent:Agents,cust:Customers,stock:Stock,dates:Dates,acc:Acc})[tab]($('#main'));
 }
 
+/* ---------- Orderla rows (calendar and today's list) ---------- */
+function olRow(o,note){return `<div><button class="ord" data-lid="${o.lid}"><div><span class="c">${h(o.code)}</span> <span class="pill" style="background:var(--infob);color:var(--info)">Orderla</span> <span class="pill ${o.pay_status==='paid'?'p-selesai':'p-menunggu_bayaran'}">${o.pay_status==='paid'?h(o.ol_status||'dibayar'):'belum bayar'}</span>
+  <div class="m">untuk ${h(o.r_name)} · daripada ${h(o.b_name||'-')}${note||''}</div><div class="m">${h((o.items||'').slice(0,110))}</div></div><div class="r"><div class="t">${rm(o.total)}</div></div></button><div class="lx" id="lx${o.lid}" hidden></div></div>`}
+function bindOl(root,reload){root.querySelectorAll('[data-lid]').forEach(b=>b.onclick=async()=>{const box=root.querySelector('#lx'+b.dataset.lid);if(!box.hidden){box.hidden=true;return}
+  try{const o=(await api('legacy',{params:{id:b.dataset.lid}})).order;box.hidden=false;
+    box.innerHTML=`<div class="card" style="margin:6px 0 10px;background:var(--bg)"><div class="rowx"><span>Pembeli</span><span>${h(o.name||'-')}${o.phone?` · <a href="https://wa.me/${h(o.phone)}" target="_blank" rel="noopener">${h(o.phone)}</a>`:''}</span></div>
+      <div class="rowx"><span>Alamat</span><span>${h(o.address||'-')} ${h(o.postcode||'')}</span></div><div class="rowx"><span>Item</span><span>${h(o.items||'-')}</span></div>
+      ${Object.entries(o.extra).filter(([k])=>!/^additional_charges\./.test(k)).map(([k,v])=>`<div class="rowx"><span>${h(k)}</span><span style="white-space:pre-wrap">${h(v)}</span></div>`).join('')}
+      <div class="rowx"><span>Diorder</span><span>${fmtDT(o.created_at)} · ${h(o.invoice_no||o.code_id)}</span></div><p class="mini" style="margin:6px 0 0">Order dari Orderla (baca sahaja). Urus status di Orderla.</p>
+      ${ME.role==='owner'?`<div style="text-align:right;margin-top:8px"><button class="btn ghost sm danger" data-oldel="${o.id}">🗑️ Padam dari sistem ni</button></div>`:''}</div>`;
+    const d=box.querySelector('[data-oldel]');if(d)d.onclick=async()=>{if(!confirm(`Padam order Orderla ${o.invoice_no||o.code_id} dari sistem ni? Sync automatik takkan bawa balik. (Data di Orderla tak terjejas.)`))return;
+      try{await api('oldel',{method:'POST',body:{id:o.id}});toast('Order dipadam');reload&&reload()}catch(e){toast(e.message)}};
+  }catch(e){toast(e.message)}})}
 /* ---------- orders ---------- */
 async function Orders(el){
   const F=[['today','Hantar hari ini'],['paid','Perlu diuruskan'],['pending','Menunggu bayaran'],['delivered','Selesai'],['all','Semua']];
@@ -248,14 +263,15 @@ async function Orders(el){
   async function load(){
     let j;try{j=await api('orders',{params:{f,q:qs,from:f==='today'?'':dfrom,to:f==='today'?'':dto}})}catch(e){if(e.message!=='auth')$('#ol').innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
     const c=j.counts;
-    $('#kp').innerHTML=`<div class="kpi"><small>Hantar hari ini</small><b>${c.today}</b> <span class="mini">${c.today_left} belum selesai</span></div>
+    $('#kp').innerHTML=`<div class="kpi"><small>Hantar hari ini</small><b>${c.today}</b> <span class="mini">${c.today_left} belum selesai${c.today_unpaid?` · ${c.today_unpaid} belum bayar`:''}</span></div>
       <div class="kpi"><small>Menunggu bayaran (24 jam)</small><b>${c.pending}</b></div><div class="kpi"><small>Bayaran diterima hari ini</small><b>${rm(c.paid_today_rm)}</b></div>`;
-    $('#ol').innerHTML=j.rows.length?j.rows.map(o=>`<button class="ord" data-id="${o.id}">
+    const LG=j.legacy||[];
+    $('#ol').innerHTML=(j.rows.length||LG.length)?j.rows.map(o=>`<button class="ord" data-id="${o.id}">
       <div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">Hantar <b style="color:var(--ink)">${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</div>
        ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}${(o.need||[]).map(t=>`<span class="pg" style="background:var(--warnb);color:var(--warn)">${h(t)}</span>`).join(' ')}<div class="m">Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
-      <div class="r"><div class="t">${rm(o.total)}</div><div class="m">Order ${fmtDT(o.created_at)}</div></div></button>`).join('')
+      <div class="r"><div class="t">${rm(o.total)}</div><div class="m">Order ${fmtDT(o.created_at)}</div></div></button>`).join('')+LG.map(o=>olRow(o)).join('')
       :`<div class="empty">Tiada order${f==='today'?' untuk dihantar hari ini':''}.</div>`;
-    document.querySelectorAll('.ord').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,load));
+    $('#ol').querySelectorAll('.ord[data-id]').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,load));bindOl($('#ol'),load);
   }
   load();
 }
@@ -335,10 +351,14 @@ async function openOrder(id,reload){
     <div class="rowx" style="font-weight:700"><span style="color:var(--ink)">Jumlah</span><span>${rm(o.total)}</span></div></div>
    <div class="card"><h2>Nota dalaman</h2><textarea id="nn" rows="3" style="width:100%" placeholder="Contoh: perisa kek ditukar, customer minta call dulu">${h(o.notes||'')}</textarea>
     <button class="btn ghost sm" id="sn" style="margin-top:8px">Simpan nota</button></div>
+   ${ME.role==='owner'?`<div class="card dz"><h2>Padam order</h2><p class="mini" style="margin-top:0">Untuk order test atau order berganda. Order, gambar dan komisen agent (yang belum dibayar) dipadam terus dan tak boleh dikembalikan. Kalau customer batal, guna <b>Batalkan</b> supaya rekod kekal.</p>
+    <button class="btn ghost sm danger" id="odel">🗑️ Padam order ${h(o.code)}</button></div>`:''}
   </div></div>`;
   const close=()=>{$('#layer').innerHTML=''};
   const done=async(p,msg)=>{try{await p;toast(msg);reload&&reload();openOrder(id,reload)}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}};
   $('#cx').onclick=close;$('#sc').onclick=e=>{if(e.target.id==='sc')close()};
+  if($('#odel'))$('#odel').onclick=async()=>{if(prompt(`Padam terus order ${o.code}? Taip PADAM untuk sahkan.`)!=='PADAM')return;
+    try{await api('delorder',{method:'POST',body:{id}});toast('Order '+o.code+' dipadam');close();reload&&reload()}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}};
   document.addEventListener('keydown',function k(e){if(e.key==='Escape'){close();document.removeEventListener('keydown',k)}});
   document.querySelectorAll('[data-prep]').forEach(c=>c.onchange=()=>done(api('prep',{method:'POST',body:{id,item:c.dataset.prep,on:c.checked}}),c.checked?'Ditick':'Tick dibuang'));
   document.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>{const st=b.dataset.step,body={id,step:st};
@@ -560,18 +580,12 @@ async function Cal(el){
   const D=j.days||{};
   $('#cg').innerHTML=['Isn','Sel','Rab','Kha','Jum','Sab','Ahd'].map(d=>`<div class="hd">${d}</div>`).join('')+Array.from({length:lead},()=>'<button class="out" tabindex="-1" aria-hidden="true"></button>').join('')+
     Array.from({length:days},(_,i)=>{const d=`${cal.m}-${String(i+1).padStart(2,'0')}`,L=D[d]||[],paid=L.filter(o=>o.pay_status==='paid').length,pend=L.length-paid;
-      return `<button data-d="${d}" class="${d===TODAY?'today':''}" aria-pressed="${cal.sel===d}" aria-label="${d}: ${paid} order dibayar${pend?', '+pend+' belum bayar':''}"><span class="d">${i+1}</span>${paid?`<span class="c">${paid}</span>`:''}${pend?`<span class="c pend">${pend}<span class="lbl"> belum bayar</span></span>`:''}</button>`}).join('');
+      return `<button data-d="${d}" class="${d===TODAY?'today':''}" aria-pressed="${cal.sel===d}" aria-label="${d}: ${paid} order dibayar${pend?', '+pend+' belum bayar':''}"><span class="d">${i+1}</span>${paid?`<span class="c">${paid}</span>`:''}${pend?`<span class="c pend">${pend}<span class="lbl"> belum bayar</span></span>`:''}</button>`}).join('')+Array.from({length:(7-(lead+days)%7)%7},()=>'<button class="out" tabindex="-1" aria-hidden="true"></button>').join('');
   const show=d=>{cal.sel=d;el.querySelectorAll('[data-d]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.d===d));const L=D[d]||[];
     $('#cday').innerHTML=`<div class="card"><h2>${fmtD(d)} · ${cal.by==='del'?'dihantar':'diorder'}</h2>${L.length?`<div class="list">${L.map(o=>o.src==='orderla'
-      ?`<div><button class="ord" data-lid="${o.lid}"><div><span class="c">${h(o.code)}</span> <span class="pill" style="background:var(--infob);color:var(--info)">Orderla</span> <span class="pill ${o.pay_status==='paid'?'p-selesai':'p-menunggu_bayaran'}">${o.pay_status==='paid'?h(o.ol_status||'dibayar'):'belum bayar'}</span>
-          <div class="m">untuk ${h(o.r_name)} · daripada ${h(o.b_name||'-')}${o.no_del&&cal.by==='del'?' · <i>tarikh hantar tak dijumpai, ikut tarikh order</i>':''}</div><div class="m">${h((o.items||'').slice(0,110))}</div></div><div class="r"><div class="t">${rm(o.total)}</div></div></button><div class="lx" id="lx${o.lid}" hidden></div></div>`
+      ?olRow(o,o.no_del&&cal.by==='del'?' · <i>tarikh hantar tak dijumpai, ikut tarikh order</i>':'')
       :`<button class="ord" data-id="${o.id}"><div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">${h(delTxt(o))} · untuk ${h(o.r_name)} · ${h(CAT.bq[o.bouquet]||o.bouquet)}</div></div><div class="r"><div class="t">${rm(o.total)}</div></div></button>`).join('')}</div>`:'<p class="mini">Tiada order.</p>'}</div>`;
-    $('#cday').querySelectorAll('[data-lid]').forEach(b=>b.onclick=async()=>{const box=$('#lx'+b.dataset.lid);if(!box.hidden){box.hidden=true;return}
-      try{const o=(await api('legacy',{params:{id:b.dataset.lid}})).order;box.hidden=false;
-        box.innerHTML=`<div class="card" style="margin:6px 0 10px;background:var(--bg)"><div class="rowx"><span>Pembeli</span><span>${h(o.name||'-')}${o.phone?` · <a href="https://wa.me/${h(o.phone)}" target="_blank" rel="noopener">${h(o.phone)}</a>`:''}</span></div>
-          <div class="rowx"><span>Alamat</span><span>${h(o.address||'-')} ${h(o.postcode||'')}</span></div><div class="rowx"><span>Item</span><span>${h(o.items||'-')}</span></div>
-          ${Object.entries(o.extra).filter(([k])=>!/^additional_charges\./.test(k)).map(([k,v])=>`<div class="rowx"><span>${h(k)}</span><span style="white-space:pre-wrap">${h(v)}</span></div>`).join('')}
-          <div class="rowx"><span>Diorder</span><span>${fmtDT(o.created_at)} · ${h(o.invoice_no||o.code_id)}</span></div><p class="mini" style="margin:6px 0 0">Order dari Orderla (baca sahaja). Urus status di Orderla.</p></div>`}catch(e){toast(e.message)}});
+    bindOl($('#cday'),()=>Cal(el));
     $('#cday').querySelectorAll('.ord[data-id]').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,()=>Cal(el)));};
   el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>show(b.dataset.d));
   if(cal.sel)show(cal.sel);else if(TODAY.startsWith(cal.m))show(TODAY);

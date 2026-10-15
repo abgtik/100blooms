@@ -68,7 +68,7 @@ case 'orders':
   if ($f === 'pending') $W[] = "pay_status<>'paid'";
   elseif ($f === 'paid') { $W[] = "pay_status='paid'"; $W[] = "status NOT IN ('selesai','batal')"; }
   elseif ($f === 'delivered') $W[] = "status='selesai'";
-  elseif ($f === 'today') { $W[] = 'del_date=?'; $P[] = date('Y-m-d'); $W[] = "pay_status='paid'"; }
+  elseif ($f === 'today') { $W[] = 'del_date=?'; $P[] = date('Y-m-d'); $W[] = "status<>'batal'"; } // same as the calendar: paid and unpaid
   if (!empty($_GET['from'])) { $W[] = "$by>=?"; $P[] = $_GET['from'] . ($by === 'created_at' ? ' 00:00:00' : ''); }
   if (!empty($_GET['to'])) { $W[] = "$by<=?"; $P[] = $_GET['to'] . ($by === 'created_at' ? ' 23:59:59' : ''); }
   if ($qq !== '') { $W[] = '(code LIKE ? OR r_name LIKE ? OR b_name LIKE ? OR r_phone LIKE ? OR b_phone LIKE ?)'; array_push($P, ...array_fill(0, 5, "%$qq%")); }
@@ -78,13 +78,26 @@ case 'orders':
   $rows = q("SELECT id,code,created_at,pay_status,status,bouquet,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher,wish,photos FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
   foreach ($rows as &$r) { $r['progress'] = progress_text($r); $r['need'] = array_values(array_filter([$r['wish'] === WISH_NONE ? 'Wishcard belum' : null, count(jdec($r['photos'])) < (int)$r['photo_count'] ? 'Polaroid ' . count(jdec($r['photos'])) . '/' . (int)$r['photo_count'] : null])); unset($r['price_lines'], $r['prep'], $r['del_steps'], $r['wish'], $r['photos']); } unset($r);
   $t = date('Y-m-d');
+  $legacy = []; $olToday = 0; $olLeft = 0;
+  try { // Orderla orders for today's deliveries sit beside the new ones
+    $olToday = (int)q("SELECT COUNT(*) FROM legacy_orders WHERE del_date=? AND (status IS NULL OR status<>'cancelled')", [$t])->fetchColumn();
+    $olLeft = (int)q("SELECT COUNT(*) FROM legacy_orders WHERE del_date=? AND (status IS NULL OR status NOT IN ('cancelled','completed'))", [$t])->fetchColumn();
+    if ($f === 'today') {
+      $LW = "del_date=? AND (status IS NULL OR status<>'cancelled')"; $LP = [$t];
+      if ($qq !== '') { $LW .= ' AND (invoice_no LIKE ? OR code_id LIKE ? OR name LIKE ? OR receiver LIKE ? OR phone LIKE ?)'; array_push($LP, ...array_fill(0, 5, "%$qq%")); }
+      foreach (q("SELECT id, code_id, invoice_no, created_at, status, pay_status, total, name, receiver, items FROM legacy_orders WHERE $LW ORDER BY created_at", $LP)->fetchAll() as $r)
+        $legacy[] = ['src' => 'orderla', 'lid' => (int)$r['id'], 'code' => $r['invoice_no'] ?: $r['code_id'], 'pay_status' => $r['pay_status'] === 'paid' ? 'paid' : 'pending',
+          'ol_status' => $r['status'], 'r_name' => $r['receiver'] ?: '-', 'b_name' => $r['name'], 'items' => $r['items'], 'total' => (float)$r['total'], 'created_at' => $r['created_at']];
+    }
+  } catch (Throwable $e) {}
   $counts = [
-    'today' => (int)q("SELECT COUNT(*) FROM orders WHERE del_date=? AND pay_status='paid' AND status<>'batal'", [$t])->fetchColumn(),
-    'today_left' => (int)q("SELECT COUNT(*) FROM orders WHERE del_date=? AND pay_status='paid' AND status NOT IN ('selesai','batal')", [$t])->fetchColumn(),
+    'today' => $olToday + (int)q("SELECT COUNT(*) FROM orders WHERE del_date=? AND status<>'batal'", [$t])->fetchColumn(),
+    'today_left' => $olLeft + (int)q("SELECT COUNT(*) FROM orders WHERE del_date=? AND status NOT IN ('selesai','batal')", [$t])->fetchColumn(),
+    'today_unpaid' => (int)q("SELECT COUNT(*) FROM orders WHERE del_date=? AND pay_status<>'paid' AND status<>'batal'", [$t])->fetchColumn(),
     'pending' => (int)q("SELECT COUNT(*) FROM orders WHERE pay_status='pending' AND created_at>=?", [date('Y-m-d H:i:s', time() - 86400)])->fetchColumn(),
     'paid_today_rm' => (float)q("SELECT COALESCE(SUM(total),0) FROM orders WHERE pay_status='paid' AND paid_at>=?", [$t . ' 00:00:00'])->fetchColumn(),
   ];
-  json_out(['rows' => $rows, 'counts' => $counts]);
+  json_out(['rows' => $rows, 'legacy' => $legacy, 'counts' => $counts]);
 
 case 'order':
   need_login();
@@ -123,6 +136,22 @@ case 'update':
   if (($body['status'] ?? '') !== 'batal') refresh_status($o['id']);
   if (!empty($body['mark_paid']) && $o['pay_status'] !== 'paid') after_paid((int)$o['id']); // email, agent commission, WhatsApp
   elseif (isset($body['status'])) sync_commissions(); // commission dropped if cancelled before payout
+  json_out(['ok' => true]);
+
+case 'delorder': // Owner: remove an order for good (test orders, duplicates). Commission already paid out blocks it.
+  need_owner();
+  $o = q('SELECT * FROM orders WHERE id=?', [(int)($body['id'] ?? 0)])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404);
+  if (q('SELECT 1 FROM commissions WHERE order_id=? AND payout_id IS NOT NULL', [$o['id']])->fetch()) fail('Komisen order ni dah dibayar kepada agent. Batalkan sahaja, jangan padam.');
+  q('DELETE FROM commissions WHERE order_id=?', [$o['id']]);
+  q('DELETE FROM orders WHERE id=?', [$o['id']]);
+  $dir = UPLOAD_DIR . '/' . basename((string)$o['code']);
+  if ($o['code'] !== '' && is_dir($dir)) { foreach (glob($dir . '/*') ?: [] as $fl) @unlink($fl); @rmdir($dir); }
+  json_out(['ok' => true]);
+
+case 'oldel': // Owner: hide an Orderla order for good (auto-sync won't bring it back)
+  need_owner();
+  $r = q('SELECT id, code_id FROM legacy_orders WHERE id=?', [(int)($body['id'] ?? 0)])->fetch(); if (!$r) fail('Order tidak dijumpai.', 404);
+  set_setting('olx_' . substr(md5((string)$r['code_id']), 0, 20), '1'); q('DELETE FROM legacy_orders WHERE id=?', [$r['id']]);
   json_out(['ok' => true]);
 
 case 'prep': // tick / untick a production checklist item
