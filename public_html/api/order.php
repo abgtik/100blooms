@@ -16,8 +16,8 @@ try {
   $o['code'] = new_code();
   $o['token'] = bin2hex(random_bytes(12));
   $o['created_at'] = date('Y-m-d H:i:s');
-  $ref = preg_replace('/[^A-Za-z0-9]/', '', (string)($in['ref'] ?? ''));
-  $o['agent_ref'] = $ref !== '' ? substr($ref, 0, 20) : null;
+  $ag = agent_from_ref($in['ref'] ?? ''); // only a real, active agent earns commission
+  $o['agent_ref'] = $ag ? (string)$ag['id'] : null;
   // Test mode: owner opens the site with ?test=<TEST_KEY>; the whole order is charged RM1 and labelled.
   if (defined('TEST_KEY') && TEST_KEY !== '' && is_string($in['test'] ?? null) && hash_equals(TEST_KEY, $in['test'])) {
     $o['price_lines'] = json_encode([['UJIAN SISTEM (bukan order sebenar)', 1]], JSON_UNESCAPED_UNICODE);

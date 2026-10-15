@@ -70,7 +70,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 6) return;
+  if ($v >= 7) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -94,13 +94,35 @@ function migrate(PDO $pdo): void {
   $run("ALTER TABLE orders ADD COLUMN pay_mode VARCHAR(10) NOT NULL DEFAULT 'gateway'");
   // v6: buyer edits the wishcard from the tracking page (limited)
   $run('ALTER TABLE orders ADD COLUMN wish_edits INT NOT NULL DEFAULT 0');
+  // v7: agents, commissions, payouts
+  foreach (agent_schema($my ? 'mysql' : 'sqlite') as $sql) $run($sql);
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','6')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','7')");
+}
+function agent_schema(string $driver): array {
+  $my = $driver === 'mysql';
+  $id = $my ? 'INT UNSIGNED AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+  $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
+  return [
+"CREATE TABLE IF NOT EXISTS agents (
+  id $id, name VARCHAR(100) NOT NULL, phone VARCHAR(30) NOT NULL, email VARCHAR(150) NOT NULL UNIQUE, pass_hash VARCHAR(255) NOT NULL,
+  active TINYINT NOT NULL DEFAULT 1, rate DECIMAL(8,2) NULL,
+  bank_name VARCHAR(60) NULL, bank_acc VARCHAR(40) NULL, bank_holder VARCHAR(100) NULL, qr_file VARCHAR(40) NULL,
+  ig VARCHAR(150) NULL, tiktok VARCHAR(150) NULL, fb VARCHAR(150) NULL, created_at DATETIME NOT NULL, last_login DATETIME NULL
+)$tail",
+"CREATE TABLE IF NOT EXISTS commissions (
+  id $id, order_id INT NOT NULL UNIQUE, agent_id INT NOT NULL, amount DECIMAL(8,2) NOT NULL, created_at DATETIME NOT NULL, payout_id INT NULL
+)$tail",
+"CREATE INDEX idx_comm_agent ON commissions (agent_id)",
+"CREATE TABLE IF NOT EXISTS payouts (
+  id $id, agent_id INT NOT NULL, amount DECIMAL(8,2) NOT NULL, ref VARCHAR(100) NULL, paid_by VARCHAR(100) NULL, created_at DATETIME NOT NULL
+)$tail",
+  ];
 }
 function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare($sql); $s->execute($p); return $s; }
 function setting(string $k, $default = null) { $r = q('SELECT v FROM settings WHERE k=?', [$k])->fetchColumn(); return $r === false ? $default : $r; }
@@ -158,6 +180,47 @@ function progress_text(array $o): string {
   $d = jdec($o['del_steps'] ?? null);
   if ($d) { $last = array_key_last(array_intersect_key(DEL_STEPS, $d)); return DEL_STEPS[$last]; }
   $items = prep_items($o); return 'Penyediaan ' . count(array_intersect_key(jdec($o['prep'] ?? null), $items)) . '/' . count($items);
+}
+
+// ---------- agents ----------
+const AGENT_RATE = 20;   // default commission per paid order (owner can change in admin)
+const PAYOUT_MIN = 40;   // minimum balance paid out on Fridays
+function agent_rate_default(): float { return (float)setting('agent_rate', AGENT_RATE); }
+function payout_min(): float { return (float)setting('payout_min', PAYOUT_MIN); }
+/** Agent number from a ?ref= value, only if that agent exists and is active. */
+function agent_from_ref(?string $ref): ?array {
+  $ref = preg_replace('/\D/', '', (string)$ref); if ($ref === '') return null;
+  return q('SELECT * FROM agents WHERE id=? AND active=1', [(int)$ref])->fetch() ?: null;
+}
+/** Idempotent: one commission per paid order that came through an agent's link; unpaid commissions of cancelled orders are dropped.
+ *  Commissions already paid out are final (agent terms). */
+function sync_commissions(): void {
+  $rows = q("SELECT o.id, o.paid_at, a.id AS aid, COALESCE(a.rate, ?) AS rate FROM orders o JOIN agents a ON a.id = (o.agent_ref + 0)
+    WHERE o.pay_status='paid' AND o.status<>'batal' AND o.agent_ref IS NOT NULL AND o.agent_ref<>''
+    AND NOT EXISTS (SELECT 1 FROM commissions c WHERE c.order_id=o.id)", [agent_rate_default()])->fetchAll();
+  foreach ($rows as $r) {
+    try { q('INSERT INTO commissions (order_id,agent_id,amount,created_at) VALUES (?,?,?,?)', [$r['id'], $r['aid'], $r['rate'], $r['paid_at'] ?: date('Y-m-d H:i:s')]); }
+    catch (PDOException $e) { /* another request inserted it */ }
+  }
+  q("DELETE FROM commissions WHERE payout_id IS NULL AND order_id IN (SELECT id FROM orders WHERE status='batal')");
+}
+/** Balance owed, lifetime earned and paid for one agent. */
+function agent_money(int $aid): array {
+  $r = q('SELECT COALESCE(SUM(CASE WHEN payout_id IS NULL THEN amount END),0) AS due, COALESCE(SUM(amount),0) AS earned, COUNT(*) AS n FROM commissions WHERE agent_id=?', [$aid])->fetch();
+  $paid = (float)q('SELECT COALESCE(SUM(amount),0) FROM payouts WHERE agent_id=?', [$aid])->fetchColumn();
+  return ['due' => (float)$r['due'], 'earned' => (float)$r['earned'], 'orders' => (int)$r['n'], 'paid' => $paid];
+}
+function next_friday(): string { $d = new DateTimeImmutable('today'); return $d->format('N') == 5 && (int)date('G') < 18 ? $d->format('Y-m-d') : $d->modify('next friday')->format('Y-m-d'); }
+/** What an agent may see of the recipient: full name, phone with the last 5 digits hidden, area only. */
+function mask_phone(string $p): string { $d = digits($p); return strlen($d) > 5 ? substr($d, 0, -5) . '*****' : '*****'; }
+function area_of(string $addr, string $post): string {
+  $parts = array_values(array_filter(array_map('trim', preg_split('/[,\n]+/', $addr)), fn($x) => $x !== ''));
+  $states = '/\b(selangor|d\/?e|darul ehsan|kuala lumpur|wilayah persekutuan|w\.?p\.?|putrajaya|negeri sembilan|malaysia)\b/i';
+  for ($i = count($parts) - 1; $i >= 0; $i--) {
+    $t = trim(preg_replace(['/\b\d{5}\b/', $states], '', $parts[$i]), " .-/");
+    if ($t !== '' && !preg_match('/\d/', $t) && !preg_match('/^(no|lot|jalan|jln|lorong|blok|block|unit|taman|tmn)\b/i', $t)) return mb_convert_case($t, MB_CASE_TITLE) . " $post";
+  }
+  return $post;
 }
 
 // ---------- wishcard + polaroids sent in after the order (tracking page and admin) ----------
@@ -373,7 +436,7 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
   if (trim((string)($in['voucher'] ?? '')) !== '') {
     $v = voucher_find((string)$in['voucher']);
     if (!$v) return ['errors' => ['Kod voucher tidak sah.']];
-    $viaAgent = preg_replace('/[^A-Za-z0-9]/', '', (string)($in['ref'] ?? '')) !== '';
+    $viaAgent = agent_from_ref($in['ref'] ?? '') !== null;
     if ($why = voucher_block($v, $bphone, $viaAgent)) return ['errors' => [$why]];
     $r = voucher_apply($L, $v, $photoCount, $setSub);
     if (is_string($r)) return ['errors' => [$r]];
@@ -543,7 +606,7 @@ function mark_paid(array $o, string $ref, string $channel, float $amount): bool 
   if (abs($amount - (float)$o['total']) > 0.009) { error_log("100blooms: amount mismatch for {$o['code']}: $amount vs {$o['total']}"); return false; }
   $n = q("UPDATE orders SET pay_status='paid', status='baru', paid_at=?, pay_ref=?, pay_channel=? WHERE id=? AND pay_status<>'paid'",
     [date('Y-m-d H:i:s'), mb_substr($ref, 0, 60), mb_substr($channel, 0, 30), $o['id']])->rowCount();
-  if ($n) notify_paid($o);
+  if ($n) { notify_paid($o); sync_commissions(); }
   return $n > 0;
 }
 function notify_paid(array $o): void {

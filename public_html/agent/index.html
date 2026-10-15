@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Agent · 100 Blooms</title>
+<meta name="theme-color" content="#fbeef0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+:root{--bg:#fbeef0;--bg2:#f6dbe1;--ink:#3b2732;--soft:#7d6370;--card:#fff;--line:#ecd6dc;--accent:#d94f74;--accent2:#b93a5e;--ok:#2f8f63;--okb:#e3f4ea;--warn:#a8691b;--warnb:#fbefd9;--bad:#b6404f;--badb:#f8e0e3;--info:#2f6fc1;--infob:#e4eefb;
+  --display:"Fredoka",ui-rounded,system-ui,sans-serif;--body:"Figtree",system-ui,-apple-system,sans-serif;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-webkit-tap-highlight-color:transparent}
+.wrap{max-width:520px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-left)) 96px}
+a{color:var(--accent)}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.brand svg{width:32px;height:32px}.brand b{font:600 19px var(--display)}.brand small{font:600 11px var(--body);letter-spacing:.08em;color:var(--accent);background:#fff;border-radius:99px;padding:2px 8px;margin-left:2px}
+h1{font:600 25px/1.15 var(--display);margin:0 0 6px;text-wrap:balance}
+h2{font:600 17px var(--display);margin:0 0 12px}
+.sub{color:var(--soft);margin:0 0 16px;font-size:14px}
+.card{background:var(--card);border-radius:22px;padding:18px;margin-bottom:14px}
+label{display:block;font-size:13px;font-weight:600;margin:12px 0 6px}
+input,select,textarea{width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(--line);font:inherit;color:inherit;background:#fff}
+input:focus-visible,button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn{display:block;width:100%;border:0;border-radius:16px;padding:14px;margin-top:16px;font:600 16px var(--display);background:var(--accent);color:#fff;cursor:pointer;text-align:center;text-decoration:none}
+.btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+.btn.sm{display:inline-block;width:auto;padding:9px 14px;font-size:14px;margin:0;border-radius:12px}
+.btn:disabled{opacity:.5}
+.msg{padding:11px 13px;border-radius:12px;font-size:13.5px;margin-top:12px}.msg.bad{background:var(--badb);color:var(--bad)}.msg.warn{background:var(--warnb);color:var(--warn)}.msg.ok{background:var(--okb);color:var(--ok)}
+.hint{font-size:12.5px;color:var(--soft)}
+.link{display:flex;gap:8px;align-items:center;background:var(--bg);border-radius:14px;padding:10px 12px;font:600 15px var(--body);word-break:break-all}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--bg);border-radius:16px;padding:12px 14px}.stat small{display:block;color:var(--soft);font-size:12px;font-weight:600}.stat b{font:600 22px var(--display);display:block;margin-top:2px}
+.stat.hero{background:linear-gradient(140deg,var(--accent),var(--accent2));color:#fff}.stat.hero small{color:#ffe3ea}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+/* bottom nav */
+nav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 8px max(6px,env(safe-area-inset-bottom));z-index:5}
+nav button{flex:1;max-width:130px;border:0;background:none;font:600 12px var(--body);color:var(--soft);padding:6px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border-radius:12px}
+nav button svg{width:22px;height:22px}
+nav button[aria-current=page]{color:var(--accent);background:var(--bg)}
+/* calendar */
+.calh{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.calh b{font:600 17px var(--display)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal .dn{font-size:11px;font-weight:700;color:var(--soft);padding:2px 0}
+.cal button{aspect-ratio:1;border:0;border-radius:12px;background:var(--bg);font:600 14px var(--body);color:var(--ink);cursor:pointer;position:relative;padding:0}
+.cal button.o{background:var(--bg2)}.cal button.t{outline:2px solid var(--accent)}.cal button[aria-pressed=true]{background:var(--accent);color:#fff}
+.cal button i{position:absolute;left:50%;bottom:5px;transform:translateX(-50%);font:700 10px var(--body);font-style:normal;background:var(--accent);color:#fff;border-radius:99px;min-width:16px;padding:0 4px;line-height:15px}
+.cal button[aria-pressed=true] i{background:#fff;color:var(--accent)}
+.cal .x{visibility:hidden}
+.ord{border:1.5px solid var(--line);border-radius:16px;padding:12px 14px;margin-top:10px}
+.ord .h{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.ord .c{font:600 13px var(--body);letter-spacing:.03em;color:var(--soft)}
+.ord b{font:600 16px var(--display)}
+.ord .m{font-size:13px;color:var(--soft)}
+.pill{display:inline-block;font:700 11.5px var(--body);border-radius:99px;padding:3px 9px;white-space:nowrap}
+.p-wait{background:var(--warnb);color:var(--warn)}.p-ok{background:var(--okb);color:var(--ok)}.p-run{background:var(--infob);color:var(--info)}.p-bad{background:var(--badb);color:var(--bad)}
+.cm{margin-top:8px;font-size:13px;font-weight:600}
+.li{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}.li:last-child{border-bottom:0}
+.li span:last-child{text-align:right;white-space:nowrap}
+.terms{font-size:13.5px;padding-left:18px;margin:6px 0 0}.terms li{margin:4px 0}
+.ck{display:flex;gap:10px;align-items:flex-start;font-weight:500;font-size:14px}.ck input{width:20px;height:20px;flex:none;margin-top:1px}
+.qr{max-width:200px;border-radius:12px;border:1px solid var(--line);display:block;margin:6px 0 10px}
+.empty{text-align:center;color:var(--soft);padding:18px 6px;font-size:14px}
+.toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:9;max-width:90%}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="brand" href="/agent/" aria-label="Portal agent 100 Blooms">
+    <svg viewBox="0 0 100 100" aria-hidden="true"><g fill="#d94f74"><ellipse cx="50" cy="26" rx="14" ry="22"/><ellipse cx="50" cy="74" rx="14" ry="22"/><ellipse cx="26" cy="50" rx="22" ry="14"/><ellipse cx="74" cy="50" rx="22" ry="14"/></g><circle cx="50" cy="50" r="12" fill="#ffd36e"/></svg>
+    <b>100 Blooms</b><small>AGENT</small></a><span id="tr"></span></div>
+  <main id="main"><p class="sub">Memuatkan…</p></main>
+</div>
+<nav id="nav" hidden aria-label="Menu agent"></nav>
+<script>
+const $=s=>document.querySelector(s);
+const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rm=n=>'RM'+Number(n||0).toFixed(Number(n)%1?2:0);
+const fmtD=(s,o)=>s?new Date(s.slice(0,10)+'T00:00').toLocaleDateString('ms-MY',o||{weekday:'short',day:'numeric',month:'short'}):'-';
+const toast=t=>{const d=document.createElement('div');d.className='toast';d.setAttribute('role','status');d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2400)};
+let ME=null,CSRF='',tab='home',cal={m:'',sel:''},INFO={rate:20,payout_min:40};
+fetch('api.php?a=info').then(r=>r.json()).then(j=>{if(j.rate){INFO=j;const t=document.getElementById('terms');if(t)t.innerHTML=TERMS(j.rate,j.payout_min)}}).catch(()=>{});
+async function api(a,{method='GET',body,params}={}){
+  const o={method,headers:{}};if(method==='POST'){o.headers['X-CSRF']=CSRF;if(body instanceof FormData)o.body=body;else{o.headers['Content-Type']='application/json';o.body=JSON.stringify(body||{})}}
+  const r=await fetch('api.php?a='+a+(params?'&'+new URLSearchParams(params):''),o);let j={};try{j=await r.json()}catch(e){}
+  if(r.status===401&&!['login','me','register'].includes(a)){ME=null;auth('login');throw new Error('auth')}
+  if(!r.ok)throw new Error(j.error||'Ralat '+r.status);return j;
+}
+const TERMS=(rate,min)=>`<ol class="terms">
+  <li>Komisen <b>${rm(rate)}</b> untuk setiap order yang <b>dah dibayar</b> melalui link awak (order sendiri pun dikira).</li>
+  <li>Link kekal pada pelanggan selama 30 hari. Kalau pelanggan tekan link agent lain selepas itu, link terakhir yang dikira.</li>
+  <li>Komisen dibayar setiap <b>Jumaat</b> (10 pagi – 6 petang) bila baki sekurang-kurangnya <b>${rm(min)}</b>.</li>
+  <li>Komisen yang dah dibayar adalah muktamad.</li>
+  <li>Awak boleh buat iklan berbayar sendiri.</li>
+  <li>Pelanggan tak boleh refund. Mereka cuma boleh tukar tarikh delivery.</li>
+  <li>Voucher tertentu tak boleh digunakan bersama link agent.</li></ol>`;
+
+/* ---------- login / register ---------- */
+function auth(mode,err){
+  $('#nav').hidden=true;$('#tr').innerHTML='';
+  const reg=mode==='register';
+  $('#main').innerHTML=reg?`<h1>Jadi agent 100 Blooms</h1><p class="sub">Kongsi link order awak dan dapat komisen untuk setiap hadiah yang dibeli. Link aktif terus selepas daftar.</p>
+   <form class="card" id="f" novalidate>
+    <label for="n">Nama penuh</label><input id="n" autocomplete="name">
+    <label for="p">No. telefon (WhatsApp)</label><input id="p" type="tel" inputmode="tel" autocomplete="tel" placeholder="01X-XXX XXXX">
+    <label for="e">Email</label><input id="e" type="email" autocomplete="email">
+    <label for="w">Password (min 8 aksara)</label><input id="w" type="password" autocomplete="new-password">
+    <h2 style="margin-top:18px">Terma agent</h2><div id="terms">${TERMS(INFO.rate,INFO.payout_min)}</div>
+    <label class="ck" style="margin-top:14px"><input type="checkbox" id="t"> Saya setuju dengan terma agent</label>
+    <div id="err"></div>
+    <button class="btn" id="go">Daftar &amp; dapatkan link</button></form>
+   <p class="hint" style="text-align:center">Dah ada akaun? <a href="#" id="sw">Log masuk</a></p>`
+  :`<h1>Log masuk agent</h1><p class="sub">Semak order, komisen dan bayaran awak.</p>
+   <form class="card" id="f" novalidate>
+    <label for="l">Email atau no. telefon</label><input id="l" autocomplete="username">
+    <label for="w">Password</label><input id="w" type="password" autocomplete="current-password">
+    <div id="err"></div>
+    <button class="btn" id="go">Log masuk</button>
+    <p class="hint" style="margin:12px 0 0">Lupa password? WhatsApp 100 Blooms untuk set semula.</p></form>
+   <p class="hint" style="text-align:center">Belum jadi agent? <a href="#" id="sw">Daftar sekarang</a></p>`;
+  $('#sw').onclick=e=>{e.preventDefault();auth(reg?'login':'register')};
+  $('#f').onsubmit=async e=>{e.preventDefault();$('#go').disabled=true;
+    try{if(reg)await api('register',{method:'POST',body:{name:$('#n').value,phone:$('#p').value,email:$('#e').value,pw:$('#w').value,terms:$('#t').checked}});
+      else await api('login',{method:'POST',body:{login:$('#l').value,pw:$('#w').value}});
+      boot(reg)}catch(x){$('#err').innerHTML=`<div class="msg bad" role="alert">${h(x.message)}</div>`;$('#go').disabled=false}};
+}
+
+/* ---------- shell ---------- */
+const NAV=[['home','Utama','<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'],['orders','Order','<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['money','Komisen','<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2s1 1.7 3 2 3 .9 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2M12 16v2"/>'],['me','Profil','<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/>']];
+async function boot(fresh){
+  try{const j=await api('me');ME=j;CSRF=j.csrf}catch(e){return auth(new URLSearchParams(location.search).has('daftar')?'register':'login')}
+  $('#nav').hidden=false;
+  $('#tr').innerHTML=`<button class="btn ghost sm" id="lo">Log keluar</button>`;
+  $('#lo').onclick=async()=>{await api('logout',{method:'POST'}).catch(()=>{});ME=null;auth('login')};
+  if(fresh)tab='home';render(fresh);
+}
+function render(fresh){
+  $('#nav').innerHTML=NAV.map(([k,t,i])=>`<button data-t="${k}" ${tab===k?'aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${i}</svg>${t}</button>`).join('');
+  $('#nav').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
+  ({home:Home,orders:Orders,money:Money,me:Profile})[tab]($('#main'),fresh);
+  window.scrollTo(0,0);
+}
+
+/* ---------- home ---------- */
+function Home(el,fresh){
+  const j=ME,a=j.agent,m=j.money,need=Math.max(0,j.payout_min-m.due);
+  const share=`Nak hantar hadiah surprise? Combo Jimat RM128 dari 100 Blooms: bouquet, kek Secret Recipe, balloon, polaroid dan wishcard, delivery percuma. Order di sini: ${j.link}`;
+  el.innerHTML=`${fresh?`<div class="msg ok" style="margin:0 0 14px">Tahniah, awak dah jadi agent! Kongsi link di bawah untuk mula dapat komisen.</div>`:''}
+   <h1>Hai, ${h(a.name.split(' ')[0])} 👋</h1><p class="sub">Agent no. <b>${a.id}</b> · komisen ${rm(j.rate)} setiap order dibayar</p>
+   <section class="card"><h2>Link order awak</h2><div class="link"><span style="flex:1">${h(j.link.replace(/^https?:\/\//,''))}</span></div>
+    <div class="acts"><button class="btn sm" id="cp">Salin link</button><a class="btn ghost sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(share)}">Kongsi di WhatsApp</a></div>
+    <p class="hint" style="margin:10px 0 0">Pelanggan yang order melalui link ni dalam 30 hari dikira sebagai order awak.</p></section>
+   <section class="card"><div class="row2">
+    <div class="stat hero"><small>Baki komisen</small><b>${rm(m.due)}</b></div>
+    <div class="stat"><small>${m.due>=j.payout_min?'Dibayar pada':'Lagi untuk bayaran'}</small><b style="font-size:18px">${m.due>=j.payout_min?fmtD(j.next_friday,{weekday:'long',day:'numeric',month:'short'}):rm(need)}</b></div>
+    <div class="stat"><small>Bulan ini</small><b>${j.month.orders} order</b><small>${rm(j.month.rm)} komisen</small></div>
+    <div class="stat"><small>Jumlah dah dibayar</small><b>${rm(m.paid)}</b><small>${m.orders} order sepanjang masa</small></div></div>
+    ${j.pending?`<div class="msg warn">${j.pending} order dari link awak masih menunggu bayaran (7 hari lepas). Team kami akan follow up.</div>`:''}
+    ${!a.bank_acc&&!a.has_qr?`<div class="msg warn">Lengkapkan maklumat bank atau DuitNow QR di <a href="#" id="gp">Profil</a> supaya kami boleh bayar komisen.</div>`:''}
+    <p class="hint" style="margin:12px 0 0">Komisen dibayar setiap Jumaat (10 pagi – 6 petang) bila baki ${rm(j.payout_min)} ke atas.</p></section>
+   <section class="card"><h2>Terma agent</h2>${TERMS(j.rate,j.payout_min)}</section>`;
+  $('#cp').onclick=()=>navigator.clipboard.writeText(j.link).then(()=>toast('Link disalin'),()=>toast('Tak dapat salin'));
+  if($('#gp'))$('#gp').onclick=e=>{e.preventDefault();tab='me';render()};
+}
+
+/* ---------- orders calendar ---------- */
+const pillOf=o=>{const c=o.status==='batal'?'p-bad':!o.paid?'p-wait':['dalam_penghantaran','sampai','selesai'].includes(o.status)?'p-ok':'p-run';return `<span class="pill ${c}">${h(o.status_label)}</span>`};
+async function Orders(el){
+  if(!cal.m)cal.m=ME.today.slice(0,7);
+  el.innerHTML='<p class="sub">Memuatkan…</p>';
+  let j;try{j=await api('orders',{params:{m:cal.m}})}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  const [Y,M]=cal.m.split('-').map(Number),first=new Date(Y,M-1,1),days=new Date(Y,M,0).getDate(),lead=(first.getDay()+6)%7;
+  const by={};j.rows.forEach(o=>(by[o.del_date]=by[o.del_date]||[]).push(o));
+  const ymd=d=>`${cal.m}-${String(d).padStart(2,'0')}`;
+  const list=cal.sel?(by[cal.sel]||[]):j.rows;
+  const paid=j.rows.filter(o=>o.paid&&o.status!=='batal'),comm=j.rows.reduce((s,o)=>s+(o.comm||0),0);
+  el.innerHTML=`<h1>Order awak</h1><p class="sub">Ikut tarikh penghantaran. Tekan tarikh untuk tapis.</p>
+   <section class="card"><div class="calh"><button class="btn ghost sm" id="pm" aria-label="Bulan sebelum">‹</button><b>${first.toLocaleDateString('ms-MY',{month:'long',year:'numeric'})}</b><button class="btn ghost sm" id="nm" aria-label="Bulan seterusnya">›</button></div>
+    <div class="cal">${['Isn','Sel','Rab','Kha','Jum','Sab','Ahd'].map(d=>`<span class="dn">${d}</span>`).join('')}${'<span class="x"></span>'.repeat(lead)}
+     ${Array.from({length:days},(_,i)=>{const d=ymd(i+1),n=(by[d]||[]).length;return `<button data-d="${d}" class="${n?'o':''} ${d===ME.today?'t':''}" aria-pressed="${cal.sel===d}" aria-label="${i+1} haribulan, ${n} order">${i+1}${n?`<i>${n}</i>`:''}</button>`}).join('')}</div>
+    <div class="row2" style="margin-top:12px"><div class="stat"><small>Order dibayar</small><b>${paid.length}</b></div><div class="stat"><small>Komisen bulan ni</small><b>${rm(comm)}</b></div></div></section>
+   <section class="card"><h2>${cal.sel?fmtD(cal.sel,{weekday:'long',day:'numeric',month:'long'}):'Semua order bulan ini'} <span class="hint">(${list.length})</span></h2>
+    ${cal.sel?`<button class="btn ghost sm" id="all" style="margin-bottom:4px">Tunjuk semua</button>`:''}
+    ${list.length?list.map(o=>`<div class="ord"><div class="h"><div><span class="c">${h(o.code)}</span><br><b>${h(o.r_name)}</b></div>${pillOf(o)}</div>
+      <div class="m">📍 ${h(o.area)} · 📞 ${h(o.r_phone)}</div>
+      <div class="m">🚚 ${fmtD(o.del_date)} · ${h(o.del)}</div>
+      <div class="m">💐 ${h(o.bouquet)} · pembeli ${h(o.buyer)} · ${rm(o.total)}</div>
+      <div class="cm">${o.comm!==null?`Komisen ${rm(o.comm)} · ${o.comm_paid?'<span style="color:var(--ok)">dah dibayar</span>':'belum dibayar'}`:o.status==='batal'?'<span class="hint">Tiada komisen (batal)</span>':'<span class="hint">Komisen dikira selepas pelanggan bayar</span>'}</div></div>`).join('')
+      :'<div class="empty">Belum ada order. Kongsi link awak untuk mula 🌸</div>'}</section>`;
+  const nav=k=>{const d=new Date(Y,M-1+k,1);cal.m=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');cal.sel='';Orders(el)};
+  $('#pm').onclick=()=>nav(-1);$('#nm').onclick=()=>nav(1);
+  el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{cal.sel=cal.sel===b.dataset.d?'':b.dataset.d;Orders(el)});
+  if($('#all'))$('#all').onclick=()=>{cal.sel='';Orders(el)};
+}
+
+/* ---------- commissions & payouts ---------- */
+async function Money(el){
+  el.innerHTML='<p class="sub">Memuatkan…</p>';
+  let j;try{j=await api('comms')}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  const m=j.money;
+  el.innerHTML=`<h1>Komisen</h1><p class="sub">Setiap order yang dibayar melalui link awak.</p>
+   <section class="card"><div class="row2"><div class="stat hero"><small>Baki belum dibayar</small><b>${rm(m.due)}</b></div><div class="stat"><small>Jumlah diperoleh</small><b>${rm(m.earned)}</b></div></div>
+    <p class="hint" style="margin:10px 0 0">${m.due>=ME.payout_min?`Akan dibayar ${fmtD(ME.next_friday,{weekday:'long',day:'numeric',month:'long'})}, 10 pagi – 6 petang.`:`Bayaran dibuat bila baki capai ${rm(ME.payout_min)}.`}</p></section>
+   <section class="card"><h2>Bayaran diterima</h2>${j.payouts.length?j.payouts.map(p=>`<div class="li"><span>${fmtD(p.created_at,{day:'numeric',month:'short',year:'numeric'})}${p.ref?`<br><span class="hint">Ruj: ${h(p.ref)}</span>`:''}</span><span><b>${rm(p.amount)}</b></span></div>`).join(''):'<div class="empty">Belum ada bayaran.</div>'}</section>
+   <section class="card"><h2>Senarai komisen</h2>${j.comms.length?j.comms.map(c=>`<div class="li"><span>${h(c.code)}<br><span class="hint">Dibayar pelanggan ${fmtD(c.created_at)}</span></span><span><b>${rm(c.amount)}</b><br><span class="hint" style="color:${c.payout_id?'var(--ok)':'var(--soft)'}">${c.payout_id?'Dah dibayar':'Belum dibayar'}</span></span></div>`).join(''):'<div class="empty">Belum ada komisen.</div>'}</section>`;
+}
+
+/* ---------- profile ---------- */
+function Profile(el){
+  const a=ME.agent;
+  el.innerHTML=`<h1>Profil</h1><p class="sub">Agent no. ${a.id} · ${h(a.email)}</p>
+   <form class="card" id="pf"><h2>Maklumat diri</h2>
+    <label for="n">Nama penuh</label><input id="n" value="${h(a.name)}" autocomplete="name">
+    <label for="p">No. telefon (WhatsApp)</label><input id="p" type="tel" value="${h(a.phone)}" autocomplete="tel">
+    <h2 style="margin-top:20px">Akaun bank untuk komisen</h2>
+    <label for="bn">Nama bank</label><input id="bn" value="${h(a.bank_name||'')}" placeholder="Contoh: Maybank">
+    <label for="ba">No. akaun</label><input id="ba" inputmode="numeric" value="${h(a.bank_acc||'')}">
+    <label for="bh">Nama pemegang akaun</label><input id="bh" value="${h(a.bank_holder||'')}">
+    <h2 style="margin-top:20px">Media sosial</h2>
+    <label for="ig">Instagram</label><input id="ig" value="${h(a.ig||'')}" placeholder="@username atau link">
+    <label for="tt">TikTok</label><input id="tt" value="${h(a.tiktok||'')}" placeholder="@username atau link">
+    <label for="fb">Facebook</label><input id="fb" value="${h(a.fb||'')}" placeholder="Link profil atau page">
+    <div id="pm"></div><button class="btn" id="ps">Simpan profil</button></form>
+   <section class="card"><h2>DuitNow QR</h2><p class="hint" style="margin-top:0">Pilihan. Kami boleh bayar komisen dengan scan QR ni.</p>
+    ${a.has_qr?`<img class="qr" src="api.php?a=myqr&t=${Date.now()}" alt="DuitNow QR awak">`:''}
+    <label class="btn ghost" for="qf" style="margin-top:6px">${a.has_qr?'Tukar QR':'Upload QR'}</label><input type="file" id="qf" accept="image/jpeg,image/png" hidden></section>
+   <form class="card" id="cf"><h2>Tukar password</h2>
+    <label for="po">Password lama</label><input id="po" type="password" autocomplete="current-password">
+    <label for="pn">Password baru (min 8)</label><input id="pn" type="password" autocomplete="new-password">
+    <button class="btn ghost" id="pc">Tukar password</button></form>`;
+  $('#pf').onsubmit=async e=>{e.preventDefault();$('#ps').disabled=true;
+    try{await api('profile',{method:'POST',body:{name:$('#n').value,phone:$('#p').value,bank_name:$('#bn').value,bank_acc:$('#ba').value,bank_holder:$('#bh').value,ig:$('#ig').value,tiktok:$('#tt').value,fb:$('#fb').value}});
+      ME=await api('me');toast('Profil disimpan');$('#pm').innerHTML=''}catch(x){$('#pm').innerHTML=`<div class="msg bad" role="alert">${h(x.message)}</div>`}$('#ps').disabled=false};
+  $('#qf').onchange=async()=>{const f=$('#qf').files[0];if(!f)return;const fd=new FormData();fd.append('file',f);
+    try{await api('qr',{method:'POST',body:fd});ME=await api('me');toast('QR disimpan');Profile(el)}catch(x){toast(x.message)}};
+  $('#cf').onsubmit=async e=>{e.preventDefault();try{await api('passwd',{method:'POST',body:{old:$('#po').value,new:$('#pn').value}});toast('Password ditukar');$('#po').value=$('#pn').value=''}catch(x){toast(x.message)}};
+}
+boot();
+</script>
+</body>
+</html>

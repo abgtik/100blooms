@@ -151,12 +151,12 @@ async function boot(){
   try{const j=await api('me');ME=j.user;CSRF=j.csrf;if(j.pmeta)PM=j.pmeta;if(j.status_label)Object.assign(ST,j.status_label);GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
 }
 function render(){
-  const T=[['dash','Dashboard'],['orders','Order'],['new','＋ Order'],['cal','Kalendar'],['report','Report'],['vouch','Voucher'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
+  const T=[['dash','Dashboard'],['orders','Order'],['new','＋ Order'],['cal','Kalendar'],['report','Report'],['vouch','Voucher'],['agent','Agent'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
   $('#app').innerHTML=`<header><h1>100 Blooms Admin</h1><div class="who">${h(ME.name)}<br>${ME.role==='owner'?'Owner':'Staff'} · <a href="#" id="lo">Log keluar</a></div></header>
    <nav class="tabs" aria-label="Menu">${T.map(([k,t])=>`<button class="tab" data-t="${k}" aria-pressed="${tab===k}">${t}</button>`).join('')}</nav><main id="main"></main>`;
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
   $('#lo').onclick=async e=>{e.preventDefault();await api('logout',{method:'POST'}).catch(()=>{});ME=null;login()};
-  ({dash:Dash,new:NewOrder,cal:Cal,report:Report,orders:Orders,vouch:Vouchers,stock:Stock,dates:Dates,acc:Acc})[tab]($('#main'));
+  ({dash:Dash,new:NewOrder,cal:Cal,report:Report,orders:Orders,vouch:Vouchers,agent:Agents,stock:Stock,dates:Dates,acc:Acc})[tab]($('#main'));
 }
 
 /* ---------- orders ---------- */
@@ -257,7 +257,7 @@ async function openOrder(id,reload){
     <div class="rowx"><span>Sumber</span><span>${o.created_by?'WhatsApp, dimasukkan oleh '+h(o.created_by):'Laman web'}</span></div>
     <div class="rowx"><span>WhatsApp</span><span><a href="${wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}, ini 100 Blooms tentang order ${o.code}. Semak status hadiah di sini: ${o.track_url}`)}" target="_blank" rel="noopener">${h(o.b_phone)}</a></span></div>
     <div class="rowx"><span>Link semak order</span><span><a href="${h(o.track_url)}" target="_blank" rel="noopener">Buka</a> · <a href="#" id="ct">Salin</a></span></div>
-    ${o.agent_ref?`<div class="rowx"><span>Link agent</span><span>${h(o.agent_ref)}</span></div>`:''}</div>
+    ${o.agent_ref?`<div class="rowx"><span>Agent</span><span>${o.agent?`<b>${h(o.agent.name)}</b> (#${o.agent.id})${o.agent.amount!==null&&o.agent.amount!==undefined?` · komisen ${rm(o.agent.amount)}${o.agent.payout_id?' (dah dibayar)':''}`:''}`:'#'+h(o.agent_ref)}</span></div>`:''}</div>
    <div class="card"><h2>Harga</h2>${o.price_lines.map(([l,p])=>`<div class="rowx"><span>${h(l)}</span><span>${p?rm(p):'Percuma'}</span></div>`).join('')}
     <div class="rowx" style="font-weight:700"><span style="color:var(--ink)">Jumlah</span><span>${rm(o.total)}</span></div></div>
    <div class="card"><h2>Nota dalaman</h2><textarea id="nn" rows="3" style="width:100%" placeholder="Contoh: perisa kek ditukar, customer minta call dulu">${h(o.notes||'')}</textarea>
@@ -325,7 +325,7 @@ function NewOrder(el){
    <div class="card"><h2>Harga & bayaran</h2>
     <details><summary class="mini" style="cursor:pointer">Voucher, pelarasan harga, kes khas</summary><div class="fgrid" style="margin-top:8px">
      <label class="fl">Kod voucher<input id="f_voucher"></label>
-     <label class="fl">Kod agent<input id="f_ref"></label>
+     <label class="fl">No. agent (contoh 101)<input id="f_ref" inputmode="numeric"></label>
      <label class="fl">Pelarasan harga RM (+/−)<input id="f_adj" type="number" step="1" placeholder="Contoh: -10 atau 15"></label>
      <label class="fl">Sebab pelarasan<input id="f_adjl" placeholder="Contoh: caj luar kawasan Kajang"></label>
      <label class="fl full" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-weight:500"><input type="checkbox" id="f_ov" style="width:auto"> Abaikan had waktu tutup, tarikh ditutup, stok dan kawasan</label>
@@ -473,6 +473,42 @@ async function Cal(el){
 }
 
 /* ---------- vouchers ---------- */
+/* ---------- agents ---------- */
+async function Agents(el){
+  const own=ME.role==='owner';let j;
+  try{j=await api('agents')}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  const due=j.rows.filter(a=>a.due>=j.payout_min&&a.active),small=j.rows.filter(a=>a.due>0&&a.due<j.payout_min);
+  const tot=due.reduce((s,a)=>s+a.due,0),sales=j.rows.reduce((s,a)=>s+a.sales,0),wa=p=>'https://wa.me/'+String(p).replace(/\D/g,'').replace(/^0/,'60');
+  const bank=a=>own?(a.bank_acc?`${h(a.bank_name||'')} ${h(a.bank_acc)}<br><span class="mini">${h(a.bank_holder||'')}</span>`:'<span style="color:var(--warn)">Belum isi akaun bank</span>')+(a.has_qr?` · <a href="api.php?a=agent_qr&id=${a.id}" target="_blank" rel="noopener">Lihat QR</a>`:''):'';
+  el.innerHTML=`<div class="kpis"><div class="kpi"><small>Agent aktif</small><b>${j.rows.filter(a=>a.active).length}</b></div><div class="kpi"><small>Jualan melalui agent</small><b>${rm(sales)}</b></div><div class="kpi"><small>Perlu dibayar ${fmtD(j.next_friday)}</small><b>${rm(tot)}</b></div></div>
+   <div class="card"><h2>Bayaran Jumaat · ${fmtD(j.next_friday)}</h2><p class="mini" style="margin-top:0">Agent dengan baki ${rm(j.payout_min)} ke atas. Pindahkan wang, kemudian tekan "Dah bayar" dan isi rujukan.</p>
+    ${due.length?due.map(a=>`<div class="rowx"><span><b style="color:var(--ink)">${h(a.name)}</b> #${a.id} · <a href="${wa(a.phone)}" target="_blank" rel="noopener">WhatsApp</a><br>${bank(a)}</span><span><b style="color:var(--ink);font-size:16px">${rm(a.due)}</b><br>${own?`<button class="btn sm" data-pay="${a.id}" data-amt="${a.due}" data-name="${h(a.name)}">Dah bayar</button>`:''}</span></div>`).join(''):'<p class="mini">Tiada agent yang perlu dibayar minggu ini.</p>'}
+    ${small.length?`<p class="mini" style="margin:10px 0 0">Belum capai minimum: ${small.map(a=>`${h(a.name)} (${rm(a.due)})`).join(', ')}</p>`:''}</div>
+   <div class="card"><h2>Senarai agent (${j.rows.length})</h2><p class="mini" style="margin-top:0">Link pendaftaran agent: <a href="${h(j.portal)}?daftar" target="_blank" rel="noopener">${h(j.portal.replace(/^https?:\/\//,''))}?daftar</a> <button class="btn ghost sm" id="cpr">Salin</button></p>
+    <input type="search" id="as" placeholder="Cari nama, no. agent atau telefon" aria-label="Cari agent" style="margin-bottom:8px">
+    <div id="al">${j.rows.length?'':'<p class="mini">Belum ada agent mendaftar.</p>'}${j.rows.map(a=>`<details class="ag" data-s="${h((a.name+' '+a.id+' '+a.phone+' '+a.email).toLowerCase())}" style="border-top:1px solid var(--line);padding:10px 0">
+      <summary style="cursor:pointer;display:flex;justify-content:space-between;gap:10px"><span><b style="color:var(--ink)">${h(a.name)}</b> #${a.id}${a.active?'':' <span class="pill p-batal">Tidak aktif</span>'}<br><span class="mini">${a.n_paid} order dibayar · ${rm(a.sales)} jualan${a.n_pending?` · ${a.n_pending} menunggu bayaran`:''}</span></span><span style="text-align:right"><b style="color:var(--ink)">${rm(a.due)}</b><br><span class="mini">baki</span></span></summary>
+      <div style="padding:8px 0 0">
+       <div class="rowx"><span>Telefon</span><span><a href="${wa(a.phone)}" target="_blank" rel="noopener">${h(a.phone)}</a></span></div>
+       <div class="rowx"><span>Email</span><span>${h(a.email)}</span></div>
+       <div class="rowx"><span>Daftar</span><span>${fmtDT(a.created_at)}${a.last_login?` · login ${fmtDT(a.last_login)}`:''}</span></div>
+       <div class="rowx"><span>Komisen</span><span>diperoleh ${rm(a.earned)} · dibayar ${rm(a.paid)}</span></div>
+       ${own?`<div class="rowx"><span>Bank</span><span>${bank(a)}</span></div>`:''}
+       ${a.ig||a.tiktok||a.fb?`<div class="rowx"><span>Sosial</span><span>${[['IG',a.ig],['TikTok',a.tiktok],['FB',a.fb]].filter(x=>x[1]).map(([k,v])=>/^https?:/.test(v)?`<a href="${h(v)}" target="_blank" rel="noopener">${k}</a>`:`${k} ${h(v)}`).join(' · ')}</span></div>`:''}
+       ${own?`<div class="bar" style="margin:8px 0 0"><label class="mini">Komisen khas RM <input type="number" min="0" step="1" data-rate="${a.id}" value="${a.rate??''}" placeholder="${j.rate} (default)" style="width:120px"></label>
+        <button class="btn ghost sm" data-act="${a.id}" data-on="${a.active?0:1}">${a.active?'Nyahaktif':'Aktifkan'}</button><button class="btn ghost sm" data-rpw="${a.id}">Set semula password</button></div>`:''}</div></details>`).join('')}</div></div>
+   ${own?`<div class="card"><h2>Tetapan agent</h2><div class="bar"><label class="mini">Komisen default RM <input type="number" id="gr" min="0" step="1" value="${j.rate}" style="width:100px"></label><label class="mini">Minimum bayaran RM <input type="number" id="gm" min="0" step="1" value="${j.payout_min}" style="width:100px"></label><button class="btn sm" id="gs">Simpan</button></div>
+    <p class="mini" style="margin:0">Komisen dikira pada masa pelanggan bayar. Tukar kadar tak ubah komisen yang dah direkod.</p></div>`:''}
+   <div class="card"><h2>Rekod bayaran</h2>${j.payouts.length?j.payouts.map(p=>`<div class="rowx"><span>${fmtDT(p.created_at)} · <b style="color:var(--ink)">${h(p.name)}</b><br><span class="mini">Ruj: ${h(p.ref||'-')} · oleh ${h(p.paid_by||'-')}</span></span><span><b style="color:var(--ink)">${rm(p.amount)}</b></span></div>`).join(''):'<p class="mini">Belum ada bayaran.</p>'}</div>`;
+  $('#cpr').onclick=()=>navigator.clipboard.writeText(j.portal+'?daftar').then(()=>toast('Link disalin'));
+  $('#as').oninput=e=>{const t=e.target.value.toLowerCase();el.querySelectorAll('.ag').forEach(d=>d.hidden=t&&!d.dataset.s.includes(t))};
+  el.querySelectorAll('[data-pay]').forEach(b=>b.onclick=async()=>{const ref=prompt(`Bayar ${rm(+b.dataset.amt)} kepada ${b.dataset.name}.\nIsi rujukan pindahan (no. transaksi):`);if(!ref)return;
+    try{const r=await api('payout',{method:'POST',body:{id:+b.dataset.pay,ref}});toast(`Bayaran ${rm(r.amount)} direkod`);Agents(el)}catch(e){toast(e.message)}});
+  el.querySelectorAll('[data-rate]').forEach(i=>i.onchange=async()=>{try{await api('agent_set',{method:'POST',body:{id:+i.dataset.rate,rate:i.value}});toast('Komisen agent disimpan')}catch(e){toast(e.message)}});
+  el.querySelectorAll('[data-act]').forEach(b=>b.onclick=async()=>{if(b.dataset.on==='0'&&!confirm('Nyahaktif agent ni? Link dia tak lagi beri komisen.'))return;try{await api('agent_set',{method:'POST',body:{id:+b.dataset.act,active:+b.dataset.on}});Agents(el)}catch(e){toast(e.message)}});
+  el.querySelectorAll('[data-rpw]').forEach(b=>b.onclick=async()=>{if(!confirm('Set semula password agent ni?'))return;try{const r=await api('agent_pw',{method:'POST',body:{id:+b.dataset.rpw}});prompt('Password sementara (hantar kepada agent melalui WhatsApp, minta dia tukar selepas login):',r.pw)}catch(e){toast(e.message)}});
+  if($('#gs'))$('#gs').onclick=async()=>{try{await api('agset',{method:'POST',body:{rate:$('#gr').value,payout_min:$('#gm').value}});toast('Tetapan disimpan');Agents(el)}catch(e){toast(e.message)}};
+}
 async function Vouchers(el){
   el.innerHTML='<div class="empty">Memuatkan…</div>';
   let j;try{j=await api('vouchers')}catch(e){el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}

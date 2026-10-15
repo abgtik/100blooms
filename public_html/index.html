@@ -407,7 +407,9 @@ const myNow=()=>CAT.now?new Date(new Date(CAT.now).getTime()+(Date.now()-CAT.t0)
 const isOff=(t,id)=>(CAT.off[t]||[]).includes(id);
 const isBlocked=d=>CAT.blocked.includes(d);
 try{const t=new URLSearchParams(location.search).get('test');if(t)sessionStorage.setItem('hb_test',t);}catch(e){}
-try{const r=new URLSearchParams(location.search).get('ref');if(r&&/^[A-Za-z0-9]{1,20}$/.test(r))localStorage.setItem('hb_ref',r);}catch(e){}
+// agent link (?ref=101): kept 30 days; the most recent agent link wins
+try{const r=new URLSearchParams(location.search).get('ref');if(r&&/^[0-9]{1,9}$/.test(r))localStorage.setItem('hb_ref',r+'|'+Date.now());}catch(e){}
+function getRef(){try{const [r,t]=(localStorage.getItem('hb_ref')||'').split('|');if(r&&(!t||Date.now()-t<30*864e5))return r}catch(e){}return ''}
 try{const s=JSON.parse(localStorage.getItem('hb_state')||'null'); if(s){S=Object.assign(blank(),s,{photos:[]});}}catch(e){}
 if(S.extraCake&&!Object.keys(S.extraCakes||{}).length){S.extraCakes={'Pilihan lain (ikut stok)':S.extraCake};}
 const save=()=>{try{const c=Object.assign({},S,{photos:[]});localStorage.setItem('hb_state',JSON.stringify(c))}catch(e){}};
@@ -727,7 +729,7 @@ const SCR={
   el.insertAdjacentHTML('beforeend','<p class="hint" style="text-align:center;margin:0">Bayar dengan DuitNow QR atau FPX (online banking) melalui halaman bayaran yang selamat.</p>');
   ['bname','bphone'].forEach(k=>$('#'+k).oninput=e=>{S[k]=e.target.value;chk();save()});chk();
   const vap=$('#vap');if(vap){const go=async()=>{const c=$('#vc').value.trim();if(!c)return;vap.disabled=true;vap.textContent='…';
-    let ref='';try{ref=localStorage.getItem('hb_ref')||''}catch(e){}
+    const ref=getRef();
     try{const r=await fetch('api/voucher.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:c,ref,phone:S.bphone})});const j=await r.json();
       if(r.ok){S.voucher=j.code;S.vinfo=j;save();SCR.sum(el);return;}
       $('#vmsg').innerHTML=`<div class="status bad" style="margin-top:8px">${h(j.error||'Kod voucher tidak sah.')}</div>`;}
@@ -872,7 +874,7 @@ async function submitOrder(){
     <button class="btn" id="retry" style="flex:none;width:100%;margin-top:12px">Cuba lagi</button><button class="btn ghost" id="bk2" style="flex:none;width:100%;margin-top:8px">Kembali ke ringkasan</button>`;
     $('#retry').onclick=()=>{$('#perr').innerHTML='';$('#pst').textContent='Cuba sekali lagi…';submitOrder()};$('#bk2').onclick=()=>{dir=-1;S.step=STEPS.indexOf('sum');render()};};
   const d=Object.assign({},S);delete d.photos;delete d.step;
-  try{d.ref=localStorage.getItem('hb_ref')||''}catch(e){}
+  d.ref=getRef();
   try{d.test=sessionStorage.getItem('hb_test')||''}catch(e){}
   d.call=callName();
   const fd=new FormData();fd.append('data',JSON.stringify(d));

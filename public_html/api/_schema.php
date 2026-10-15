@@ -4,7 +4,7 @@ function schema_sql(string $driver): array {
   $my = $driver === 'mysql';
   $id = $my ? 'INT UNSIGNED AUTO_INCREMENT PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
-  return [
+  return array_merge([
 "CREATE TABLE IF NOT EXISTS orders (
   id $id,
   code VARCHAR(20) NOT NULL UNIQUE,
@@ -42,7 +42,7 @@ function schema_sql(string $driver): array {
   note VARCHAR(200) NULL, created_at DATETIME NOT NULL
 )$tail",
 "CREATE TABLE IF NOT EXISTS login_attempts (ip VARCHAR(45) NOT NULL, at DATETIME NOT NULL)$tail",
-  ];
+  ], agent_schema($driver));
 }
 function seed_products(): void {
   $C = catalog();

@@ -86,6 +86,7 @@ case 'order':
   $o['track_url'] = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
   unset($o['token']);
   $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS; $o['invoice'] = invoice_text($o);
+  $o['agent'] = $o['agent_ref'] ? (q('SELECT a.id,a.name,c.amount,c.payout_id FROM agents a LEFT JOIN commissions c ON c.order_id=? AND c.agent_id=a.id WHERE a.id=?', [$o['id'], (int)$o['agent_ref']])->fetch() ?: null) : null;
   foreach (['cake_flavours', 'extra_cakes', 'photos', 'price_lines', 'prep', 'del_steps'] as $k) $o[$k] = json_decode((string)$o[$k], true) ?: [];
   json_out(['order' => $o]);
 
@@ -114,6 +115,7 @@ case 'update':
   $set[] = 'updated_by=?'; $P[] = $m['name']; $P[] = $o['id'];
   q('UPDATE orders SET ' . implode(',', $set) . ' WHERE id=?', $P);
   if (($body['status'] ?? '') !== 'batal') refresh_status($o['id']);
+  if (!empty($body['mark_paid']) || isset($body['status'])) sync_commissions(); // agent commission on payment; dropped if cancelled before payout
   json_out(['ok' => true]);
 
 case 'prep': // tick / untick a production checklist item
@@ -187,6 +189,64 @@ case 'padd': // staff add polaroids received on WhatsApp
 case 'pdel':
   $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
   json_out(['ok' => true, 'photos' => remove_photo($o, (string)($body['f'] ?? ''))]);
+
+case 'agents': // agent list with sales, commission balance and payout info
+  $m = need_login(); sync_commissions(); $own = $m['role'] === 'owner';
+  $rows = q("SELECT a.*, (SELECT COUNT(*) FROM orders o WHERE o.agent_ref = CAST(a.id AS CHAR) AND o.pay_status='paid' AND o.status<>'batal') AS n_paid,
+      (SELECT COALESCE(SUM(o.total),0) FROM orders o WHERE o.agent_ref = CAST(a.id AS CHAR) AND o.pay_status='paid' AND o.status<>'batal') AS sales,
+      (SELECT COUNT(*) FROM orders o WHERE o.agent_ref = CAST(a.id AS CHAR) AND o.pay_status<>'paid' AND o.status<>'batal') AS n_pending
+    FROM agents a ORDER BY a.id")->fetchAll();
+  $out = [];
+  foreach ($rows as $r) {
+    $x = ['id' => (int)$r['id'], 'name' => $r['name'], 'phone' => $r['phone'], 'email' => $r['email'], 'active' => (int)$r['active'], 'rate' => $r['rate'] !== null ? (float)$r['rate'] : null,
+      'ig' => $r['ig'], 'tiktok' => $r['tiktok'], 'fb' => $r['fb'], 'created_at' => $r['created_at'], 'last_login' => $r['last_login'],
+      'n_paid' => (int)$r['n_paid'], 'n_pending' => (int)$r['n_pending'], 'sales' => (float)$r['sales']] + agent_money((int)$r['id']);
+    if ($own) $x += ['bank_name' => $r['bank_name'], 'bank_acc' => $r['bank_acc'], 'bank_holder' => $r['bank_holder'], 'has_qr' => (bool)$r['qr_file']];
+    $out[] = $x;
+  }
+  $pays = q('SELECT p.*, a.name FROM payouts p JOIN agents a ON a.id=p.agent_id ORDER BY p.created_at DESC LIMIT 30')->fetchAll();
+  json_out(['rows' => $out, 'payouts' => $pays, 'rate' => agent_rate_default(), 'payout_min' => payout_min(), 'next_friday' => next_friday(), 'portal' => SITE_URL . '/agent/']);
+
+case 'agent_set': // owner: activate / deactivate, own commission rate (blank = default)
+  need_owner(); $id = (int)($body['id'] ?? 0);
+  if (!q('SELECT 1 FROM agents WHERE id=?', [$id])->fetch()) fail('Agent tidak dijumpai.', 404);
+  if (isset($body['active'])) q('UPDATE agents SET active=? WHERE id=?', [!empty($body['active']) ? 1 : 0, $id]);
+  if (array_key_exists('rate', $body)) q('UPDATE agents SET rate=? WHERE id=?', [(string)$body['rate'] === '' ? null : max(0, min(500, (float)$body['rate'])), $id]);
+  json_out(['ok' => true]);
+
+case 'agent_pw': // owner: reset a forgotten password; the temporary password is shown once to give the agent on WhatsApp
+  need_owner(); $id = (int)($body['id'] ?? 0);
+  $tmp = substr(str_replace(['+', '/', '='], '', base64_encode(random_bytes(9))), 0, 10);
+  if (!q('UPDATE agents SET pass_hash=? WHERE id=?', [password_hash($tmp, PASSWORD_DEFAULT), $id])->rowCount()) fail('Agent tidak dijumpai.', 404);
+  json_out(['ok' => true, 'pw' => $tmp]);
+
+case 'agent_qr':
+  need_owner(); $r = q('SELECT qr_file FROM agents WHERE id=?', [(int)($_GET['id'] ?? 0)])->fetch();
+  $p = $r && $r['qr_file'] ? UPLOAD_DIR . '/_agents/' . basename($r['qr_file']) : '';
+  if (!$p || !is_file($p)) { http_response_code(404); exit; }
+  header('Content-Type: ' . (str_ends_with($p, '.png') ? 'image/png' : 'image/jpeg')); header('Cache-Control: private, no-store'); readfile($p); exit;
+
+case 'payout': // owner: record that the agent's whole unpaid balance has been transferred
+  $m = need_login(); need_owner(); $id = (int)($body['id'] ?? 0);
+  $ref = str_in($body['ref'] ?? '', 100); if ($ref === '') fail('Isi rujukan pindahan (contoh no. transaksi).');
+  sync_commissions();
+  $pdo = db(); $pdo->beginTransaction();
+  try {
+    $cs = q('SELECT id, amount FROM commissions WHERE agent_id=? AND payout_id IS NULL', [$id])->fetchAll();
+    $due = round(array_sum(array_column($cs, 'amount')), 2);
+    if ($due <= 0) { $pdo->rollBack(); fail('Tiada baki untuk dibayar.'); }
+    q('INSERT INTO payouts (agent_id,amount,ref,paid_by,created_at) VALUES (?,?,?,?,?)', [$id, $due, $ref, $m['name'], date('Y-m-d H:i:s')]);
+    $pid = (int)$pdo->lastInsertId();
+    q('UPDATE commissions SET payout_id=? WHERE payout_id IS NULL AND id IN (' . implode(',', array_map('intval', array_column($cs, 'id'))) . ')', [$pid]);
+    $pdo->commit();
+  } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+  json_out(['ok' => true, 'amount' => $due]);
+
+case 'agset': // owner: default commission + minimum payout
+  need_owner();
+  $rate = max(0, min(500, (float)($body['rate'] ?? AGENT_RATE))); $min = max(0, min(5000, (float)($body['payout_min'] ?? PAYOUT_MIN)));
+  foreach (['agent_rate' => $rate, 'payout_min' => $min] as $k => $v) { q('DELETE FROM settings WHERE k=?', [$k]); q('INSERT INTO settings (k,v) VALUES (?,?)', [$k, (string)$v]); }
+  json_out(['ok' => true]);
 
 case 'products':
   need_login();
@@ -335,7 +395,8 @@ case 'manual': // sales team keys in an order taken on WhatsApp
   if ($mode === 'paid' && $payRef === '') fail('Isi rujukan bayaran (contoh no. transaksi atau "tunai").');
   $o = $r['order'];
   $o['code'] = new_code(); $o['token'] = bin2hex(random_bytes(12)); $o['created_at'] = date('Y-m-d H:i:s');
-  $ref = preg_replace('/[^A-Za-z0-9]/', '', (string)($d['ref'] ?? '')); $o['agent_ref'] = $ref !== '' ? substr($ref, 0, 20) : null;
+  $ag = agent_from_ref($d['ref'] ?? ''); if (trim((string)($d['ref'] ?? '')) !== '' && !$ag) fail('Kod agent tidak dijumpai atau tidak aktif.');
+  $o['agent_ref'] = $ag ? (string)$ag['id'] : null;
   $o['created_by'] = $m['name']; $o['pay_mode'] = $mode === 'link' ? 'gateway' : 'invoice';
   $note = trim('Order WhatsApp oleh ' . $m['name'] . (!empty($d['override']) ? ' (had waktu/kawasan diabaikan)' : '') . '. ' . str_in($d['notes'] ?? '', 500));
   $o['notes'] = $note;
@@ -348,7 +409,7 @@ case 'manual': // sales team keys in an order taken on WhatsApp
   } catch (Throwable $e) { error_log('100blooms manual: ' . $e->getMessage()); fail('Order tak dapat disimpan. Cuba lagi.', 500); }
   $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
   $inv = invoice_text($o);
-  if ($mode === 'paid') { notify_paid($o); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => true, 'track_url' => $track, 'invoice' => $inv]); }
+  if ($mode === 'paid') { notify_paid($o); sync_commissions(); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => true, 'track_url' => $track, 'invoice' => $inv]); }
   if ($mode === 'invoice') json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'mode' => 'invoice', 'track_url' => $track, 'invoice' => $inv, 'has_qr' => bank_qr_path() !== null]);
   try { [$bill, $url] = pay_create($o); q('UPDATE orders SET bill_code=? WHERE id=?', [$bill, $o['id']]); }
   catch (Throwable $e) { error_log('100blooms manual bill: ' . $e->getMessage()); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'payUrl' => null, 'track_url' => $track, 'warn' => 'Order disimpan tapi link bayaran gagal dicipta: ' . mb_substr($e->getMessage(), 0, 150)]); }

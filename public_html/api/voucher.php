@@ -9,7 +9,7 @@ if ((int)q('SELECT COUNT(*) FROM login_attempts WHERE ip=? AND at>?', [$ipKey, d
   fail('Terlalu banyak cubaan kod voucher. Cuba lagi dalam 15 minit.', 429);
 $v = voucher_find((string)($in['code'] ?? ''));
 if (!$v) { q('INSERT INTO login_attempts (ip,at) VALUES (?,?)', [$ipKey, date('Y-m-d H:i:s')]); fail('Kod voucher tidak sah.', 404); }
-$viaAgent = preg_replace('/[^A-Za-z0-9]/', '', (string)($in['ref'] ?? '')) !== '';
+$viaAgent = agent_from_ref($in['ref'] ?? '') !== null;
 if ($why = voucher_block($v, (string)($in['phone'] ?? ''), $viaAgent)) fail($why, 422);
 json_out(['code' => $v['code'], 'type' => $v['type'], 'value' => (float)$v['value'], 'max_off' => $v['max_off'] !== null ? (float)$v['max_off'] : null,
   'gift_name' => $v['gift_name'], 'label' => voucher_label($v)]);
