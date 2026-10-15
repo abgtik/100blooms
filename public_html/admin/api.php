@@ -346,6 +346,14 @@ case 'olset': // owner: Orderla API credentials (orderla.my/admin/manage-api); t
   json_out(['email' => (string)setting('ol_email', ''), 'has_token' => (string)setting('ol_token', '') !== '', 'count' => (int)$agg['n'], 'first' => $agg['a'], 'last' => $agg['b'], 'sales' => (float)$agg['s'],
     'synced' => setting('ol_synced')]);
 
+case 'olreparse': // re-read delivery date / receiver from orders already imported (after the detection improves)
+  need_owner(); $n = 0;
+  foreach (q('SELECT id, extra, raw FROM legacy_orders WHERE del_date IS NULL OR receiver IS NULL')->fetchAll() as $r) {
+    $o = json_decode((string)$r['raw'], true) ?: []; $x = ol_extra($o); [$d, $rc] = ol_guess($x, (string)($o['notes'] ?? '') . "\n" . (string)($o['seller_notes'] ?? ''));
+    if ($d || $rc) { q('UPDATE legacy_orders SET del_date=COALESCE(del_date,?), receiver=COALESCE(receiver,?) WHERE id=?', [$d, $rc, $r['id']]); $n++; }
+  }
+  json_out(['ok' => true, 'fixed' => $n]);
+
 case 'oltest': // fetch the last 30 days and report what fields Orderla sends (names only, no customer data)
   need_owner();
   try { $j = orderla_get('/orders', ['start_date' => date('Y-m-d', strtotime('-30 days')), 'end_date' => date('Y-m-d')]); } catch (Throwable $e) { fail($e->getMessage(), 502); }
@@ -570,6 +578,18 @@ case 'calendar':
     }
   } catch (Throwable $e) {}
   json_out(['m' => $m, 'by' => $by, 'days' => $days]);
+
+case 'upcoming': // deliveries from today to the end of next month, both systems
+  need_login();
+  $a = date('Y-m-d'); $b = date('Y-m-t', strtotime('first day of next month'));
+  $new = (int)q("SELECT COUNT(*) FROM orders WHERE status<>'batal' AND del_date BETWEEN ? AND ?", [$a, $b])->fetchColumn();
+  $newPend = (int)q("SELECT COUNT(*) FROM orders WHERE status<>'batal' AND pay_status<>'paid' AND del_date BETWEEN ? AND ?", [$a, $b])->fetchColumn();
+  $ol = 0; $olNoDate = 0;
+  try {
+    $ol = (int)q("SELECT COUNT(*) FROM legacy_orders WHERE (status IS NULL OR status<>'cancelled') AND del_date BETWEEN ? AND ?", [$a, $b])->fetchColumn();
+    $olNoDate = (int)q("SELECT COUNT(*) FROM legacy_orders WHERE (status IS NULL OR status NOT IN ('cancelled','completed')) AND del_date IS NULL AND created_at>=?", [date('Y-m-d H:i:s', strtotime('-60 days'))])->fetchColumn();
+  } catch (Throwable $e) {}
+  json_out(['to' => $b, 'new' => $new, 'new_pending' => $newPend, 'orderla' => $ol, 'orderla_nodate' => $olNoDate, 'synced' => setting('ol_synced'), 'auto' => (string)setting('ol_token', '') !== '', 'err' => setting('ol_err')]);
 
 case 'legacy': // one Orderla order, read-only
   need_login();

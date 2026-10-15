@@ -548,7 +548,11 @@ async function Cal(el){
       <h2 style="margin:0;min-width:150px;text-align:center">${first.toLocaleDateString('ms-MY',{month:'long',year:'numeric'})}</h2><button class="btn ghost sm" id="nm" aria-label="Bulan seterusnya">›</button>
       <button class="btn ghost sm" id="tm">Bulan ni</button></div>
      <div class="seg" role="group" aria-label="Ikut tarikh"><button data-b="del" aria-pressed="${cal.by==='del'}">Tarikh hantar</button><button data-b="created" aria-pressed="${cal.by==='created'}">Tarikh order</button></div></div>
+    <div id="cup" style="margin-top:10px"></div>
     <div class="cal" id="cg" style="margin-top:12px"><div class="empty" style="grid-column:1/-1">Memuatkan…</div></div></div><div id="cday"></div>`;
+  api('upcoming').then(u=>{const tot=u.new+u.orderla;$('#cup').innerHTML=`<div class="msg ${u.orderla_nodate?'warn':'ok'}" style="margin:0">📦 <b>${tot} order</b> akan dihantar dari hari ni hingga ${fmtD(u.to)}${u.orderla?` (${u.new} sistem baru, ${u.orderla} Orderla)`:''}${u.new_pending?` · ${u.new_pending} belum bayar`:''}.
+     ${u.auto?` Order Orderla disync automatik setiap 30 minit${u.synced?` (terakhir ${fmtDT(u.synced)})`:''}.`:''}
+     ${u.orderla_nodate?`<br>⚠️ ${u.orderla_nodate} order Orderla dalam 60 hari lepas tiada tarikh hantar yang dikenal pasti, jadi diletak ikut tarikh order. Semak di Orderla atau hantar screenshot "Uji sambungan" kepada Claude.`:''}${u.err?`<br>Sync terakhir gagal: ${h(u.err)}`:''}</div>`}).catch(()=>{});
   const nav=k=>{const d=new Date(Y,M-1+k,1);cal.m=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');cal.sel='';Cal(el)};
   $('#pm').onclick=()=>nav(-1);$('#nm').onclick=()=>nav(1);$('#tm').onclick=()=>{cal.m=TODAY.slice(0,7);cal.sel=TODAY;Cal(el)};
   el.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{cal.by=b.dataset.b;Cal(el)});
@@ -749,7 +753,8 @@ async function Acc(el){
     ${o.count?`<div class="msg ok" style="margin:0 0 10px">${o.count.toLocaleString()} order Orderla dalam sistem (${o.first.slice(0,7)} – ${o.last.slice(0,7)}), jualan dibayar ${rm(o.sales)}.${o.synced?` Sync terakhir ${fmtDT(o.synced)}.`:''}</div>`:''}
     <div class="bar" style="margin:0"><input id="ole" type="email" value="${h(o.email)}" placeholder="X-User-Email" aria-label="Email Orderla" style="flex:1"><input id="olt" type="password" placeholder="${o.has_token?'Token disimpan (biar kosong)':'X-User-Token'}" aria-label="Token Orderla" autocomplete="off" style="flex:1"><button class="btn ghost sm" id="ols">Simpan</button></div>
     <p class="mini" style="margin:6px 0 0">Dapatkan di orderla.my → Manage API (pelan PRO). Token disimpan di server sahaja.</p>
-    <div class="bar" style="margin:10px 0 0"><button class="btn ghost sm" id="olx">Uji sambungan</button><button class="btn sm" id="oli">Import semua (2021 – sekarang)</button><button class="btn ghost sm" id="olr">Sync 2 bulan terakhir</button></div>
+    <div class="bar" style="margin:10px 0 0"><button class="btn ghost sm" id="olx">Uji sambungan</button><button class="btn sm" id="oli">Import semua (2021 – sekarang)</button><button class="btn ghost sm" id="olr">Sync 2 bulan terakhir</button><button class="btn ghost sm" id="olp">Kesan semula tarikh hantar</button></div>
+    <p class="mini" style="margin:6px 0 0">Selagi token disimpan, order Orderla bulan ni dan bulan lepas disync automatik setiap 30 minit (termasuk tempahan untuk tarikh ke depan).</p>
     <div id="olo"></div></div>`;}
   if(ME.role==='owner')users+=`<div class="card"><h2>Notifikasi email</h2><p class="mini" style="margin-top:0">Hantar email ujian ke alamat NOTIFY_EMAIL dalam config.php.</p><button class="btn ghost sm" id="tm">Hantar email ujian</button> <span class="mini" id="tmr"></span></div>`;
   el.innerHTML=users+`<div class="card"><h2>Tukar password saya</h2><div class="bar"><input id="po" type="password" placeholder="Password lama" aria-label="Password lama" autocomplete="current-password"><input id="pn" type="password" placeholder="Password baru (min 8)" aria-label="Password baru" autocomplete="new-password"><button class="btn sm" id="pc">Tukar</button></div></div>`;
@@ -779,6 +784,7 @@ async function Acc(el){
         try{const r=await api('olimport',{method:'POST',body:{m}});tot.new+=r.new;tot.updated+=r.updated}catch(e){out(`<div class="msg bad">Berhenti di ${m}: ${h(e.message)}. Tekan Import semula untuk sambung (data yang dah masuk tak berganda).</div>`);btns.forEach(b=>b.disabled=false);return}}
       btns.forEach(b=>b.disabled=false);toast('Import selesai');out(`<div class="msg ok">Selesai: ${tot.new} order baru, ${tot.updated} dikemas kini. Lihat tab Pelanggan dan Dashboard.</div>`)};
     const monthsFrom=(y,m)=>{const a=[],n=new Date();for(let d=new Date(y,m-1,1);d<=n;d.setMonth(d.getMonth()+1))a.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));return a};
+    $('#olp').onclick=async()=>{try{const r=await api('olreparse',{method:'POST'});toast(`${r.fixed} order dikemas kini`)}catch(e){toast(e.message)}};
     $('#oli').onclick=()=>{if(confirm('Import semua order Orderla dari Januari 2021? Proses ni ambil beberapa minit. Jangan tutup halaman.'))run(monthsFrom(2021,1))};
     $('#olr').onclick=()=>{const n=new Date(),p=new Date(n.getFullYear(),n.getMonth()-1,1);run(monthsFrom(p.getFullYear(),p.getMonth()+1))};
   }

@@ -347,6 +347,8 @@ function ol_extra(array $o): array {
 /** Best guesses from the extra fields: delivery date and receiver name. */
 function ol_guess(array $extra, string $notes): array {
   $date = null; $recv = null;
+  $bm = ['januari' => 'January', 'februari' => 'February', 'mac' => 'March', 'april' => 'April', 'mei' => 'May', 'jun' => 'June', 'julai' => 'July', 'ogos' => 'August', 'september' => 'September', 'oktober' => 'October', 'november' => 'November', 'disember' => 'December'];
+  $extra = array_map(fn($v) => preg_replace_callback('/\b(' . implode('|', array_keys($bm)) . ')\b/i', fn($m) => $bm[strtolower($m[1])], (string)$v), $extra);
   foreach ($extra as $k => $v) {
     $lk = strtolower($k);
     if (!$recv && preg_match('/receiver|recipient|penerima/', $lk) && (preg_match('/name|nama/', $lk) || preg_match('/^(receiver|recipient|penerima)$/', $lk))) $recv = $v;
@@ -355,6 +357,11 @@ function ol_guess(array $extra, string $notes): array {
       elseif (preg_match('/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/', $v, $m) && ($t = strtotime($m[1]))) $date = date('Y-m-d', $t);
       elseif (preg_match('#(\d{1,2})/(\d{1,2})/(\d{4})#', $v, $m)) $date = sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
     }
+  }
+  if (!$date) foreach ($extra as $k => $v) { // no labelled date: any value that reads like "Thursday, 20 November 2026" or a dd/mm/yyyy
+    if (preg_match('/^additional_charges\./', $k)) continue;
+    if (preg_match('/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Isnin|Selasa|Rabu|Khamis|Jumaat|Sabtu|Ahad)[a-z]*,?\s+(\d{1,2}\s+[A-Za-z]+\s+\d{4})/i', $v, $m) && ($t = strtotime($m[1]))) { $date = date('Y-m-d', $t); break; }
+    if (preg_match('#\b(\d{1,2})[/.-](\d{1,2})[/.-](20\d{2})\b#', $v, $m) && checkdate((int)$m[2], (int)$m[1], (int)$m[3])) { $date = sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]); break; }
   }
   if (!$recv && preg_match('/Receiver Name:\s*\n?\s*([^\n]+)/i', $notes, $m)) $recv = trim($m[1]);
   if (!$date && preg_match('/Date & Time Slot:\s*\n?\s*[A-Za-z]+,\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})/i', $notes, $m) && ($t = strtotime($m[1]))) $date = date('Y-m-d', $t);
@@ -379,6 +386,26 @@ function ol_upsert(array $o): string {
   $row = ['src' => 'orderla', 'code_id' => $code] + $row;
   q('INSERT INTO legacy_orders (' . implode(',', array_keys($row)) . ') VALUES (' . implode(',', array_fill(0, count($row), '?')) . ')', array_values($row));
   return 'new';
+}
+/** While Orderla is still taking orders: pull this month and last month every 30 minutes (new bookings for future dates included). */
+function orderla_autosync(): void {
+  if ((string)setting('ol_token', '') === '' || (string)setting('ol_auto', '1') !== '1') return;
+  if (time() - (int)setting('ol_auto_at', 0) < 1800) return;
+  set_setting('ol_auto_at', (string)time());
+  try {
+    if (setting('ol_reparse_v') !== '2') { // once after an update: re-read dates/receivers already imported with the newer detection
+      foreach (q('SELECT id, raw FROM legacy_orders WHERE del_date IS NULL OR receiver IS NULL')->fetchAll() as $r) {
+        $o = json_decode((string)$r['raw'], true) ?: []; [$d, $rc] = ol_guess(ol_extra($o), (string)($o['notes'] ?? '') . "\n" . (string)($o['seller_notes'] ?? ''));
+        if ($d || $rc) q('UPDATE legacy_orders SET del_date=COALESCE(del_date,?), receiver=COALESCE(receiver,?) WHERE id=?', [$d, $rc, $r['id']]);
+      }
+      set_setting('ol_reparse_v', '2');
+    }
+    foreach ([date('Y-m', strtotime('first day of last month')), date('Y-m')] as $m) {
+      $j = orderla_get('/orders', ['start_date' => "$m-01", 'end_date' => date('Y-m-t', strtotime("$m-01"))]);
+      foreach ((array)($j['orders'] ?? []) as $o) ol_upsert((array)$o);
+    }
+    set_setting('ol_synced', date('Y-m-d H:i:s'));
+  } catch (Throwable $e) { error_log('100blooms orderla autosync: ' . $e->getMessage()); set_setting('ol_err', mb_substr($e->getMessage(), 0, 200)); }
 }
 /** Orderla rows that count as sales. */
 const OL_PAID = "pay_status='paid' AND (status IS NULL OR status<>'cancelled')";
@@ -536,6 +563,7 @@ function cron_tick(bool $force = false): void {
     if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
     unpaid_sweep();
     if ($GLOBALS['WA_Q']) wa_flush();
+    orderla_autosync();
   } catch (Throwable $e) { error_log('100blooms cron: ' . $e->getMessage()); }
 }
 /** Website orders still unpaid UNPAID_MIN minutes after submit: re-check the gateway first, then nudge team + buyer once. */
