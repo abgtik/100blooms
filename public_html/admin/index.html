@@ -83,7 +83,30 @@ a{color:var(--accent)}
 .seg{display:inline-flex;background:var(--bg);border-radius:12px;padding:3px;gap:2px}
 .seg button{border:0;background:none;padding:6px 12px;border-radius:9px;font:600 13px var(--body);color:var(--soft);cursor:pointer}
 .seg button[aria-pressed=true]{background:var(--seg);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.subtabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin:4px 0 14px;overflow-x:auto;scrollbar-width:none}
+.subtabs button{border:0;background:none;font:600 14px var(--body);color:var(--soft);padding:10px 14px;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;white-space:nowrap}
+.subtabs button[aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent)}
+.podium{position:relative;display:grid;grid-template-columns:repeat(3,1fr);align-items:end;gap:10px;max-width:560px;margin:18px auto 8px;padding-top:30px;overflow:hidden}
+.pod{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0;position:relative}
+.pod .av{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;font:700 19px var(--display);color:#fff;border:4px solid var(--card);box-shadow:0 6px 16px -6px rgba(0,0,0,.3)}
+.pod.p1 .av{width:72px;height:72px;font-size:23px;background:linear-gradient(135deg,#f7c948,#e0a106)}.pod.p2 .av{background:linear-gradient(135deg,#c9d1d9,#8e9aa6)}.pod.p3 .av{background:linear-gradient(135deg,#e3a26f,#b06a34)}
+.pod .crown{font-size:26px;line-height:1;margin-bottom:-6px;animation:bob 2.4s ease-in-out infinite}@keyframes bob{50%{transform:translateY(-4px) rotate(-6deg)}}
+.pod .pn{font:700 13.5px var(--body);color:var(--ink);margin-top:6px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pod .pv{font:700 15px var(--display);color:var(--accent)}.pod .ps{font-size:11.5px;color:var(--soft)}
+.pod .pw{font-size:11.5px;margin:2px 0 6px;color:var(--soft)}
+.pod .blk{width:100%;border-radius:12px 12px 0 0;display:grid;place-items:start center;padding-top:8px;color:#fff;font:800 30px var(--display);text-shadow:0 2px 0 rgba(0,0,0,.12)}
+.pod.p1 .blk{height:120px;background:linear-gradient(180deg,#f7c948,#e8a91a)}.pod.p2 .blk{height:88px;background:linear-gradient(180deg,#cfd6dd,#9aa6b2)}.pod.p3 .blk{height:64px;background:linear-gradient(180deg,#e8ad7c,#c07a43)}
+.podium .cf{position:absolute;width:8px;height:8px;border-radius:2px;opacity:.75;animation:cf 3.2s ease-in-out infinite}
+.podium .c1{left:12%;top:8px;background:var(--accent);transform:rotate(20deg)}.podium .c2{left:30%;top:2px;background:#f7c948;animation-delay:.6s}.podium .c3{right:28%;top:12px;background:#7cc4a4;animation-delay:1.1s}
+.podium .c4{right:10%;top:4px;background:#8fb6ea;border-radius:50%;animation-delay:1.7s}.podium .c5{left:50%;top:0;background:#f29bb3;border-radius:50%;animation-delay:2.2s}
+@keyframes cf{50%{transform:translateY(6px) rotate(140deg)}}
+.rlist .btn{white-space:nowrap}.rlist{border-top:2px solid var(--line);margin-top:0;padding-top:4px}.rk{min-width:28px;height:28px;border-radius:50%;background:var(--bg);display:grid;place-items:center;font:700 12.5px var(--body);color:var(--soft)}
+@media (max-width:560px){.pod .av{width:46px;height:46px;font-size:16px}.pod.p1 .av{width:58px;height:58px}.pod .pn{font-size:12px}.pod .pv{font-size:13px}.pod.p1 .blk{height:96px}.pod.p2 .blk{height:70px}.pod.p3 .blk{height:50px}}
+@media (prefers-reduced-motion:reduce){.pod .crown,.podium .cf{animation:none}}
 .chartbox{position:relative;height:260px}
+.ctip{position:absolute;z-index:5;pointer-events:none;background:var(--ink);color:var(--card);border-radius:10px;padding:6px 10px;font:500 12.5px var(--body);white-space:nowrap;box-shadow:0 8px 20px -8px rgba(0,0,0,.35)}
+.ctip b{font-weight:700}.ctip div{font-size:14px;font-weight:700}.ctip .pv{font-size:11.5px;font-weight:500;opacity:.8}
+.bb{cursor:pointer;outline:none}.bb.on rect:not([fill=transparent]){filter:brightness(.88)}
 .bb:hover rect{filter:brightness(.92)}
 .hbar{display:grid;grid-template-columns:22px 1fr auto;gap:2px 10px;align-items:center;margin:8px 0;font-size:14px}
 .hbar i{grid-column:2/4;height:7px;border-radius:9px;background:var(--bg);overflow:hidden;display:block}.hbar i b{display:block;height:100%;background:var(--accent);border-radius:9px}
@@ -472,10 +495,17 @@ function barChart(id,labels,data,prev,prevLabels){
   let g='';for(let i=0;i<=4;i++){const v=mx*i/4,y=T+ch-ch*i/4;g+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="${cv('--grid')}"/><text x="${L-6}" y="${y+4}" text-anchor="end" font-size="11" fill="${cv('--soft')}">${fmt(v)}</text>`}
   const bars=data.map((v,i)=>{const h=v/mx*ch,x=L+slot*i+(slot-bw)/2,y=T+ch-h,p=prev?prev[i]||0:null;
     const ph=p!==null?p/mx*ch:0,pw=bw*.55,tip=`${labels[i]}: ${rm(v)}${p!==null?` · sebelum (${prevLabels?prevLabels[i]:''}): ${rm(p)}`:''}`;
-    return `<g class="bb"><title>${tip}</title>${p!==null&&p>0?`<rect x="${x-bw*.18}" y="${T+ch-ph}" width="${pw}" height="${Math.max(ph,2)}" rx="4" fill="${cv('--bar2')}"/>`:''}
+    return `<g class="bb" data-i="${i}" tabindex="0">${p!==null&&p>0?`<rect x="${x-bw*.18}" y="${T+ch-ph}" width="${pw}" height="${Math.max(ph,2)}" rx="4" fill="${cv('--bar2')}"/>`:''}
       <rect x="${x+(p!==null?bw*.18:0)}" y="${y}" width="${p!==null?bw*.82:bw}" height="${Math.max(h,v>0?2:0)}" rx="5" fill="${cv('--bar')}"/>
       <rect x="${L+slot*i}" y="${T}" width="${slot}" height="${ch}" fill="transparent"/>${i%every===0?`<text x="${x+bw/2}" y="${H-8}" text-anchor="middle" font-size="11" fill="${cv('--soft')}">${labels[i]}</text>`:''}</g>`}).join('');
-  box.innerHTML=`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graf: ${labels.length} titik data">${g}${bars}</svg>`;
+  box.innerHTML=`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graf: ${labels.length} titik data">${g}${bars}</svg><div class="ctip" hidden></div>`;
+  const tipEl=box.querySelector('.ctip'),svg=box.querySelector('svg');
+  const show=g=>{const i=+g.dataset.i,v=data[i],p=prev?prev[i]||0:null;box.querySelectorAll('.bb').forEach(x=>x.classList.toggle('on',x===g));
+    tipEl.innerHTML=`<b>${h(labels[i])}</b><div>${rm(v)}</div>${p!==null?`<div class="pv">${h(prevLabels?prevLabels[i]:'Sebelum')}: ${rm(p)}${p?` · ${v>=p?'↑':'↓'} ${Math.round(Math.abs(v-p)/p*100)}%`:''}</div>`:''}`;
+    tipEl.hidden=false;const sc=box.clientWidth/W,cx=(L+slot*i+slot/2)*sc,tw=tipEl.offsetWidth;
+    tipEl.style.left=Math.max(0,Math.min(box.clientWidth-tw,cx-tw/2))+'px';tipEl.style.top=Math.max(0,(T+ch-Math.max(v,p||0)/mx*ch)*sc-tipEl.offsetHeight-8)+'px'};
+  svg.querySelectorAll('.bb').forEach(g=>{g.addEventListener('pointerenter',()=>show(g));g.addEventListener('click',()=>show(g));g.addEventListener('focus',()=>show(g))});
+  svg.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'){tipEl.hidden=true;box.querySelectorAll('.bb.on').forEach(x=>x.classList.remove('on'))}});
 }
 const dShort=s=>new Date(s+'T00:00').toLocaleDateString('ms-MY',{day:'numeric',month:'short'});
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -497,7 +527,12 @@ async function Dash(el){
    <div class="grid4">
     ${card('Sales hari ni',K.today,`sehingga ${j.cut.now}`,`semalam (sehingga ${j.cut.now})`)}
     ${card('Sales 7 hari',K.week,'7 hari terakhir','7 hari sebelumnya')}
-    ${card('Sales bulan ni',K.month,'bulan ni setakat hari ni',`bulan lepas (${lmTxt})`)}
+    ${(()=>{const c=K.month,F=c.full||c.prev,pct=F.s?Math.round(c.s/F.s*100):0,lmName=new Date(lmA+'T00:00').toLocaleDateString('ms-MY',{month:'long'});
+      return `<div class="kpi"><small>Sales bulan ni</small><b>${rm(c.s)}</b> ${delta(c.s,F.s)}<div class="mini">${c.n} order · hari ${j.cut.m_days[0]} daripada ${j.cut.m_days[1]}</div>
+       <div class="mini">vs <b style="color:var(--ink)">${rm(F.s)}</b> sebulan penuh ${lmName} (${F.n} order)</div>
+       <div class="pbar" style="margin:6px 0 3px" title="${pct}% daripada sales ${lmName}"><b style="width:${Math.min(100,pct)}%"></b></div>
+       <div class="mini">${c.s>=F.s?`🎉 Dah lepasi ${lmName}!`:`${pct}% · lagi ${rm(Math.ceil(F.s-c.s))} untuk lepasi ${lmName}`}</div>
+       <div class="mini" style="opacity:.8">Tarikh sama bulan lepas (${lmTxt}): ${rm(c.prev.s)}</div></div>`})()}
     <div class="kpi"><small>Order masuk hari ni</small><b>${K.created.n}</b> ${delta(K.created.n,K.created.prev.n)}<div class="mini">termasuk yang belum bayar</div><div class="mini">vs ${K.created.prev.n} semalam (sehingga ${j.cut.now})</div></div>
     ${j.alltime&&j.alltime.orderla.n?`<div class="kpi"><small>Sepanjang masa</small><b>${rm(Math.round(j.alltime.orderla.s+j.alltime.baru.s))}</b><div class="mini">${(j.alltime.orderla.n+j.alltime.baru.n).toLocaleString()} order dibayar</div><div class="mini">Orderla ${rm(Math.round(j.alltime.orderla.s))} · baru ${rm(Math.round(j.alltime.baru.s))}</div></div>`:''}
     <div class="kpi ${+j.pending.n?'hl':''}"><small>Menunggu bayaran (7 hari)</small><b>${j.pending.n}</b><div class="mini">${rm(j.pending.s)} belum dibayar · <a href="#" id="fu">Follow up</a></div></div>
@@ -554,7 +589,7 @@ async function Report(el){
     ${+j.discount?`<div class="kpi"><small>Diskaun voucher</small><b>${rm(j.discount)}</b></div>`:''}</div>
    <div class="card"><h2>Jualan harian (${rp.by==='del'?'ikut tarikh hantar':'ikut tarikh bayar'})</h2><div class="chartbox"><div id="ch2" style="height:260px"></div></div></div>
    <div class="ranks">${tbl('Bouquet',R.bouquet)}${tbl('Momen',R.occasion)}${tbl('Balloon',R.balloon)}${tbl('Kek',R.cake)}${tbl('Jenis penghantaran',R.del)}${tbl('Zon',R.zone)}${tbl('Kawasan (poskod)',R.area)}${tbl('Sumber order',R.source)}${tbl('Voucher',R.voucher)}</div>
-   <p class="mini">Order batal tak dikira. "Kadar bayar" = order masuk dalam tempoh ni yang dah dibayar.</p>`;
+   <p class="mini">Order batal tak dikira. "Kadar bayar" = order masuk dalam tempoh ni yang dah dibayar.${j.orderla&&j.orderla.n?` Termasuk <b>${j.orderla.n} order Orderla</b> (${rm(j.orderla.s)}): tarikh bayar dikira ikut tarikh order, bouquet/balloon/kek dibaca dari nama item, dan Orderla tiada data momen kecuali ada soalan "occasion" dalam borang.`:''}</p>`;
   barChart('ch2',Object.keys(j.series).map(dShort),Object.values(j.series));
 }
 
@@ -663,31 +698,54 @@ async function Agents(el){
   if($('#gs'))$('#gs').onclick=async()=>{try{await api('agset',{method:'POST',body:{rate:$('#gr').value,payout_min:$('#gm').value}});toast('Tetapan disimpan');Agents(el)}catch(e){toast(e.message)}};
 }
 /* ---------- customers (new system + Orderla history) ---------- */
-let cu={q:'',sort:'last',lim:100};
+let cu={q:'',sort:'last',lim:100,sub:'list',rk:'rm',hideInt:true};
 const fuMsg=r=>{const first=(r.name||'').split(' ')[0]||'';const when=r.years>1?`${r.years} tahun lepas`:'Tahun lepas';
   return `Hai ${first} 🌸\n\n${when}, pada minggu yang sama, awak hantar hadiah${r.receiver?` kepada ${r.receiver}`:''} melalui 100 Blooms. Semoga senyuman hari tu masih diingat 😊\n\nNak buat kejutan lagi tahun ni? Combo Jimat RM128, lengkap dengan bouquet, sepotong kek, balloon, polaroid dan wishcard. Delivery PERCUMA (10 pagi – 6 petang).\n\n👉 ${ME.site||location.origin}\n\n— 100 Blooms`};
 async function Customers(el){
   el.innerHTML='<div class="empty">Memuatkan…</div>';
-  let j,ly;try{[j,ly]=await Promise.all([api('customers',{params:{sort:cu.sort}}),api('lastyear')])}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  let j,ly;try{[j,ly]=await Promise.all([api('customers',{params:{sort:'last'}}),api('lastyear')])}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
   const wa=(p,t)=>`https://wa.me/${p}${t?'?text='+encodeURIComponent(t):''}`;
-  const draw=()=>{const t=cu.q.toLowerCase(),rows=j.rows.filter(r=>!t||(r.name||'').toLowerCase().includes(t)||r.phone.includes(t.replace(/\D/g,'')||'#'));
-    $('#cul').innerHTML=rows.slice(0,cu.lim).map(r=>`<div class="rowx"><span><b style="color:var(--ink)">${h(r.name||'-')}</b> ${r.src.includes('orderla')?'<span class="pill" style="background:var(--infob);color:var(--info)">Orderla</span>':''}<br>
-      <span class="mini">${r.n} order · ${rm(r.rm)} · terakhir ${new Date(r.last.slice(0,10)+'T00:00').toLocaleDateString('ms-MY',{day:'numeric',month:'short',year:'numeric'})}${r.n>1?` · pertama ${r.first.slice(0,4)}`:''}</span></span><span><a class="btn ghost sm" href="${wa(r.phone)}" target="_blank" rel="noopener">WhatsApp</a></span></div>`).join('')
-      +(rows.length>cu.lim?`<button class="btn ghost sm" id="cum" style="margin-top:10px">Tunjuk lagi (${rows.length-cu.lim})</button>`:'')||'<p class="mini">Tiada pelanggan.</p>';
-    if($('#cum'))$('#cum').onclick=()=>{cu.lim+=200;draw()};$('#cuc').textContent=rows.length.toLocaleString()};
+  const dLong=s=>new Date(s.slice(0,10)+'T00:00').toLocaleDateString('ms-MY',{day:'numeric',month:'short',year:'numeric'});
+  const olPill=r=>r.src.includes('orderla')?'<span class="pill" style="background:var(--infob);color:var(--info)">Orderla</span>':'';
+  const internal=r=>/100\s*blooms|^pickup$|^pick\s*up$|^test/i.test((r.name||'').trim());
+  const sorted=k=>[...j.rows].sort((a,b)=>k==='rm'?b.rm-a.rm||b.n-a.n:k==='n'?b.n-a.n||b.rm-a.rm:(b.last>a.last?1:b.last<a.last?-1:0));
   const tot=j.rows.reduce((a,r)=>a+r.rm,0),rep=j.rows.filter(r=>r.n>1).length;
+  const SUB=[['list','📋 Senarai pelanggan'],['rank','🏆 Ranking'],['fu','🎁 Follow-up minggu ni'+(ly.rows.length?` (${ly.rows.length})`:'')]];
   el.innerHTML=`<div class="kpis"><div class="kpi"><small>Pelanggan (pernah bayar)</small><b>${j.total.toLocaleString()}</b></div><div class="kpi"><small>Pelanggan ulang beli</small><b>${rep.toLocaleString()}</b><div class="mini">${j.total?Math.round(rep/j.total*100):0}% daripada semua</div></div><div class="kpi"><small>Jumlah jualan sepanjang masa</small><b>${rm(Math.round(tot))}</b></div></div>
-   <div class="card"><h2>🎁 Minggu ni, tahun-tahun lepas</h2><p class="mini" style="margin-top:0">Pelanggan yang hantar hadiah sekitar minggu ni pada tahun lepas (kemungkinan birthday atau anniversary yang sama). Tekan WhatsApp untuk hantar ayat follow-up yang dah siap.</p>
-    ${ly.rows.length?ly.rows.map(r=>`<div class="rowx"><span><b style="color:var(--ink)">${h(r.name||'-')}</b>${r.receiver?` → ${h(r.receiver)}`:''}<br><span class="mini">${fmtD(r.d)} ${r.years>1?`(${r.years} tahun lepas)`:'(tahun lepas)'} · ${h((r.items||'').slice(0,70))}</span></span>
-      <span>${r.phone?`<a class="btn sm" href="${wa(r.phone,fuMsg(r))}" target="_blank" rel="noopener">WhatsApp</a>`:''}</span></div>`).join(''):'<p class="mini">Tiada order pada minggu yang sama tahun-tahun lepas. (Import data Orderla di tab Pengguna untuk isi bahagian ni.)</p>'}</div>
-   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">Senarai pelanggan <span class="mini">(<span id="cuc"></span>)</span></h2>
-     <div class="bar" style="margin:0"><div class="seg" role="group" aria-label="Susun ikut">${[['last','Terkini'],['rm','Paling banyak belanja'],['n','Paling kerap']].map(([k,t])=>`<button data-cs="${k}" aria-pressed="${cu.sort===k}">${t}</button>`).join('')}</div>
-     <a class="btn ghost sm" href="api.php?a=customers&csv=1&sort=${cu.sort}">Muat turun CSV</a></div></div>
-    <input type="search" id="cuq" value="${h(cu.q)}" placeholder="Cari nama atau nombor" aria-label="Cari pelanggan" style="margin:10px 0 4px;width:100%">
-    <div id="cul"></div></div>`;
-  draw();
-  $('#cuq').oninput=e=>{cu.q=e.target.value;cu.lim=100;draw()};
-  el.querySelectorAll('[data-cs]').forEach(b=>b.onclick=()=>{cu.sort=b.dataset.cs;Customers(el)});
+   <div class="subtabs" role="tablist" aria-label="Bahagian pelanggan">${SUB.map(([k,t])=>`<button role="tab" data-sub="${k}" aria-selected="${cu.sub===k}">${t}</button>`).join('')}</div><div id="cub"></div>`;
+  const body=()=>{el.querySelectorAll('[data-sub]').forEach(b=>b.setAttribute('aria-selected',b.dataset.sub===cu.sub));const B=$('#cub');
+    if(cu.sub==='fu'){B.innerHTML=`<div class="card"><h2>🎁 Minggu ni, tahun-tahun lepas</h2><p class="mini" style="margin-top:0">Pelanggan yang hantar hadiah sekitar minggu ni pada tahun lepas (kemungkinan birthday atau anniversary yang sama). Tekan WhatsApp untuk hantar ayat follow-up yang dah siap.</p>
+      ${ly.rows.length?ly.rows.map(r=>`<div class="rowx"><span><b style="color:var(--ink)">${h(r.name||'-')}</b>${r.receiver?` → ${h(r.receiver)}`:''}<br><span class="mini">${fmtD(r.d)} ${r.years>1?`(${r.years} tahun lepas)`:'(tahun lepas)'} · ${h((r.items||'').slice(0,70))}</span></span>
+        <span>${r.phone?`<a class="btn sm" href="${wa(r.phone,fuMsg(r))}" target="_blank" rel="noopener">WhatsApp</a>`:''}</span></div>`).join(''):'<p class="mini">Tiada order pada minggu yang sama tahun-tahun lepas.</p>'}</div>`;return}
+    if(cu.sub==='rank'){
+      const rows=sorted(cu.rk).filter(r=>!cu.hideInt||!internal(r)),val=r=>cu.rk==='rm'?rm(Math.round(r.rm)):r.n+' order',sub=r=>cu.rk==='rm'?r.n+' order':rm(Math.round(r.rm));
+      const ini=n=>(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+      const step=(r,pos)=>r?`<div class="pod p${pos}">${pos===1?'<div class="crown" aria-hidden="true">👑</div>':''}<div class="av">${h(ini(r.name))}</div>
+        <div class="pn" title="${h(r.name)}">${h(r.name||'-')}</div><div class="pv">${val(r)}</div><div class="ps">${sub(r)}</div>
+        <a class="pw" href="${wa(r.phone)}" target="_blank" rel="noopener" aria-label="WhatsApp ${h(r.name)}">WhatsApp</a>
+        <div class="blk"><span>${pos}</span></div></div>`:'<div class="pod"></div>';
+      B.innerHTML=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">🏆 Pelanggan terbaik</h2>
+        <div class="seg" role="group" aria-label="Ranking ikut">${[['rm','Paling banyak belanja'],['n','Paling kerap']].map(([k,t])=>`<button data-rk="${k}" aria-pressed="${cu.rk===k}">${t}</button>`).join('')}</div></div>
+        <label class="mini" style="display:inline-flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="cuh" ${cu.hideInt?'checked':''}> Sembunyikan akaun dalaman (nama ada "100 Blooms", "pickup")</label>
+        <div class="podium" aria-label="Tiga teratas">${step(rows[1],2)}${step(rows[0],1)}${step(rows[2],3)}<i class="cf c1"></i><i class="cf c2"></i><i class="cf c3"></i><i class="cf c4"></i><i class="cf c5"></i></div>
+        <div class="rlist">${rows.slice(3,30).map((r,i)=>`<div class="rowx"><span style="display:flex;gap:10px;align-items:center"><b class="rk">${i+4}</b><span style="text-align:left"><b style="color:var(--ink)">${h(r.name||'-')}</b> ${olPill(r)}<br><span class="mini">${val(r)} · ${sub(r)} · terakhir ${dLong(r.last)}</span></span></span>
+          <span><a class="btn ghost sm" href="${wa(r.phone)}" target="_blank" rel="noopener">WhatsApp</a></span></div>`).join('')}</div></div>`;
+      B.querySelectorAll('[data-rk]').forEach(b=>b.onclick=()=>{cu.rk=b.dataset.rk;body()});$('#cuh').onchange=e=>{cu.hideInt=e.target.checked;body()};return}
+    B.innerHTML=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">Senarai pelanggan <span class="mini">(<span id="cuc"></span>)</span></h2>
+      <div class="bar" style="margin:0"><div class="seg" role="group" aria-label="Susun ikut">${[['last','Terkini'],['rm','Paling banyak belanja'],['n','Paling kerap']].map(([k,t])=>`<button data-cs="${k}" aria-pressed="${cu.sort===k}">${t}</button>`).join('')}</div>
+      <a class="btn ghost sm" href="api.php?a=customers&csv=1&sort=${cu.sort}">Muat turun CSV</a></div></div>
+      <input type="search" id="cuq" value="${h(cu.q)}" placeholder="Cari nama atau nombor" aria-label="Cari pelanggan" style="margin:10px 0 4px;width:100%"><div id="cul"></div></div>`;
+    const list=sorted(cu.sort);
+    const draw=()=>{const t=cu.q.toLowerCase(),rows=list.filter(r=>!t||(r.name||'').toLowerCase().includes(t)||r.phone.includes(t.replace(/\D/g,'')||'#'));
+      $('#cul').innerHTML=rows.slice(0,cu.lim).map(r=>`<div class="rowx"><span><b style="color:var(--ink)">${h(r.name||'-')}</b> ${olPill(r)}<br>
+        <span class="mini">${r.n} order · ${rm(r.rm)} · terakhir ${dLong(r.last)}${r.n>1?` · pertama ${r.first.slice(0,4)}`:''}</span></span><span><a class="btn ghost sm" href="${wa(r.phone)}" target="_blank" rel="noopener">WhatsApp</a></span></div>`).join('')
+        +(rows.length>cu.lim?`<button class="btn ghost sm" id="cum" style="margin-top:10px">Tunjuk lagi (${rows.length-cu.lim})</button>`:'')||'<p class="mini">Tiada pelanggan.</p>';
+      if($('#cum'))$('#cum').onclick=()=>{cu.lim+=200;draw()};$('#cuc').textContent=rows.length.toLocaleString()};
+    draw();$('#cuq').oninput=e=>{cu.q=e.target.value;cu.lim=100;draw()};
+    B.querySelectorAll('[data-cs]').forEach(b=>b.onclick=()=>{cu.sort=b.dataset.cs;cu.lim=100;body()});
+  };
+  el.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{cu.sub=b.dataset.sub;body()});
+  body();
 }
 async function Vouchers(el){
   el.innerHTML='<div class="empty">Memuatkan…</div>';

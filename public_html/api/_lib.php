@@ -433,6 +433,45 @@ function ol_enrich(int $limit = 20): array {
   }
   return ['checked' => $done, 'found' => $found, 'left' => $left];
 }
+/** Report buckets for one Orderla order (read from the raw order): bouquet, balloon, cake, momen, slot, zone, voucher. Lists, since one order can hold several. */
+function ol_report_parts(array $o, array $extra): array {
+  static $C = null, $byCode = null, $bqNames = null;
+  if ($C === null) { $C = catalog(); $byCode = []; foreach (product_meta()['bal'] ?? [] as $id => $m) if (!empty($m['code'])) $byCode[strtoupper((string)$m['code'])] = $C['bal'][$id] ?? $id;
+    $bqNames = []; foreach ($C['bq'] as $n) $bqNames[strtolower($n)] = $n; }
+  $out = ['bouquet' => [], 'balloon' => [], 'cake' => [], 'occasion' => [], 'del' => [], 'zone' => [], 'voucher' => []];
+  foreach ((array)($o['order_list'] ?? []) as $it) {
+    if (!is_array($it)) continue;
+    $name = trim((string)($it['name'] ?? '')); if ($name === '') continue;
+    $var = ''; if (!empty($it['variants']) && is_array($it['variants'])) $var = trim(implode(', ', array_filter(array_map(fn($x) => is_array($x) ? (string)($x['name'] ?? $x['value'] ?? '') : (string)$x, $it['variants']))));
+    if (preg_match('/balloon|belon/i', $name)) {
+      $lab = $var !== '' ? $var : $name;
+      if (preg_match('/\b([A-Z]{1,3}\d{2,3})\b/', strtoupper($lab), $m) && isset($byCode[$m[1]])) $lab = $byCode[$m[1]];
+      $out['balloon'][] = mb_substr($lab, 0, 40);
+    } elseif (preg_match('/\bcake\b|\bkek\b/i', $name)) $out['cake'][] = mb_substr($var !== '' ? $var : $name, 0, 40);
+    else {
+      $first = strtolower(preg_split('/\s+/', $name)[0]);
+      if (isset($bqNames[$first])) $out['bouquet'][] = $bqNames[$first];
+      elseif (preg_match('/bouquet|bunga|flower|rose/i', $name)) $out['bouquet'][] = mb_substr(trim(preg_replace('/\s*\((XS|S|M|L|XL)\)\s*$/i', '', preg_replace('/\s*bouquet\s*/i', ' ', $name))), 0, 40);
+    }
+  }
+  foreach ($extra as $k => $v) if (preg_match('/occasion|momen|majlis|sempena/i', (string)$k) && trim((string)$v) !== '') { $out['occasion'][] = mb_substr(trim((string)$v), 0, 40); break; }
+  $slot = null; $txt = (string)($o['notes'] ?? '') . "\n" . implode("\n", array_map('strval', $extra));
+  if (preg_match('/(\d{1,2}:\d{2}\s*[AP]M)\s*[-–]\s*(\d{1,2}:\d{2}\s*[AP]M)/i', $txt, $m)) {
+    $key = fn($a, $b) => strtoupper(preg_replace('/\s+/', '', "$a-$b"));
+    $mine = ['free' => 'Percuma 10am–6pm', 'A' => 'Slot A', 'B' => 'Slot B', 'C' => 'Slot C'];
+    foreach (SLOT_EN as $k => $t) { [$a, $b] = array_map('trim', explode('–', $t)); if ($key($a, $b) === $key($m[1], $m[2])) $slot = $mine[$k]; }
+    $slot = $slot ?? strtoupper($m[1]) . '–' . strtoupper($m[2]);
+  }
+  $dtype = (string)($extra['Delivery'] ?? '');
+  if (preg_match('/pick\s*-?up|self|ambil/i', $dtype)) { $out['del'][] = 'Ambil sendiri'; $out['zone'][] = 'Ambil sendiri'; }
+  else {
+    if ($slot) $out['del'][] = $slot;
+    $fee = (float)($o['delivery_fee'] ?? 0);
+    $out['zone'][] = $fee <= 0 ? 'Zon biru (percuma)' : ($fee == 20.0 ? 'Zon merah (+RM20)' : 'Caj hantar RM' . rtrim(rtrim(number_format($fee, 2, '.', ''), '0'), '.'));
+  }
+  foreach (['voucher_code', 'coupon_code', 'discount_code', 'promo_code', 'voucher', 'coupon'] as $k) if (!empty($o[$k]) && is_scalar($o[$k])) { $out['voucher'][] = strtoupper(mb_substr((string)$o[$k], 0, 30)); break; }
+  return $out;
+}
 /** Orderla rows that count as sales. */
 const OL_PAID = "pay_status='paid' AND (status IS NULL OR status<>'cancelled')";
 

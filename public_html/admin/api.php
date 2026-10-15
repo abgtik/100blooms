@@ -545,6 +545,7 @@ case 'dash': // ?by=paid (tarikh bayar) | created (tarikh order). Sales = paid, 
   $w0 = strtotime('-6 days', $d0);
   $kpi = ['today' => $cmp($d0, $now, $d0 - 86400, $now - 86400), 'week' => $cmp($w0, $now, $w0 - 7 * 86400, $w0 - 1),
     'month' => $cmp(strtotime($m0), $now, $lm0, $lmCut)];
+  $kpi['month']['full'] = $sum($lm0, $lmEnd); // whole of last month, the number to beat
   $created = fn(int $a, int $b) => (int)q('SELECT COUNT(*) FROM orders WHERE created_at>=? AND created_at<=?', [date('Y-m-d H:i:s', $a), date('Y-m-d H:i:s', $b)])->fetchColumn();
   $kpi['created'] = ['n' => $created($d0, $now), 'prev' => ['n' => $created($d0 - 86400, $now - 86400)]];
   $pend = q("SELECT COUNT(*) n, COALESCE(SUM(total),0) s FROM orders WHERE pay_status='pending' AND status<>'batal' AND created_at>=?", [date('Y-m-d H:i:s', $now - 7 * 86400)])->fetch();
@@ -565,7 +566,7 @@ case 'dash': // ?by=paid (tarikh bayar) | created (tarikh order). Sales = paid, 
   try { foreach (q('SELECT SUBSTR(created_at,1,4) y, COUNT(*) n, COALESCE(SUM(total),0) s FROM legacy_orders WHERE ' . OL_PAID . ' GROUP BY SUBSTR(created_at,1,4)')->fetchAll() as $r) { $yr[$r['y']] = ($yr[$r['y']] ?? 0) + (float)$r['s']; $all['orderla']['n'] += (int)$r['n']; $all['orderla']['s'] += (float)$r['s']; } } catch (Throwable $e) {}
   if ($yr) { $y0 = (int)min(array_keys($yr)); $ys = range($y0, (int)date('Y')); $series['year'] = ['keys' => array_map('strval', $ys), 'cur' => array_map(fn($y) => round($yr[(string)$y] ?? 0, 2), $ys), 'prev' => array_map(fn($y) => round($yr[(string)($y - 1)] ?? 0, 2), $ys)]; }
   json_out(['by' => $col === 'created_at' ? 'created' : 'paid', 'kpi' => $kpi, 'pending' => $pend, 'series' => $series, 'alltime' => $all,
-    'cut' => ['now' => date('H:i', $now), 'lm' => date('Y-m-d', $lm0) . '|' . date('Y-m-d', $lmCut)], 'today_del' => array_column($todayDel, 'n', 'status'), 'top_bq' => $topBq]);
+    'cut' => ['now' => date('H:i', $now), 'lm' => date('Y-m-d', $lm0) . '|' . date('Y-m-d', $lmCut), 'lm_end' => date('Y-m-d', $lmEnd), 'm_days' => [(int)date('j', $now), (int)date('t', $now)]], 'today_del' => array_column($todayDel, 'n', 'status'), 'top_bq' => $topBq]);
 
 case 'report':
 case 'reportcsv':
@@ -583,6 +584,14 @@ case 'reportcsv':
     foreach ($paid as $o) fputcsv($out, [$o['code'], $o['created_at'], $o['paid_at'], $o['del_date'], $o['del_type'] . ($o['del_time'] ? ' ' . $o['del_time'] : ''), $o['status'],
       $C['occ'][$o['occasion']] ?? $o['occasion'], $C['bq'][$o['bouquet']] ?? $o['bouquet'], $C['bal'][$o['balloon']] ?? $o['balloon'], $o['cake'], $o['photo_count'],
       $o['r_name'], $o['r_post'], $o['zone'], $o['b_name'], $o['b_phone'], $o['voucher'] ?? '', $o['discount'] ?? 0, $o['agent_ref'] ?? '', $o['total'], $o['pay_channel']]);
+    try {
+      $lw = $by === 'del_date' ? 'del_date>=? AND del_date<=?' : 'created_at>=? AND created_at<=?';
+      foreach (q('SELECT * FROM legacy_orders WHERE ' . OL_PAID . " AND $lw ORDER BY created_at", $by === 'del_date' ? [$from, $to] : ["$from 00:00:00", "$to 23:59:59"])->fetchAll() as $r) {
+        $o = json_decode((string)$r['raw'], true) ?: []; $P = ol_report_parts($o, json_decode((string)$r['extra'], true) ?: []);
+        fputcsv($out, [$r['invoice_no'] ?: $r['code_id'], $r['created_at'], $r['created_at'], $r['del_date'] ?? '', implode(', ', $P['del']), 'Orderla: ' . $r['status'], implode(', ', $P['occasion']), implode(', ', $P['bouquet']),
+          implode(', ', $P['balloon']), implode(', ', $P['cake']), '', $r['receiver'] ?? '', $r['postcode'], implode(', ', $P['zone']), $r['name'], $r['phone'], implode(', ', $P['voucher']), $o['discount'] ?? 0, '', $r['total'], 'Orderla']);
+      }
+    } catch (Throwable $e) {}
     fclose($out); exit;
   }
   $createdN = (int)q('SELECT COUNT(*) FROM orders WHERE created_at>=? AND created_at<=?', ["$from 00:00:00", "$to 23:59:59"])->fetchColumn();
@@ -599,10 +608,25 @@ case 'reportcsv':
     $inc('area', substr($o['r_post'], 0, 2) . 'xxx', $v); $inc('source', $o['agent_ref'] ? 'Agent: ' . $o['agent_ref'] : (!empty($o['created_by']) ? 'WhatsApp (sales team)' : 'Laman web (terus)'), $v);
     if (!empty($o['voucher'])) $inc('voucher', $o['voucher'], $v);
   }
+  $olN = 0; $olS = 0.0;
+  try { // Orderla orders in the same period: paid date = order date (Orderla doesn't send a paid time); delivery date when known
+    $lw = $by === 'del_date' ? 'del_date>=? AND del_date<=?' : 'created_at>=? AND created_at<=?';
+    foreach (q('SELECT created_at, del_date, total, postcode, extra, raw FROM legacy_orders WHERE ' . OL_PAID . " AND $lw", $by === 'del_date' ? [$from, $to] : ["$from 00:00:00", "$to 23:59:59"])->fetchAll() as $r) {
+      $v = (float)$r['total']; $sales += $v; $olN++; $olS += $v;
+      $d = substr((string)($by === 'del_date' ? $r['del_date'] : $r['created_at']), 0, 10); $series[$d] = ($series[$d] ?? 0) + $v;
+      $o = json_decode((string)$r['raw'], true) ?: []; $disc += (float)($o['discount'] ?? 0);
+      foreach (ol_report_parts($o, json_decode((string)$r['extra'], true) ?: []) as $k => $list) foreach (array_unique($list) as $nm) $inc($k, $nm, $v);
+      if (preg_match('/^\d{5}$/', (string)$r['postcode'])) $inc('area', substr($r['postcode'], 0, 2) . 'xxx', $v);
+      $inc('source', 'Orderla', $v);
+    }
+    $createdN += (int)q('SELECT COUNT(*) FROM legacy_orders WHERE created_at>=? AND created_at<=?', ["$from 00:00:00", "$to 23:59:59"])->fetchColumn();
+    $createdPaid += (int)q('SELECT COUNT(*) FROM legacy_orders WHERE ' . OL_PAID . ' AND created_at>=? AND created_at<=?', ["$from 00:00:00", "$to 23:59:59"])->fetchColumn();
+  } catch (Throwable $e) {}
+  $nPaid = count($paid) + $olN;
   foreach ($rank as &$r) { uasort($r, fn($x, $y) => $y[0] <=> $x[0] ?: $y[1] <=> $x[1]); $r = array_map(fn($k, $x) => ['name' => (string)$k, 'n' => $x[0], 'sales' => round($x[1], 2)], array_keys($r), $r); } unset($r);
   $days = []; for ($d = strtotime($from); $d <= strtotime($to) && count($days) < 400; $d += 86400) $days[date('Y-m-d', $d)] = round($series[date('Y-m-d', $d)] ?? 0, 2);
-  json_out(['from' => $from, 'to' => $to, 'by' => $by, 'sales' => round($sales, 2), 'paid' => count($paid), 'avg' => count($paid) ? round($sales / count($paid), 2) : 0,
-    'created' => $createdN, 'pay_rate' => $createdN ? round($createdPaid / $createdN * 100) : 0, 'discount' => round($disc, 2), 'rank' => $rank, 'series' => $days]);
+  json_out(['from' => $from, 'to' => $to, 'by' => $by, 'sales' => round($sales, 2), 'paid' => $nPaid, 'avg' => $nPaid ? round($sales / $nPaid, 2) : 0,
+    'orderla' => ['n' => $olN, 's' => round($olS, 2)], 'created' => $createdN, 'pay_rate' => $createdN ? round($createdPaid / $createdN * 100) : 0, 'discount' => round($disc, 2), 'rank' => $rank, 'series' => $days]);
 
 case 'calendar':
   need_login();
