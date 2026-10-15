@@ -164,6 +164,75 @@ case 'deluser':
   if ($id === (int)$me['id']) fail('Tak boleh padam akaun sendiri.');
   q('DELETE FROM admins WHERE id=?', [$id]); json_out(['ok' => true]);
 
+case 'dash':
+  need_login();
+  $t = date('Y-m-d'); $m0 = date('Y-m-01');
+  $paidSum = fn(string $from, string $to) => q("SELECT COUNT(*) n, COALESCE(SUM(total),0) s FROM orders WHERE pay_status='paid' AND status<>'batal' AND paid_at>=? AND paid_at<=?", [$from, $to])->fetch();
+  $today = $paidSum("$t 00:00:00", "$t 23:59:59"); $month = $paidSum("$m0 00:00:00", "$t 23:59:59");
+  $pend = q("SELECT COUNT(*) n, COALESCE(SUM(total),0) s FROM orders WHERE pay_status='pending' AND status<>'batal' AND created_at>=?", [date('Y-m-d H:i:s', time() - 7 * 86400)])->fetch();
+  $created = (int)q('SELECT COUNT(*) FROM orders WHERE created_at>=?', ["$t 00:00:00"])->fetchColumn();
+  // sales series by paid date: 14 days, 12 weeks, 12 months
+  $rows = q("SELECT paid_at, total FROM orders WHERE pay_status='paid' AND status<>'batal' AND paid_at>=?", [date('Y-m-01', strtotime('-11 months')) . ' 00:00:00'])->fetchAll();
+  $day = []; for ($i = 13; $i >= 0; $i--) $day[date('Y-m-d', strtotime("-$i days"))] = 0;
+  $wk = []; for ($i = 11; $i >= 0; $i--) $wk[date('o-\WW', strtotime("-$i weeks"))] = 0;
+  $mo = []; for ($i = 11; $i >= 0; $i--) $mo[date('Y-m', strtotime(date('Y-m-01') . " -$i months"))] = 0;
+  foreach ($rows as $r) { $ts = strtotime($r['paid_at']); $v = (float)$r['total'];
+    if (isset($day[$k = date('Y-m-d', $ts)])) $day[$k] += $v; if (isset($wk[$k = date('o-\WW', $ts)])) $wk[$k] += $v; if (isset($mo[$k = date('Y-m', $ts)])) $mo[$k] += $v; }
+  $todayDel = q("SELECT status, COUNT(*) n FROM orders WHERE del_date=? AND pay_status='paid' AND status<>'batal' GROUP BY status", [$t])->fetchAll();
+  $topBq = q("SELECT bouquet, COUNT(*) n FROM orders WHERE pay_status='paid' AND status<>'batal' AND paid_at>=? GROUP BY bouquet ORDER BY n DESC", ["$m0 00:00:00"])->fetchAll();
+  $C = catalog(); foreach ($topBq as &$b) $b['name'] = $C['bq'][$b['bouquet']] ?? $b['bouquet']; unset($b);
+  json_out(['today' => $today, 'month' => $month, 'pending' => $pend, 'created_today' => $created,
+    'series' => ['day' => $day, 'week' => $wk, 'month' => $mo], 'today_del' => array_column($todayDel, 'n', 'status'), 'top_bq' => $topBq]);
+
+case 'report':
+case 'reportcsv':
+  need_login();
+  $from = (string)($_GET['from'] ?? date('Y-m-01')); $to = (string)($_GET['to'] ?? date('Y-m-d'));
+  foreach ([$from, $to] as $d) if (!DateTimeImmutable::createFromFormat('!Y-m-d', $d)) fail('Tarikh tidak sah.');
+  $by = ($_GET['by'] ?? 'paid') === 'del' ? 'del_date' : 'paid_at';
+  $lo = $by === 'del_date' ? $from : "$from 00:00:00"; $hi = $by === 'del_date' ? $to : "$to 23:59:59";
+  $paid = q("SELECT * FROM orders WHERE pay_status='paid' AND status<>'batal' AND $by>=? AND $by<=? ORDER BY $by", [$lo, $hi])->fetchAll();
+  if ($a === 'reportcsv') {
+    header('Content-Type: text/csv; charset=utf-8'); header("Content-Disposition: attachment; filename=\"100blooms-order-$from-$to.csv\"");
+    $out = fopen('php://output', 'w'); fwrite($out, "\xEF\xBB\xBF");
+    fputcsv($out, ['Kod', 'Tarikh order', 'Tarikh bayar', 'Tarikh hantar', 'Slot', 'Status', 'Momen', 'Bouquet', 'Balloon', 'Kek', 'Polaroid', 'Penerima', 'Poskod', 'Zon', 'Pembeli', 'WhatsApp', 'Voucher', 'Diskaun', 'Agent', 'Jumlah', 'Saluran bayar']);
+    $C = catalog();
+    foreach ($paid as $o) fputcsv($out, [$o['code'], $o['created_at'], $o['paid_at'], $o['del_date'], $o['del_type'] . ($o['del_time'] ? ' ' . $o['del_time'] : ''), $o['status'],
+      $C['occ'][$o['occasion']] ?? $o['occasion'], $C['bq'][$o['bouquet']] ?? $o['bouquet'], $C['bal'][$o['balloon']] ?? $o['balloon'], $o['cake'], $o['photo_count'],
+      $o['r_name'], $o['r_post'], $o['zone'], $o['b_name'], $o['b_phone'], $o['voucher'] ?? '', $o['discount'] ?? 0, $o['agent_ref'] ?? '', $o['total'], $o['pay_channel']]);
+    fclose($out); exit;
+  }
+  $createdN = (int)q('SELECT COUNT(*) FROM orders WHERE created_at>=? AND created_at<=?', ["$from 00:00:00", "$to 23:59:59"])->fetchColumn();
+  $createdPaid = (int)q("SELECT COUNT(*) FROM orders WHERE created_at>=? AND created_at<=? AND pay_status='paid'", ["$from 00:00:00", "$to 23:59:59"])->fetchColumn();
+  $C = catalog(); $sales = 0; $disc = 0; $rank = ['bouquet' => [], 'balloon' => [], 'occasion' => [], 'cake' => [], 'del' => [], 'zone' => [], 'area' => [], 'source' => [], 'voucher' => []]; $series = [];
+  $DL = ['free' => 'Percuma 10am–6pm', 'A' => 'Slot A', 'B' => 'Slot B', 'C' => 'Slot C', 'spec' => 'Masa khusus'];
+  $inc = function (string $k, string $name, float $v) use (&$rank) { $rank[$k][$name] = ($rank[$k][$name] ?? [0, 0]); $rank[$k][$name][0]++; $rank[$k][$name][1] += $v; };
+  foreach ($paid as $o) {
+    $v = (float)$o['total']; $sales += $v; $disc += (float)($o['discount'] ?? 0);
+    $d = substr((string)$o[$by], 0, 10); $series[$d] = ($series[$d] ?? 0) + $v;
+    $inc('bouquet', $C['bq'][$o['bouquet']] ?? $o['bouquet'], $v); $inc('balloon', $C['bal'][$o['balloon']] ?? $o['balloon'], $v);
+    $inc('occasion', $C['occ'][$o['occasion']] ?? $o['occasion'], $v); $inc('cake', $o['cake'], $v);
+    $inc('del', $DL[$o['del_type']] ?? $o['del_type'], $v); $inc('zone', $o['zone'] === 'plus20' ? 'Zon merah (+RM20)' : 'Zon biru (percuma)', $v);
+    $inc('area', substr($o['r_post'], 0, 2) . 'xxx', $v); $inc('source', $o['agent_ref'] ? 'Agent: ' . $o['agent_ref'] : 'Terus (tanpa agent)', $v);
+    if (!empty($o['voucher'])) $inc('voucher', $o['voucher'], $v);
+  }
+  foreach ($rank as &$r) { uasort($r, fn($x, $y) => $y[0] <=> $x[0] ?: $y[1] <=> $x[1]); $r = array_map(fn($k, $x) => ['name' => (string)$k, 'n' => $x[0], 'sales' => round($x[1], 2)], array_keys($r), $r); } unset($r);
+  $days = []; for ($d = strtotime($from); $d <= strtotime($to) && count($days) < 400; $d += 86400) $days[date('Y-m-d', $d)] = round($series[date('Y-m-d', $d)] ?? 0, 2);
+  json_out(['from' => $from, 'to' => $to, 'by' => $by, 'sales' => round($sales, 2), 'paid' => count($paid), 'avg' => count($paid) ? round($sales / count($paid), 2) : 0,
+    'created' => $createdN, 'pay_rate' => $createdN ? round($createdPaid / $createdN * 100) : 0, 'discount' => round($disc, 2), 'rank' => $rank, 'series' => $days]);
+
+case 'calendar':
+  need_login();
+  $m = preg_match('/^\d{4}-\d{2}$/', (string)($_GET['m'] ?? '')) ? $_GET['m'] : date('Y-m');
+  $by = ($_GET['by'] ?? 'del') === 'created' ? 'created' : 'del';
+  $col = $by === 'del' ? 'del_date' : 'created_at';
+  $lo = "$m-01"; $hi = date('Y-m-t', strtotime($lo));
+  $rows = q("SELECT id,code,pay_status,status,del_date,del_type,del_time,created_at,r_name,bouquet,total FROM orders
+    WHERE $col>=? AND $col<=? AND status<>'batal' ORDER BY $col", [$by === 'del' ? $lo : "$lo 00:00:00", $by === 'del' ? $hi : "$hi 23:59:59"])->fetchAll();
+  $days = [];
+  foreach ($rows as $r) { $d = substr($by === 'del' ? $r['del_date'] : $r['created_at'], 0, 10); $days[$d][] = $r; }
+  json_out(['m' => $m, 'by' => $by, 'days' => $days]);
+
 case 'vouchers':
   need_login();
   $rows = q("SELECT v.*, (SELECT COUNT(*) FROM orders o WHERE o.voucher=v.code AND o.pay_status='paid') AS used,

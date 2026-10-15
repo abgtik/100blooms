@@ -62,6 +62,27 @@ input[type=search]{flex:1;min-width:180px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;z-index:50;font-size:13.5px}
 a{color:var(--accent)}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px}
+.kpi.hl{background:#fff7e8;border:1.5px solid #f1d38f}
+.kpi .mini a{color:inherit}
+.seg{display:inline-flex;background:var(--bg);border-radius:12px;padding:3px;gap:2px}
+.seg button{border:0;background:none;padding:6px 12px;border-radius:9px;font:600 13px var(--body);color:var(--soft);cursor:pointer}
+.seg button[aria-pressed=true]{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.chartbox{position:relative;height:260px}
+.bb rect:hover{fill:#d94f74}
+.hbar{display:grid;grid-template-columns:22px 1fr auto;gap:2px 10px;align-items:center;margin:8px 0;font-size:14px}
+.hbar i{grid-column:2/4;height:7px;border-radius:9px;background:var(--bg);overflow:hidden;display:block}.hbar i b{display:block;height:100%;background:var(--accent);border-radius:9px}
+.hbar .n{color:var(--soft);font-size:12.5px}
+.ranks{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.rt{width:100%;border-collapse:collapse;font-size:13.5px}.rt td{padding:5px 0;border-bottom:1px dashed var(--line)}.rt td+td{text-align:right;font-variant-numeric:tabular-nums;color:var(--soft);white-space:nowrap;padding-left:8px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .hd{font-size:11.5px;color:var(--soft);text-align:center;font-weight:700;padding:4px 0}
+.cal button{min-height:78px;border:1.5px solid transparent;background:var(--card);border-radius:12px;padding:6px;text-align:left;font:inherit;color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.cal button.out{visibility:hidden}.cal button.today{border-color:var(--accent)}.cal button[aria-pressed=true]{background:var(--ink);color:#fff}
+.cal .d{font-weight:700;font-size:13px}.cal .c{font:600 12px var(--body);background:var(--accent);color:#fff;border-radius:99px;padding:1px 7px;align-self:flex-start}
+.cal .c.pend{background:var(--warnb);color:var(--warn)}
+@media (max-width:560px){.cal button{min-height:56px;padding:4px}.cal .d{font-size:12px}.cal .lbl{display:none}}
 @media print{body *{visibility:hidden}}
 </style>
 </head>
@@ -72,7 +93,7 @@ a{color:var(--accent)}
 const $=s=>document.querySelector(s);
 const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rm=n=>(+n<0?'−':'')+'RM'+Math.abs(+n).toFixed(+n%1?2:0);
-let GW='gateway bayaran',ME=null,CSRF='',CAT=null,TODAY='',tab='orders',f='today',qs='',dfrom='',dto='';
+let GW='gateway bayaran',ME=null,CSRF='',CAT=null,TODAY='',tab='dash',f='today',qs='',dfrom='',dto='';
 const ST={menunggu_bayaran:'Menunggu bayaran',baru:'Baru (dibayar)',disiapkan:'Sedang disiapkan',dalam_penghantaran:'Dalam penghantaran',selesai:'Selesai',batal:'Batal'};
 const DEL={free:'Percuma 10am–6pm',A:'Slot A 9am–12pm',B:'Slot B 1pm–4pm',C:'Slot C 5pm–8pm',spec:'Masa khusus'};
 const OCC_T=()=>CAT.occ,REL_T=()=>CAT.rel;
@@ -104,12 +125,12 @@ async function boot(){
   try{const j=await api('me');ME=j.user;CSRF=j.csrf;GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
 }
 function render(){
-  const T=[['orders','Order'],['vouch','Voucher'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
+  const T=[['dash','Dashboard'],['orders','Order'],['cal','Kalendar'],['report','Report'],['vouch','Voucher'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
   $('#app').innerHTML=`<header><h1>100 Blooms Admin</h1><div class="who">${h(ME.name)}<br>${ME.role==='owner'?'Owner':'Staff'} · <a href="#" id="lo">Log keluar</a></div></header>
    <nav class="tabs" aria-label="Menu">${T.map(([k,t])=>`<button class="tab" data-t="${k}" aria-pressed="${tab===k}">${t}</button>`).join('')}</nav><main id="main"></main>`;
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
   $('#lo').onclick=async e=>{e.preventDefault();await api('logout',{method:'POST'}).catch(()=>{});ME=null;login()};
-  ({orders:Orders,vouch:Vouchers,stock:Stock,dates:Dates,acc:Acc})[tab]($('#main'));
+  ({dash:Dash,cal:Cal,report:Report,orders:Orders,vouch:Vouchers,stock:Stock,dates:Dates,acc:Acc})[tab]($('#main'));
 }
 
 /* ---------- orders ---------- */
@@ -202,6 +223,110 @@ async function openOrder(id,reload){
   $('#cw').onclick=()=>{navigator.clipboard.writeText($('#wb').innerText).then(()=>toast('Ayat disalin'),()=>toast('Tak dapat salin'))};
   $('#pw').onclick=()=>{const w=window.open('','_blank');w.document.write(`<!doctype html><title>Wishcard ${h(o.code)}</title><style>@page{size:A6;margin:12mm}body{font:15pt/1.6 Georgia,serif;color:#3b2732;white-space:pre-wrap;display:flex;align-items:center;min-height:90vh}</style><body>${$('#wb').innerHTML}<script>print()<\/script>`);w.document.close()};
   $('#rpu').onclick=()=>{const f=$('#rpf').files[0];if(!f)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fd.append('file',f);done(api('rphoto',{method:'POST',body:fd}),'Gambar dimuat naik')};
+}
+
+/* ---------- shared: charts (plain SVG, no external library) ---------- */
+function niceMax(v){if(v<=0)return 100;const p=Math.pow(10,Math.floor(Math.log10(v))),n=v/p;return(n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*p}
+function barChart(id,labels,data){
+  const box=document.getElementById(id);if(!box)return;
+  const W=Math.max(320,box.clientWidth||600),H=box.clientHeight||260,L=52,R=8,T=10,B=26,cw=W-L-R,ch=H-T-B,n=data.length||1,mx=niceMax(Math.max(0,...data));
+  const slot=cw/n,bw=Math.min(38,slot*.68),every=Math.ceil(n/Math.max(1,Math.floor(cw/58)));
+  const fmt=v=>'RM'+(v>=1000?(Math.round(v/100)/10)+'k':Math.round(v));
+  let g='';for(let i=0;i<=4;i++){const v=mx*i/4,y=T+ch-ch*i/4;g+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="#f1e4e8"/><text x="${L-6}" y="${y+4}" text-anchor="end" font-size="11" fill="#7d6370">${fmt(v)}</text>`}
+  const bars=data.map((v,i)=>{const h=v/mx*ch,x=L+slot*i+(slot-bw)/2,y=T+ch-h;
+    return `<g class="bb"><rect x="${x}" y="${y}" width="${bw}" height="${Math.max(h,v>0?2:0)}" rx="5" fill="#e9799a"><title>${labels[i]}: ${rm(v)}</title></rect>${i%every===0?`<text x="${x+bw/2}" y="${H-8}" text-anchor="middle" font-size="11" fill="#7d6370">${labels[i]}</text>`:''}</g>`}).join('');
+  box.innerHTML=`<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graf: ${labels.length} titik data">${g}${bars}</svg>`;
+}
+const dShort=s=>new Date(s+'T00:00').toLocaleDateString('ms-MY',{day:'numeric',month:'short'});
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+
+/* ---------- dashboard ---------- */
+let dashMode='day';
+async function Dash(el){
+  el.innerHTML='<div class="empty">Memuatkan…</div>';
+  let j;try{j=await api('dash')}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  const hr=new Date().getHours(),greet=hr<12?'Selamat pagi':hr<15?'Selamat tengah hari':hr<19?'Selamat petang':'Selamat malam';
+  const td=j.today_del,tdN=Object.values(td).reduce((a,b)=>a+ +b,0),mx=Math.max(1,...j.top_bq.map(b=>+b.n));
+  el.innerHTML=`<h2 style="font:600 22px var(--display);margin:6px 0 2px">${greet}, ${h(ME.name.split(' ')[0])}</h2>
+   <p class="mini" style="margin:0 0 12px">${new Date().toLocaleDateString('ms-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
+   <div class="grid4">
+    <div class="kpi"><small>Sales hari ni</small><b>${rm(j.today.s)}</b><div class="mini">${j.today.n} order dibayar hari ni</div></div>
+    <div class="kpi"><small>Order masuk hari ni</small><b>${j.created_today}</b><div class="mini">termasuk yang belum bayar</div></div>
+    <div class="kpi ${+j.pending.n?'hl':''}"><small>Menunggu bayaran (7 hari)</small><b>${j.pending.n}</b><div class="mini">${rm(j.pending.s)} belum dibayar · <a href="#" id="fu">Follow up</a></div></div>
+    <div class="kpi"><small>Sales bulan ni</small><b>${rm(j.month.s)}</b><div class="mini">${j.month.n} order dibayar</div></div>
+   </div>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px"><h2 style="margin:0">Jumlah sales</h2>
+     <div class="seg" role="group" aria-label="Tempoh graf">${[['day','Harian'],['week','Mingguan'],['month','Bulanan']].map(([k,t])=>`<button data-m="${k}" aria-pressed="${dashMode===k}">${t}</button>`).join('')}</div></div>
+    <div class="chartbox"><div id="ch1" style="height:260px"></div></div><p class="mini" style="margin:8px 0 0">Order yang dah dibayar sahaja, ikut tarikh bayaran. Order batal tak dikira.</p></div>
+   <div class="ranks">
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Hantar hari ni</h2><span class="pill p-baru">${tdN} order</span></div>
+     ${[['baru','Baru (belum disiapkan)'],['disiapkan','Sedang disiapkan'],['dalam_penghantaran','Dalam penghantaran'],['selesai','Selesai']].map(([k,t])=>`<div class="rowx"><span>${t}</span><span><b>${td[k]||0}</b></span></div>`).join('')}
+     <button class="btn ghost sm" id="goToday" style="margin-top:10px">Buka order hari ni</button></div>
+    <div class="card"><h2>Bouquet laris bulan ni</h2>${j.top_bq.length?j.top_bq.map((b,i)=>`<div class="hbar"><span class="n">${i+1}</span><span>${h(b.name)}</span><b>${b.n}</b><i><b style="width:${b.n/mx*100}%"></b></i></div>`).join(''):'<p class="mini">Belum ada order dibayar bulan ni.</p>'}</div>
+   </div>`;
+  const draw=()=>{const S=j.series[dashMode],k=Object.keys(S);
+    const lab=dashMode==='day'?k.map(dShort):dashMode==='week'?k.map(w=>'Mg '+w.split('W')[1]):k.map(m=>new Date(m+'-01T00:00').toLocaleDateString('ms-MY',{month:'short',year:'2-digit'}));
+    barChart('ch1',lab,Object.values(S).map(v=>Math.round(v*100)/100));};
+  draw();
+  el.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{dashMode=b.dataset.m;el.querySelectorAll('[data-m]').forEach(x=>x.setAttribute('aria-pressed',x===b));draw()});
+  $('#fu').onclick=e=>{e.preventDefault();tab='orders';f='pending';render()};
+  $('#goToday').onclick=()=>{tab='orders';f='today';render()};
+}
+
+/* ---------- report ---------- */
+let rp={preset:'month',from:'',to:'',by:'paid'};
+function presetRange(p){const n=new Date(),d=x=>ymd(x);
+  if(p==='7')return[d(new Date(n.getTime()-6*864e5)),d(n)];if(p==='30')return[d(new Date(n.getTime()-29*864e5)),d(n)];if(p==='90')return[d(new Date(n.getTime()-89*864e5)),d(n)];
+  if(p==='last'){const a=new Date(n.getFullYear(),n.getMonth()-1,1),b=new Date(n.getFullYear(),n.getMonth(),0);return[d(a),d(b)]}
+  return[d(new Date(n.getFullYear(),n.getMonth(),1)),d(n)];}
+async function Report(el){
+  if(rp.preset!=='custom')[rp.from,rp.to]=presetRange(rp.preset);
+  el.innerHTML=`<div class="card"><div class="bar" style="margin:0">${[['7','7 hari'],['month','Bulan ni'],['last','Bulan lepas'],['30','30 hari'],['90','90 hari']].map(([k,t])=>`<button class="chip" data-p="${k}" aria-pressed="${rp.preset===k}">${t}</button>`).join('')}</div>
+    <div class="bar" style="margin:10px 0 0"><label class="mini">Dari <input type="date" id="rf" value="${rp.from}"></label><label class="mini">Hingga <input type="date" id="rt" value="${rp.to}"></label>
+     <div class="seg" role="group" aria-label="Ikut tarikh"><button data-b="paid" aria-pressed="${rp.by==='paid'}">Tarikh bayar</button><button data-b="del" aria-pressed="${rp.by==='del'}">Tarikh hantar</button></div>
+     <a class="btn ghost sm" id="csv" style="text-decoration:none" href="api.php?a=reportcsv&from=${rp.from}&to=${rp.to}&by=${rp.by}">Muat turun CSV</a></div></div>
+   <div id="rbody"><div class="empty">Memuatkan…</div></div>`;
+  el.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{rp.preset=b.dataset.p;Report(el)});
+  el.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{rp.by=b.dataset.b;Report(el)});
+  const cust=()=>{rp.preset='custom';rp.from=$('#rf').value;rp.to=$('#rt').value;if(rp.from&&rp.to)Report(el)};$('#rf').onchange=cust;$('#rt').onchange=cust;
+  let j;try{j=await api('report',{params:{from:rp.from,to:rp.to,by:rp.by}})}catch(e){$('#rbody').innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  const R=j.rank,tbl=(t,a)=>`<div class="card"><h2>${t}</h2>${a.length?`<table class="rt">${a.slice(0,8).map(r=>`<tr><td>${h(r.name)}</td><td>${r.n} · ${rm(r.sales)}</td></tr>`).join('')}</table>`:'<p class="mini">Tiada data.</p>'}</div>`;
+  $('#rbody').innerHTML=`<div class="grid4">
+    <div class="kpi"><small>Jumlah jualan</small><b>${rm(j.sales)}</b></div>
+    <div class="kpi"><small>Order dibayar</small><b>${j.paid}</b></div>
+    <div class="kpi"><small>Purata setiap order</small><b>${rm(j.avg)}</b></div>
+    <div class="kpi"><small>Kadar bayar</small><b>${j.pay_rate}%</b><div class="mini">${j.created} order masuk dalam tempoh ni</div></div>
+    ${+j.discount?`<div class="kpi"><small>Diskaun voucher</small><b>${rm(j.discount)}</b></div>`:''}</div>
+   <div class="card"><h2>Jualan harian (${rp.by==='del'?'ikut tarikh hantar':'ikut tarikh bayar'})</h2><div class="chartbox"><div id="ch2" style="height:260px"></div></div></div>
+   <div class="ranks">${tbl('Bouquet',R.bouquet)}${tbl('Momen',R.occasion)}${tbl('Balloon',R.balloon)}${tbl('Kek',R.cake)}${tbl('Jenis penghantaran',R.del)}${tbl('Zon',R.zone)}${tbl('Kawasan (poskod)',R.area)}${tbl('Sumber order',R.source)}${tbl('Voucher',R.voucher)}</div>
+   <p class="mini">Order batal tak dikira. "Kadar bayar" = order masuk dalam tempoh ni yang dah dibayar.</p>`;
+  barChart('ch2',Object.keys(j.series).map(dShort),Object.values(j.series));
+}
+
+/* ---------- calendar ---------- */
+let cal={m:'',by:'del',sel:''};
+async function Cal(el){
+  if(!cal.m)cal.m=TODAY.slice(0,7);
+  const [Y,M]=cal.m.split('-').map(Number),first=new Date(Y,M-1,1),days=new Date(Y,M,0).getDate(),lead=(first.getDay()+6)%7;
+  el.innerHTML=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+     <div style="display:flex;align-items:center;gap:8px"><button class="btn ghost sm" id="pm" aria-label="Bulan sebelum">‹</button>
+      <h2 style="margin:0;min-width:150px;text-align:center">${first.toLocaleDateString('ms-MY',{month:'long',year:'numeric'})}</h2><button class="btn ghost sm" id="nm" aria-label="Bulan seterusnya">›</button>
+      <button class="btn ghost sm" id="tm">Bulan ni</button></div>
+     <div class="seg" role="group" aria-label="Ikut tarikh"><button data-b="del" aria-pressed="${cal.by==='del'}">Tarikh hantar</button><button data-b="created" aria-pressed="${cal.by==='created'}">Tarikh order</button></div></div>
+    <div class="cal" id="cg" style="margin-top:12px"><div class="empty" style="grid-column:1/-1">Memuatkan…</div></div></div><div id="cday"></div>`;
+  const nav=k=>{const d=new Date(Y,M-1+k,1);cal.m=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');cal.sel='';Cal(el)};
+  $('#pm').onclick=()=>nav(-1);$('#nm').onclick=()=>nav(1);$('#tm').onclick=()=>{cal.m=TODAY.slice(0,7);cal.sel=TODAY;Cal(el)};
+  el.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{cal.by=b.dataset.b;Cal(el)});
+  let j;try{j=await api('calendar',{params:{m:cal.m,by:cal.by}})}catch(e){$('#cg').innerHTML=`<div class="msg bad" style="grid-column:1/-1">${h(e.message)}</div>`;return}
+  const D=j.days||{};
+  $('#cg').innerHTML=['Isn','Sel','Rab','Kha','Jum','Sab','Ahd'].map(d=>`<div class="hd">${d}</div>`).join('')+Array.from({length:lead},()=>'<button class="out" tabindex="-1" aria-hidden="true"></button>').join('')+
+    Array.from({length:days},(_,i)=>{const d=`${cal.m}-${String(i+1).padStart(2,'0')}`,L=D[d]||[],paid=L.filter(o=>o.pay_status==='paid').length,pend=L.length-paid;
+      return `<button data-d="${d}" class="${d===TODAY?'today':''}" aria-pressed="${cal.sel===d}" aria-label="${d}: ${paid} order dibayar${pend?', '+pend+' belum bayar':''}"><span class="d">${i+1}</span>${paid?`<span class="c">${paid}</span>`:''}${pend?`<span class="c pend">${pend}<span class="lbl"> belum bayar</span></span>`:''}</button>`}).join('');
+  const show=d=>{cal.sel=d;el.querySelectorAll('[data-d]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.d===d));const L=D[d]||[];
+    $('#cday').innerHTML=`<div class="card"><h2>${fmtD(d)} · ${cal.by==='del'?'dihantar':'diorder'}</h2>${L.length?`<div class="list">${L.map(o=>`<button class="ord" data-id="${o.id}"><div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">${h(delTxt(o))} · untuk ${h(o.r_name)} · ${h(CAT.bq[o.bouquet]||o.bouquet)}</div></div><div class="r"><div class="t">${rm(o.total)}</div></div></button>`).join('')}</div>`:'<p class="mini">Tiada order.</p>'}</div>`;
+    $('#cday').querySelectorAll('.ord').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,()=>Cal(el)));};
+  el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>show(b.dataset.d));
+  if(cal.sel)show(cal.sel);else if(TODAY.startsWith(cal.m))show(TODAY);
 }
 
 /* ---------- vouchers ---------- */
