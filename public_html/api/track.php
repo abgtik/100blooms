@@ -5,7 +5,6 @@
 // Returns only what the buyer already knows: no recipient phone or full address.
 require __DIR__ . '/_lib.php';
 
-function norm_phone(string $p): string { $d = digits($p); if (str_starts_with($d, '60')) $d = '0' . substr($d, 2); return ltrim($d, '0'); }
 $ipKey = substr('t' . ($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

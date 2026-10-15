@@ -60,7 +60,7 @@ case 'orders':
   $where = $W ? 'WHERE ' . implode(' AND ', $W) : '';
   $order = $f === 'pending' || $by === 'created_at' ? 'created_at DESC' : "del_date ASC, CASE del_type WHEN 'A' THEN 1 WHEN 'spec' THEN 2 WHEN 'free' THEN 3 WHEN 'B' THEN 4 ELSE 5 END, created_at";
   if ($f === 'all' || $f === 'delivered') $order = 'created_at DESC';
-  $rows = q("SELECT id,code,created_at,pay_status,status,bouquet,cake,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
+  $rows = q("SELECT id,code,created_at,pay_status,status,bouquet,cake,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
   $t = date('Y-m-d');
   $counts = [
     'today' => (int)q("SELECT COUNT(*) FROM orders WHERE del_date=? AND pay_status='paid' AND status<>'batal'", [$t])->fetchColumn(),
@@ -163,6 +163,46 @@ case 'deluser':
   need_owner(); $id = (int)($body['id'] ?? 0);
   if ($id === (int)$me['id']) fail('Tak boleh padam akaun sendiri.');
   q('DELETE FROM admins WHERE id=?', [$id]); json_out(['ok' => true]);
+
+case 'vouchers':
+  need_login();
+  $rows = q("SELECT v.*, (SELECT COUNT(*) FROM orders o WHERE o.voucher=v.code AND o.pay_status='paid') AS used,
+    (SELECT COALESCE(SUM(o.total),0) FROM orders o WHERE o.voucher=v.code AND o.pay_status='paid') AS sales
+    FROM vouchers v ORDER BY v.created_at DESC")->fetchAll();
+  foreach ($rows as &$r) $r['label'] = voucher_label($r);
+  json_out(['rows' => $rows, 'types' => VOUCHER_TYPES]);
+
+case 'vsave':
+  need_owner();
+  $code = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string)($body['code'] ?? '')));
+  $type = (string)($body['type'] ?? '');
+  if (strlen($code) < 3 || strlen($code) > 30) fail('Kod voucher mesti 3–30 huruf atau nombor, tanpa ruang.');
+  if (!isset(VOUCHER_TYPES[$type])) fail('Jenis voucher tidak sah.');
+  $value = (float)($body['value'] ?? 0);
+  if ($type === 'rm' && ($value <= 0 || $value >= BASE_PRICE)) fail('Nilai diskaun RM mesti antara 1 dan ' . (BASE_PRICE - 1) . '.');
+  if ($type === 'pct' && ($value <= 0 || $value > 90)) fail('Peratus diskaun mesti antara 1 dan 90.');
+  if ($type === 'photo') { $value = max(1, min(MAX_PHOTOS - 1, (int)$value)); }
+  $gift = str_in($body['gift_name'] ?? '', 100);
+  if ($type === 'gift' && $gift === '') fail('Tulis nama hadiah percuma.');
+  $dates = [];
+  foreach (['starts_on', 'ends_on'] as $k) { $d = (string)($body[$k] ?? ''); if ($d !== '' && !DateTimeImmutable::createFromFormat('!Y-m-d', $d)) fail('Tarikh tidak sah.'); $dates[$k] = $d !== '' ? $d : null; }
+  if ($dates['starts_on'] && $dates['ends_on'] && $dates['ends_on'] < $dates['starts_on']) fail('Tarikh tamat sebelum tarikh mula.');
+  $max = (string)($body['max_uses'] ?? '') === '' ? null : max(1, (int)$body['max_uses']);
+  $maxOff = $type === 'pct' && (string)($body['max_off'] ?? '') !== '' ? max(1, (float)$body['max_off']) : null;
+  $vals = [$type, $value, $maxOff, $type === 'gift' ? $gift : null, !empty($body['agent_ok']) ? 1 : 0, $dates['starts_on'], $dates['ends_on'], $max, !empty($body['once_per_phone']) ? 1 : 0, str_in($body['note'] ?? '', 200)];
+  if (q('SELECT 1 FROM vouchers WHERE code=?', [$code])->fetchColumn()) {
+    if (empty($body['edit'])) fail('Kod ini dah wujud.');
+    q('UPDATE vouchers SET type=?, value=?, max_off=?, gift_name=?, agent_ok=?, starts_on=?, ends_on=?, max_uses=?, once_per_phone=?, note=? WHERE code=?', [...$vals, $code]);
+  } else q('INSERT INTO vouchers (type,value,max_off,gift_name,agent_ok,starts_on,ends_on,max_uses,once_per_phone,note,code,active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?)', [...$vals, $code, date('Y-m-d H:i:s')]);
+  json_out(['ok' => true]);
+
+case 'vtoggle':
+  need_owner(); q('UPDATE vouchers SET active=? WHERE code=?', [!empty($body['active']) ? 1 : 0, (string)($body['code'] ?? '')]); json_out(['ok' => true]);
+
+case 'vdel':
+  need_owner(); $c = (string)($body['code'] ?? '');
+  if ((int)q('SELECT COUNT(*) FROM orders WHERE voucher=?', [$c])->fetchColumn()) fail('Voucher ini dah digunakan dalam order. Matikan sahaja, jangan padam.');
+  q('DELETE FROM vouchers WHERE code=?', [$c]); json_out(['ok' => true]);
 
 case 'testmail':
   need_owner();

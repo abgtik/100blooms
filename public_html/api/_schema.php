@@ -21,7 +21,7 @@ function schema_sql(string $driver): array {
   del_date DATE NOT NULL, del_type VARCHAR(6) NOT NULL, del_time VARCHAR(5) NULL,
   b_name VARCHAR(100) NOT NULL, b_phone VARCHAR(30) NOT NULL,
   price_lines TEXT NOT NULL, total DECIMAL(8,2) NOT NULL,
-  agent_ref VARCHAR(20) NULL, notes TEXT NULL, recipient_photo VARCHAR(80) NULL, updated_by VARCHAR(100) NULL
+  agent_ref VARCHAR(20) NULL, voucher VARCHAR(30) NULL, discount DECIMAL(8,2) NOT NULL DEFAULT 0, notes TEXT NULL, recipient_photo VARCHAR(80) NULL, updated_by VARCHAR(100) NULL
 )$tail",
 "CREATE INDEX idx_orders_del ON orders (del_date)",
 "CREATE INDEX idx_orders_created ON orders (created_at)",
@@ -35,6 +35,12 @@ function schema_sql(string $driver): array {
 )$tail",
 "CREATE TABLE IF NOT EXISTS blocked_dates (d DATE PRIMARY KEY, reason VARCHAR(150) NULL)$tail",
 "CREATE TABLE IF NOT EXISTS settings (k VARCHAR(40) PRIMARY KEY, v TEXT NULL)$tail",
+"CREATE TABLE IF NOT EXISTS vouchers (
+  code VARCHAR(30) PRIMARY KEY, type VARCHAR(8) NOT NULL, value DECIMAL(8,2) NOT NULL DEFAULT 0, max_off DECIMAL(8,2) NULL,
+  gift_name VARCHAR(100) NULL, agent_ok TINYINT NOT NULL DEFAULT 0, active TINYINT NOT NULL DEFAULT 1,
+  starts_on DATE NULL, ends_on DATE NULL, max_uses INT NULL, once_per_phone TINYINT NOT NULL DEFAULT 1,
+  note VARCHAR(200) NULL, created_at DATETIME NOT NULL
+)$tail",
 "CREATE TABLE IF NOT EXISTS login_attempts (ip VARCHAR(45) NOT NULL, at DATETIME NOT NULL)$tail",
   ];
 }

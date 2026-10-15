@@ -64,7 +64,25 @@ function db(): PDO {
   $pdo = new PDO(DB_DSN, defined('DB_USER') ? DB_USER : null, defined('DB_PASS') ? DB_PASS : null, [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, PDO::ATTR_EMULATE_PREPARES => false]);
   if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') $pdo->exec("SET time_zone = '+08:00'");
+  migrate($pdo);
   return $pdo;
+}
+/** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
+function migrate(PDO $pdo): void {
+  try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
+  if ($v >= 2) return;
+  $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
+  $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
+  $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
+  $run("CREATE TABLE IF NOT EXISTS vouchers (
+    code VARCHAR(30) PRIMARY KEY, type VARCHAR(8) NOT NULL, value DECIMAL(8,2) NOT NULL DEFAULT 0, max_off DECIMAL(8,2) NULL,
+    gift_name VARCHAR(100) NULL, agent_ok TINYINT NOT NULL DEFAULT 0, active TINYINT NOT NULL DEFAULT 1,
+    starts_on DATE NULL, ends_on DATE NULL, max_uses INT NULL, once_per_phone TINYINT NOT NULL DEFAULT 1,
+    note VARCHAR(200) NULL, created_at DATETIME NOT NULL)$tail");
+  $run('ALTER TABLE orders ADD COLUMN voucher VARCHAR(30) NULL');
+  $run('ALTER TABLE orders ADD COLUMN discount DECIMAL(8,2) NOT NULL DEFAULT 0');
+  $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','2')");
 }
 function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare($sql); $s->execute($p); return $s; }
 function setting(string $k, $default = null) { $r = q('SELECT v FROM settings WHERE k=?', [$k])->fetchColumn(); return $r === false ? $default : $r; }
@@ -86,6 +104,53 @@ function off_items(): array {
 }
 function blocked_dates(): array {
   return array_column(q("SELECT d FROM blocked_dates WHERE d >= ? ORDER BY d", [date('Y-m-d')])->fetchAll(), 'd');
+}
+
+// ---------- vouchers ----------
+const VOUCHER_TYPES = ['rm' => 'Diskaun RM', 'pct' => 'Diskaun %', 'photo' => 'Polaroid percuma', 'gift' => 'Hadiah percuma'];
+function norm_phone(string $p): string { $d = digits($p); if (str_starts_with($d, '60')) $d = '0' . substr($d, 2); return ltrim($d, '0'); }
+function voucher_find(string $code): ?array {
+  $code = strtoupper(preg_replace('/\s+/', '', $code));
+  if ($code === '') return null;
+  return q('SELECT * FROM vouchers WHERE code=?', [$code])->fetch() ?: null;
+}
+/** Why this voucher can't be used right now, or null if it can. */
+function voucher_block(array $v, string $phone, bool $viaAgent): ?string {
+  $today = date('Y-m-d');
+  if (!(int)$v['active']) return 'Voucher ini tidak aktif.';
+  if ($v['starts_on'] && $today < $v['starts_on']) return 'Voucher ini belum boleh digunakan.';
+  if ($v['ends_on'] && $today > $v['ends_on']) return 'Voucher ini dah tamat tempoh.';
+  if ($viaAgent && !(int)$v['agent_ok']) return 'Voucher ini tak boleh digunakan bersama link agent.';
+  if ($v['max_uses'] !== null && (int)q("SELECT COUNT(*) FROM orders WHERE voucher=? AND pay_status='paid'", [$v['code']])->fetchColumn() >= (int)$v['max_uses'])
+    return 'Voucher ini dah habis ditebus.';
+  if ((int)$v['once_per_phone'] && $phone !== '') {
+    foreach (q("SELECT b_phone FROM orders WHERE voucher=? AND pay_status='paid'", [$v['code']])->fetchAll() as $r)
+      if (norm_phone($r['b_phone']) === norm_phone($phone)) return 'Nombor WhatsApp ini dah pernah guna voucher ini.';
+  }
+  return null;
+}
+function voucher_label(array $v): string {
+  switch ($v['type']) {
+    case 'rm': return 'Diskaun RM' . rtrim(rtrim(number_format((float)$v['value'], 2, '.', ''), '0'), '.');
+    case 'pct': return 'Diskaun ' . rtrim(rtrim(number_format((float)$v['value'], 2, '.', ''), '0'), '.') . '%' . ($v['max_off'] ? ' (maks RM' . (float)$v['max_off'] . ')' : '');
+    case 'photo': return (int)$v['value'] . ' polaroid tambahan percuma';
+    default: return 'Hadiah percuma: ' . $v['gift_name'];
+  }
+}
+/** Applies the voucher to the price lines. Returns [lines, discount] or an error string. Discounts apply to the set price only, never delivery. */
+function voucher_apply(array $L, array $v, int $photoCount, float $setSubtotal) {
+  $tag = ' (voucher ' . $v['code'] . ')';
+  switch ($v['type']) {
+    case 'rm': $off = min((float)$v['value'], $setSubtotal - 1); $L[] = ['Voucher ' . $v['code'], -$off]; return [$L, $off];
+    case 'pct': $off = round($setSubtotal * (float)$v['value'] / 100, 2); if ($v['max_off']) $off = min($off, (float)$v['max_off']); $off = min($off, $setSubtotal - 1);
+      $L[] = ['Voucher ' . $v['code'] . ' (' . (float)$v['value'] . '%)', -$off]; return [$L, $off];
+    case 'photo':
+      $n = max(1, (int)$v['value']);
+      if ($photoCount < 2) return 'Voucher ini beri ' . $n . ' polaroid tambahan percuma. Upload sekurang-kurangnya ' . ($n + 1) . ' gambar untuk guna.';
+      $free = min($n, $photoCount - 1); $off = $free * EXTRA_PHOTO;
+      $L[] = ['Polaroid percuma × ' . $free . $tag, -$off]; return [$L, $off];
+    default: $L[] = ['🎁 ' . $v['gift_name'] . $tag, 0]; return [$L, 0.0];
+  }
 }
 
 // ---------- order validation + pricing (authoritative; the app only previews) ----------
@@ -157,7 +222,18 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null)
   if ($photoCount > 1) $L[] = ['Polaroid tambahan × ' . ($photoCount - 1), ($photoCount - 1) * EXTRA_PHOTO];
   $L[] = [DELIVERY[$del]['label'] . ($del === 'spec' ? ' ' . $time : ''), DELIVERY[$del]['fee']];
   if ($zone === 'plus20') $L[] = ['Caj kawasan (Rawang / Kuang / Selayang / Sg Buloh)', 20];
-  $total = array_sum(array_column($L, 1));
+  $setSub = array_sum(array_column(array_slice($L, 0, count($L) - ($zone === 'plus20' ? 2 : 1)), 1)); // everything before delivery
+  $vcode = null; $discount = 0.0;
+  if (trim((string)($in['voucher'] ?? '')) !== '') {
+    $v = voucher_find((string)$in['voucher']);
+    if (!$v) return ['errors' => ['Kod voucher tidak sah.']];
+    $viaAgent = preg_replace('/[^A-Za-z0-9]/', '', (string)($in['ref'] ?? '')) !== '';
+    if ($why = voucher_block($v, $bphone, $viaAgent)) return ['errors' => [$why]];
+    $r = voucher_apply($L, $v, $photoCount, $setSub);
+    if (is_string($r)) return ['errors' => [$r]];
+    [$L, $discount] = $r; $vcode = $v['code'];
+  }
+  $total = round(array_sum(array_column($L, 1)), 2);
 
   return ['order' => [
     'occasion' => $occ, 'relation' => $rel, 'gender' => $gender, 'call_name' => $call,
@@ -168,6 +244,7 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null)
     'del_date' => $date, 'del_type' => $del, 'del_time' => $time,
     'b_name' => $bname, 'b_phone' => $bphone,
     'price_lines' => json_encode($L, JSON_UNESCAPED_UNICODE), 'total' => $total,
+    'voucher' => $vcode, 'discount' => $discount,
   ]];
 }
 

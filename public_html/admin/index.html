@@ -71,7 +71,7 @@ a{color:var(--accent)}
 <script>
 const $=s=>document.querySelector(s);
 const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const rm=n=>'RM'+(+n).toFixed(+n%1?2:0);
+const rm=n=>(+n<0?'−':'')+'RM'+Math.abs(+n).toFixed(+n%1?2:0);
 let GW='gateway bayaran',ME=null,CSRF='',CAT=null,TODAY='',tab='orders',f='today',qs='',dfrom='',dto='';
 const ST={menunggu_bayaran:'Menunggu bayaran',baru:'Baru (dibayar)',disiapkan:'Sedang disiapkan',dalam_penghantaran:'Dalam penghantaran',selesai:'Selesai',batal:'Batal'};
 const DEL={free:'Percuma 10am–6pm',A:'Slot A 9am–12pm',B:'Slot B 1pm–4pm',C:'Slot C 5pm–8pm',spec:'Masa khusus'};
@@ -104,12 +104,12 @@ async function boot(){
   try{const j=await api('me');ME=j.user;CSRF=j.csrf;GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
 }
 function render(){
-  const T=[['orders','Order'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
+  const T=[['orders','Order'],['vouch','Voucher'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
   $('#app').innerHTML=`<header><h1>100 Blooms Admin</h1><div class="who">${h(ME.name)}<br>${ME.role==='owner'?'Owner':'Staff'} · <a href="#" id="lo">Log keluar</a></div></header>
    <nav class="tabs" aria-label="Menu">${T.map(([k,t])=>`<button class="tab" data-t="${k}" aria-pressed="${tab===k}">${t}</button>`).join('')}</nav><main id="main"></main>`;
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
   $('#lo').onclick=async e=>{e.preventDefault();await api('logout',{method:'POST'}).catch(()=>{});ME=null;login()};
-  ({orders:Orders,stock:Stock,dates:Dates,acc:Acc})[tab]($('#main'));
+  ({orders:Orders,vouch:Vouchers,stock:Stock,dates:Dates,acc:Acc})[tab]($('#main'));
 }
 
 /* ---------- orders ---------- */
@@ -132,7 +132,7 @@ async function Orders(el){
       <div class="kpi"><small>Menunggu bayaran (24 jam)</small><b>${c.pending}</b></div><div class="kpi"><small>Bayaran diterima hari ini</small><b>${rm(c.paid_today_rm)}</b></div>`;
     $('#ol').innerHTML=j.rows.length?j.rows.map(o=>`<button class="ord" data-id="${o.id}">
       <div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">Hantar <b style="color:var(--ink)">${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</div>
-       <div class="m">Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.notes?' · 📝':''}</div></div>
+       <div class="m">Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
       <div class="r"><div class="t">${rm(o.total)}</div><div class="m">Order ${fmtDT(o.created_at)}</div></div></button>`).join('')
       :`<div class="empty">Tiada order${f==='today'?' untuk dihantar hari ini':''}.</div>`;
     document.querySelectorAll('.ord').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,load));
@@ -204,6 +204,36 @@ async function openOrder(id,reload){
   $('#rpu').onclick=()=>{const f=$('#rpf').files[0];if(!f)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fd.append('file',f);done(api('rphoto',{method:'POST',body:fd}),'Gambar dimuat naik')};
 }
 
+/* ---------- vouchers ---------- */
+async function Vouchers(el){
+  el.innerHTML='<div class="empty">Memuatkan…</div>';
+  let j;try{j=await api('vouchers')}catch(e){el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  const own=ME.role==='owner';
+  const valIn=t=>t==='rm'?'Nilai diskaun (RM)':t==='pct'?'Peratus (%)':t==='photo'?'Bilangan polaroid percuma':'';
+  el.innerHTML=`${own?`<div class="card"><h2>Cipta voucher</h2>
+    <div class="bar"><input id="vcode" placeholder="KOD (contoh RAYA10)" aria-label="Kod voucher" style="text-transform:uppercase">
+     <select id="vtype" aria-label="Jenis">${Object.entries(j.types).map(([k,t])=>`<option value="${k}">${t}</option>`).join('')}</select>
+     <input id="vval" type="number" min="1" step="1" placeholder="Nilai" aria-label="Nilai" style="width:150px">
+     <input id="vmax" type="number" min="1" placeholder="Maks diskaun RM (tak wajib)" aria-label="Maks diskaun" style="display:none">
+     <input id="vgift" placeholder="Nama hadiah (contoh: Coklat Ferrero)" aria-label="Nama hadiah" style="display:none;flex:1"></div>
+    <div class="bar"><label class="mini">Mula <input id="vs" type="date"></label><label class="mini">Tamat <input id="ve" type="date"></label>
+     <input id="vuses" type="number" min="1" placeholder="Had jumlah guna (kosong = tiada had)" aria-label="Had jumlah guna" style="width:250px"></div>
+    <div class="bar"><label class="mini"><input id="vag" type="checkbox"> Boleh guna dengan link agent</label>
+     <label class="mini"><input id="vop" type="checkbox" checked> Satu nombor WhatsApp sekali sahaja</label></div>
+    <div class="bar"><input id="vnote" placeholder="Nota dalaman (contoh: kempen Hari Ibu)" aria-label="Nota" style="flex:1"><button class="btn sm" id="vsave">Cipta voucher</button></div>
+    <p class="mini" style="margin:0">Diskaun hanya pada harga set (bukan caj penghantaran). Jumlah order sentiasa sekurang-kurangnya RM1. Kalau "boleh guna dengan link agent" tak ditanda, customer yang datang dari link agent tak boleh guna kod ni.</p></div>`:''}
+   <div class="card"><h2>Senarai voucher</h2>${j.rows.length?j.rows.map(v=>`<div class="rowx" style="align-items:center">
+     <span style="flex:1"><b style="color:var(--ink);letter-spacing:.03em">${h(v.code)}</b> ${+v.active?'<span class="pill p-selesai">Aktif</span>':'<span class="pill p-batal">Mati</span>'}<br>
+      ${h(v.label)} · ${+v.agent_ok?'boleh dengan agent':'<b>tak boleh</b> dengan agent'}${+v.once_per_phone?' · sekali setiap nombor':''}<br>
+      <span class="mini">Ditebus ${v.used}${v.max_uses?'/'+v.max_uses:''} kali · jualan ${rm(v.sales)}${v.starts_on||v.ends_on?` · ${v.starts_on?fmtD(v.starts_on):'…'} hingga ${v.ends_on?fmtD(v.ends_on):'…'}`:''}${v.note?' · '+h(v.note):''}</span></span>
+     ${own?`<span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn ghost sm" data-vt="${h(v.code)}" data-a="${+v.active?0:1}">${+v.active?'Matikan':'Aktifkan'}</button>${+v.used?'':`<button class="btn ghost sm" data-vd="${h(v.code)}">Padam</button>`}</span>`:''}</div>`).join(''):'<p class="mini">Belum ada voucher.</p>'}</div>`;
+  if(own){const sync=()=>{const t=$('#vtype').value;$('#vval').style.display=t==='gift'?'none':'';$('#vval').placeholder=valIn(t);$('#vmax').style.display=t==='pct'?'':'none';$('#vgift').style.display=t==='gift'?'':'none';};
+   $('#vtype').onchange=sync;sync();
+   $('#vsave').onclick=async()=>{try{await api('vsave',{method:'POST',body:{code:$('#vcode').value,type:$('#vtype').value,value:$('#vval').value,max_off:$('#vmax').value,gift_name:$('#vgift').value,
+     starts_on:$('#vs').value,ends_on:$('#ve').value,max_uses:$('#vuses').value,agent_ok:$('#vag').checked,once_per_phone:$('#vop').checked,note:$('#vnote').value}});toast('Voucher dicipta');Vouchers(el)}catch(e){toast(e.message)}};
+   el.querySelectorAll('[data-vt]').forEach(b=>b.onclick=async()=>{await api('vtoggle',{method:'POST',body:{code:b.dataset.vt,active:+b.dataset.a}});Vouchers(el)});
+   el.querySelectorAll('[data-vd]').forEach(b=>b.onclick=async()=>{if(!confirm('Padam voucher '+b.dataset.vd+'?'))return;try{await api('vdel',{method:'POST',body:{code:b.dataset.vd}});Vouchers(el)}catch(e){toast(e.message)}});}
+}
 /* ---------- stock ---------- */
 async function Stock(el){
   el.innerHTML='<div class="empty">Memuatkan…</div>';

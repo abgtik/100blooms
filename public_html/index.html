@@ -398,7 +398,7 @@ const zoneOf=p=>{if(!p||p.length<5)return null;const pc=+p;return inR(pc,ZONE_FR
 const zoneFee=()=>zoneOf(S.rpost)==='plus20'?20:0;
 
 /* ---------- STATE ---------- */
-const blank=()=>({step:0,occ:null,rel:null,gender:null,call:'',callCustom:'',bq:null,bal:null,cake:null,extraCake:0,extraCakes:{},photos:[],
+const blank=()=>({voucher:'',vinfo:null,step:0,occ:null,rel:null,gender:null,call:'',callCustom:'',bq:null,bal:null,cake:null,extraCake:0,extraCakes:{},photos:[],
   otherFl:[],wishPick:null,wish:'',rname:'',rphone:'',raddr:'',rpost:'',date:'',del:'free',time:'',bname:'',bphone:'',sender:''});
 let S=blank(), dir=1;
 /* server state: Malaysia time, closed dates, out-of-stock items (api/catalog.php) */
@@ -428,10 +428,17 @@ function lines(){
   if(S.extraCake)L.push(['Kek tambahan × '+S.extraCake+(extraList()?' ('+extraList()+')':''),S.extraCake*20,'cake']);
   if(S.photos.length>1)L.push(['Polaroid tambahan × '+(S.photos.length-1),(S.photos.length-1)*10,'pola']);
   const dl={free:'Penghantaran percuma (10am–6pm)',A:'Slot A (9am–12pm)',B:'Slot B (1pm–4pm)',C:'Slot C (5pm–8pm)',spec:'Masa khusus '+(S.time||'')}[S.del];
-  L.push([dl,delFee()]);if(zoneFee())L.push(['Caj kawasan (Rawang / Kuang / Selayang / Sg Buloh)',zoneFee()]);return L;
+  const setSub=L.reduce((a,b)=>a+b[1],0);
+  L.push([dl,delFee()]);if(zoneFee())L.push(['Caj kawasan (Rawang / Kuang / Selayang / Sg Buloh)',zoneFee()]);
+  const V=S.vinfo;if(V){ // mirrors voucher_apply() in api/_lib.php; the server has the final say
+    if(V.type==='rm')L.push(['Voucher '+V.code,-Math.min(V.value,setSub-1)]);
+    else if(V.type==='pct'){let off=Math.round(setSub*V.value)/100;if(V.max_off)off=Math.min(off,V.max_off);L.push(['Voucher '+V.code+' ('+V.value+'%)',-Math.min(off,setSub-1)]);}
+    else if(V.type==='photo'){const f=Math.min(Math.max(1,V.value),S.photos.length-1);if(f>0)L.push(['Polaroid percuma × '+f+' (voucher '+V.code+')',-f*10]);}
+    else L.push(['🎁 '+V.gift_name+' (voucher '+V.code+')',0]);}
+  return L;
 }
 const total=()=>lines().reduce((a,b)=>a+b[1],0);
-const rm=n=>'RM'+n;
+const rm=n=>'RM'+(Math.round(n*100)%100?(+n).toFixed(2):Math.round(n));
 
 function setTheme(){
   const o=occ(),r=document.documentElement.style;
@@ -707,7 +714,9 @@ const SCR={
     <div class="row"><span>Telefon</span><span>${h(S.rphone)}</span></div>
     <div class="row"><span>Alamat</span><span>${h(S.raddr)}, ${h(S.rpost)}</span></div>
     <div class="row"><span>Tarikh</span><span>${fmtDate(S.date)}</span></div></div>
-   <div class="sum"><h2>Harga</h2>${lines().map(([l,p])=>`<div class="row"><span>${h(l)}</span><span>${p?rm(p):'Percuma'}</span></div>`).join('')}
+   <div class="sum"><h2>Kod voucher</h2>${S.vinfo?`<div class="row" style="align-items:center"><span style="color:var(--ok);font-weight:600">🎟️ ${h(S.vinfo.code)}: ${h(S.vinfo.label)}</span><span><button class="cdel" id="vrm" style="color:var(--soft)">Buang</button></span></div>${S.vinfo.type==='photo'&&S.photos.length<2?`<div class="status warn">Voucher ni beri polaroid tambahan percuma. Kembali ke langkah Polaroid dan upload sekurang-kurangnya ${Math.max(1,S.vinfo.value)+1} gambar untuk guna.</div>`:''}`
+     :`<div style="display:flex;gap:8px"><input id="vc" type="text" autocapitalize="characters" placeholder="Masukkan kod (jika ada)" aria-label="Kod voucher" value="${h(S.voucher||'')}" style="flex:1;min-width:0"><button class="btn ghost" id="vap" style="flex:none;padding:12px 16px">Guna</button></div><div id="vmsg"></div>`}</div>
+   <div class="sum"><h2>Harga</h2>${lines().map(([l,p])=>`<div class="row"><span>${h(l)}</span><span${p<0?' style="color:var(--ok)"':''}>${p<0?'−'+rm(-p):p?rm(p):'Percuma'}</span></div>`).join('')}
     <div class="row tot"><span>Jumlah</span><span>${rm(total())}</span></div></div>
    <p class="note" style="margin:0"><b>Polisi tempahan:</b> order yang dah dibayar tak boleh dibatalkan atau di-refund. Kalau ada perubahan, awak boleh tukar tarikh delivery dengan WhatsApp kami.</p>
    <div class="sum"><h2>Maklumat awak</h2>
@@ -717,6 +726,15 @@ const SCR={
   try{if(sessionStorage.getItem('hb_test'))el.insertAdjacentHTML('afterbegin','<div class="status warn"><b>Mod ujian:</b> jika kod ujian betul, bayaran sebenar hanya RM1 dan order ditanda ORDER UJIAN.</div>')}catch(e){}
   el.insertAdjacentHTML('beforeend','<p class="hint" style="text-align:center;margin:0">Bayar dengan DuitNow QR atau FPX (online banking) melalui halaman bayaran yang selamat.</p>');
   ['bname','bphone'].forEach(k=>$('#'+k).oninput=e=>{S[k]=e.target.value;chk();save()});chk();
+  const vap=$('#vap');if(vap){const go=async()=>{const c=$('#vc').value.trim();if(!c)return;vap.disabled=true;vap.textContent='…';
+    let ref='';try{ref=localStorage.getItem('hb_ref')||''}catch(e){}
+    try{const r=await fetch('api/voucher.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:c,ref,phone:S.bphone})});const j=await r.json();
+      if(r.ok){S.voucher=j.code;S.vinfo=j;save();SCR.sum(el);return;}
+      $('#vmsg').innerHTML=`<div class="status bad" style="margin-top:8px">${h(j.error||'Kod voucher tidak sah.')}</div>`;}
+    catch(e){$('#vmsg').innerHTML='<div class="status bad" style="margin-top:8px">Tiada sambungan internet.</div>'}
+    vap.disabled=false;vap.textContent='Guna';};
+   vap.onclick=go;$('#vc').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();go()}};}
+  const vrm=$('#vrm');if(vrm)vrm.onclick=()=>{S.voucher='';S.vinfo=null;save();SCR.sum(el)};
  },
  pay(el){
   $('#back').disabled=true;$('#foot').innerHTML='';
@@ -752,7 +770,7 @@ function showCart(){
   sheet(`<h2>Hadiah awak setakat ni</h2>
    ${im&&im.bq?`<div style="display:flex;gap:12px;align-items:center"><img src="${im.bq}" alt="" style="width:64px;height:80px;object-fit:contain;background:#fff;border-radius:12px"><div><b style="font-family:var(--display);font-size:17px">Combo Jimat · ${b.t}</b><br><span class="hint">Untuk ${h(callName()||'-')} · ${h(occ()?occ().t:'')}</span></div></div>`:''}
    <div class="sum" style="padding:0">${it.map(([k,v])=>`<div class="row"><span>${k}</span><span>${v?h(v):'<span class="hint">Belum pilih</span>'}</span></div>`).join('')}</div>
-   <div class="sum" style="padding:0;border-top:1.5px dashed var(--line);padding-top:12px">${lines().map(([l,p,k])=>`<div class="row" style="align-items:center"><span>${h(l)}${k?`<br><button class="cdel" data-k="${k}" aria-label="Kurangkan ${h(l)}">− Kurangkan</button>`:''}</span><span>${p?rm(p):'Percuma'}</span></div>`).join('')}
+   <div class="sum" style="padding:0;border-top:1.5px dashed var(--line);padding-top:12px">${lines().map(([l,p,k])=>`<div class="row" style="align-items:center"><span>${h(l)}${k?`<br><button class="cdel" data-k="${k}" aria-label="Kurangkan ${h(l)}">− Kurangkan</button>`:''}</span><span>${p<0?'−'+rm(-p):p?rm(p):'Percuma'}</span></div>`).join('')}
     <div class="row tot"><span>Jumlah</span><span>${rm(total())}</span></div></div>
    <button class="btn ghost" id="cc" style="flex:none">Teruskan</button>`);
   $('#cc').onclick=closeSheet;
