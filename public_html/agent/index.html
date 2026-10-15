@@ -98,6 +98,7 @@ nav button[aria-current=page]{color:var(--accent);background:var(--bg)}
 @media (prefers-color-scheme:dark){:root{--bg:#1d1517;--bg2:#3a2229;--ink:#f5e9ec;--soft:#c6a9b2;--card:#2a1d21;--line:#47323a;--field:#211719;--okb:#183a2a;--ok:#7fd3a7;--warnb:#3d2d14;--warn:#f0c27a;--badb:#43202a;--bad:#ff9aa9;--infob:#1d2c44;--info:#9cc2ff}
   .hero{background:#4a2330}.btn.ghost{background:var(--field)}nav{background:var(--card)!important}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.pwrap{position:relative;display:block;flex:1 1 160px;min-width:0}.pwrap input{width:100%;padding-right:46px!important}.eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:none;color:var(--soft);cursor:pointer;display:grid;place-items:center;border-radius:10px;padding:0}.eye:hover{color:var(--ink)}.eye:focus-visible{outline:3px solid var(--accent);outline-offset:0}
 </style>
 </head>
 <body>
@@ -323,6 +324,15 @@ function Profile(el){
     try{await api('qr',{method:'POST',body:fd});ME=await api('me');toast('QR disimpan');Profile(el)}catch(x){toast(x.message)}};
   $('#cf').onsubmit=async e=>{e.preventDefault();try{await api('passwd',{method:'POST',body:{old:$('#po').value,new:$('#pn').value}});toast('Password ditukar');$('#po').value=$('#pn').value=''}catch(x){toast(x.message)}};
 }
+/* show / hide password: adds an eye button to every password field, including ones rendered later */
+(()=>{const EYE='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  OFF='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.9 3.8M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>';
+  const deco=root=>root.querySelectorAll('input[type=password]:not([data-eye])').forEach(i=>{i.dataset.eye=1;
+    const w=document.createElement('span');w.className='pwrap';i.parentNode.insertBefore(w,i);w.appendChild(i);
+    const b=document.createElement('button');b.type='button';b.className='eye';b.innerHTML=EYE;b.setAttribute('aria-label','Tunjuk password');b.setAttribute('aria-pressed','false');
+    b.onclick=()=>{const show=i.type==='password';i.type=show?'text':'password';b.innerHTML=show?OFF:EYE;b.setAttribute('aria-label',show?'Sorok password':'Tunjuk password');b.setAttribute('aria-pressed',String(show));i.focus()};
+    w.appendChild(b)});
+  new MutationObserver(()=>deco(document)).observe(document.body,{childList:true,subtree:true});deco(document);})();
 boot();
 </script>
 </body>
