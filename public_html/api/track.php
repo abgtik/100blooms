@@ -44,4 +44,6 @@ json_out([
   'sender' => $o['sender'], 'total' => (float)$o['total'], 'b_name' => explode(' ', $o['b_name'])[0],
   'payUrl' => ($o['pay_status'] !== 'paid' && $o['bill_code'] && $o['status'] !== 'batal') ? pay_url($o['bill_code']) : null,
   'wa' => WA_MAIN,
+  'bank' => ($o['pay_status'] !== 'paid' && $o['status'] !== 'batal' && !$o['bill_code'])
+    ? ['text' => setting('bank_text', ''), 'qr' => bank_qr_path() !== null] : null,
 ]);

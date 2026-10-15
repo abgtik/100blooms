@@ -119,7 +119,7 @@ a{color:var(--accent)}
 const $=s=>document.querySelector(s);
 const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rm=n=>(+n<0?'−':'')+'RM'+Math.abs(+n).toFixed(+n%1?2:0);
-let GW='gateway bayaran',ME=null,CSRF='',CAT=null,TODAY='',tab='dash',f='today',qs='',dfrom='',dto='';
+let PM={bq:{},bal:{},cake:{}},GW='gateway bayaran',ME=null,CSRF='',CAT=null,TODAY='',tab='dash',f='today',qs='',dfrom='',dto='';
 const ST={menunggu_bayaran:'Menunggu bayaran',baru:'Baru (dibayar)',disiapkan:'Sedang disiapkan',dalam_penghantaran:'Dalam penghantaran',selesai:'Selesai',batal:'Batal'};
 const DEL={free:'Percuma 10am–6pm',A:'Slot A 9am–12pm',B:'Slot B 1pm–4pm',C:'Slot C 5pm–8pm',spec:'Masa khusus'};
 const OCC_T=()=>CAT.occ,REL_T=()=>CAT.rel;
@@ -148,7 +148,7 @@ function login(err){
   $('#le').focus();
 }
 async function boot(){
-  try{const j=await api('me');ME=j.user;CSRF=j.csrf;if(j.status_label)Object.assign(ST,j.status_label);GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
+  try{const j=await api('me');ME=j.user;CSRF=j.csrf;if(j.pmeta)PM=j.pmeta;if(j.status_label)Object.assign(ST,j.status_label);GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
 }
 function render(){
   const T=[['dash','Dashboard'],['orders','Order'],['new','＋ Order'],['cal','Kalendar'],['report','Report'],['vouch','Voucher'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
@@ -191,8 +191,7 @@ function wfCards(o){
   const who=x=>x?`${h(x.by)}, ${fmtDT(x.at)}`:'';
   if(o.status==='batal')return `<div class="card"><h2>Order dibatalkan</h2><p class="mini" style="margin-top:0">Order ni tak dikira dalam jualan.</p><button class="btn ghost sm" id="rs">Aktifkan semula</button></div>`;
   if(o.pay_status!=='paid')return `<div class="card"><h2>💳 Bayaran belum diterima</h2><p class="mini" style="margin-top:0">Order disimpan ${fmtDT(o.created_at)}. Customer mungkin belum habis bayar, atau bayaran gagal.</p>
-     <div class="bar" style="margin:0"><button class="btn sm" id="rc">Semak semula dengan ${h(GW)}</button>
-     ${ME.role==='owner'?`<button class="btn ghost sm" id="mp">Tanda dibayar (manual)</button>`:''}<button class="btn ghost sm" id="cn">Batalkan</button></div></div>`;
+     <div class="bar" style="margin:0"><button class="btn sm" id="mp">Sahkan bayaran</button>${o.bill_code?`<button class="btn ghost sm" id="rc">Semak semula dengan ${h(GW)}</button>`:''}<button class="btn ghost sm" id="ivw">WhatsApp invoice</button><button class="btn ghost sm" id="ivc">Salin invoice</button><button class="btn ghost sm" id="cn">Batalkan</button></div></div>`;
   const items=Object.entries(o.prep_items),P=o.prep||{},nDone=items.filter(([k])=>P[k]).length,D=o.del_steps||{},steps=Object.entries(o.del_labels);
   const dN=steps.filter(([k])=>D[k]).length,lockPrep=!!D.otw_pickup,ready=nDone===items.length;
   const act=(k)=>{
@@ -273,7 +272,9 @@ async function openOrder(id,reload){
   if($('#cn2'))$('#cn2').onclick=()=>{if(confirm('Batalkan order '+o.code+'? Order batal tak dikira dalam jualan.'))done(api('update',{method:'POST',body:{id,status:'batal'}}),'Order dibatalkan')};
   if($('#rs'))$('#rs').onclick=()=>done(api('update',{method:'POST',body:{id,status:'aktif'}}),'Order diaktifkan semula');
   if($('#rc'))$('#rc').onclick=async()=>{try{const j=await api('recheck',{method:'POST',body:{id}});toast(j.paid?'Bayaran disahkan':'Masih belum dibayar');if(j.paid){reload&&reload();openOrder(id,reload)}}catch(e){toast(e.message)}};
-  if($('#mp'))$('#mp').onclick=()=>{const r=prompt('Rujukan bayaran (contoh: no. transaksi bank)');if(r!==null)done(api('update',{method:'POST',body:{id,mark_paid:1,pay_ref:r||'manual'}}),'Ditanda dibayar')};
+  if($('#ivw'))$('#ivw').onclick=()=>window.open(waLink(o.b_phone,o.invoice),'_blank','noopener');
+  if($('#ivc'))$('#ivc').onclick=()=>navigator.clipboard.writeText(o.invoice).then(()=>toast('Invoice disalin'));
+  if($('#mp'))$('#mp').onclick=()=>{const r=prompt('Rujukan bayaran dari resit pembeli (contoh: no. transaksi)');if(r&&r.trim())done(api('update',{method:'POST',body:{id,mark_paid:1,pay_ref:r.trim()}}),'Ditanda dibayar')};
   if($('#cn'))$('#cn').onclick=()=>{if(confirm('Batalkan order '+o.code+'?'))done(api('update',{method:'POST',body:{id,status:'batal'}}),'Order dibatalkan')};
   $('#sd').onclick=()=>done(api('update',{method:'POST',body:{id,del_date:$('#nd').value,del_type:$('#nt').value,del_time:$('#ntm').value}}),'Tarikh dikemas kini');
   $('#ct').onclick=e=>{e.preventDefault();navigator.clipboard.writeText(o.track_url).then(()=>toast('Link disalin'),()=>toast('Tak dapat salin'))};
@@ -285,49 +286,50 @@ async function openOrder(id,reload){
 
 /* ---------- manual order (sales team, WhatsApp orders) ---------- */
 function NewOrder(el){
-  const C=CAT,opt=(o,sel)=>Object.entries(o).map(([k,t])=>`<option value="${h(k)}" ${k===sel?'selected':''}>${h(t)}</option>`).join('');
+  const C=CAT,lab=(t,k,n)=>{const c=(PM[t]||{})[k];return (c&&c.code?c.code+' - ':'')+n};
+  const optc=(t,o)=>Object.entries(o).map(([k,n])=>[k,lab(t,k,n)]).sort((a,b)=>{const ca=(PM[t]||{})[a[0]]?.code||'',cb=(PM[t]||{})[b[0]]?.code||'';return (!ca-!cb)||(ca||a[1]).localeCompare(cb||b[1],undefined,{numeric:true})}).map(([k,n])=>`<option value="${h(k)}">${h(n)}</option>`).join('');
   const cakes=[...C.cake_free,...C.cake_up],tom=new Date(Date.now()+864e5);
   el.innerHTML=`<form id="nf" novalidate>
-   <div class="card"><h2>Pembeli (yang WhatsApp)</h2><div class="fgrid">
-    <label class="fl">Nama pembeli<input id="f_bname" required></label>
-    <label class="fl">No. WhatsApp pembeli<input id="f_bphone" type="tel" inputmode="tel" placeholder="01X-XXX XXXX" required></label>
-    <label class="fl">Kod agent (jika ada)<input id="f_ref" placeholder="Kosongkan jika tiada"></label></div></div>
-   <div class="card"><h2>Hadiah</h2><div class="fgrid">
-    <label class="fl">Momen<select id="f_occ">${opt(C.occ,'birthday')}</select></label>
-    <label class="fl">Untuk siapa<select id="f_rel">${opt(C.rel,'kawan')}</select></label>
-    <label class="fl">Jantina penerima<select id="f_gender"><option value="p">Perempuan</option><option value="l">Lelaki</option></select></label>
-    <label class="fl">Panggilan (dalam kad)<input id="f_call" placeholder="Contoh: Sayang, Mak"></label>
-    <label class="fl">Bouquet<select id="f_bq">${opt(C.bq)}</select></label>
-    <label class="fl">Balloon<select id="f_bal">${opt(C.bal)}</select></label>
-    <label class="fl">Kek<select id="f_cake">${cakes.map(c=>`<option ${c===cakes[0]?'selected':''}>${h(c)}</option>`).join('')}</select></label>
+   <div class="card"><h2>Item</h2><div class="fgrid">
+    <label class="fl">Bouquet<select id="f_bq">${optc('bq',C.bq)}</select></label>
+    <label class="fl">Wrapping / nota bouquet<input id="f_bqn" placeholder="Contoh: Red + Black (Normal)"></label>
+    <label class="fl">Balloon<select id="f_bal">${optc('bal',C.bal)}</select></label>
+    <label class="fl">Kek<select id="f_cake">${cakes.map(c=>`<option>${h(c)}</option>`).join('')}</select></label>
     <label class="fl" id="w_ofl" hidden>Perisa pilihan (pisah dengan koma, maks 5)<input id="f_ofl" placeholder="Cheese Cake, Tiramisu"></label>
-    <label class="fl full">Kek tambahan (RM20 sepotong, tak wajib)<div class="bar" style="margin:0">${cakes.filter(c=>!/lain/.test(c)).map((c,i)=>`<span class="mini" style="display:flex;align-items:center;gap:4px">${h(c)} <input type="number" min="0" max="10" value="0" data-xc="${h(c)}" style="width:62px" aria-label="Bilangan ${h(c)}"></span>`).join('')}</div></label>
-    <label class="fl full">Gambar polaroid (dari WhatsApp customer; 1 percuma, tambahan RM10)<input id="f_photos" type="file" accept="image/*" multiple></label>
-    <label class="fl full">Ayat wishcard<textarea id="f_wish" rows="3" maxlength="320"></textarea></label>
-    <label class="fl">Daripada (nama dalam kad)<input id="f_sender"></label></div></div>
+    <label class="fl">Bilangan polaroid<input id="f_pc" type="number" min="1" max="10" value="1"></label>
+    <label class="fl">Gambar polaroid (jika dah terima)<input id="f_photos" type="file" accept="image/*" multiple></label>
+    <details class="fl full"><summary style="cursor:pointer">Kek tambahan (RM20 sepotong)</summary><div class="bar" style="margin:6px 0 0">${cakes.filter(c=>!/lain/.test(c)).map(c=>`<span class="mini" style="display:flex;align-items:center;gap:4px">${h(c)} <input type="number" min="0" max="10" value="0" data-xc="${h(c)}" style="width:62px" aria-label="Bilangan ${h(c)}"></span>`).join('')}</div></details>
+    <label class="fl full">Ayat wishcard (kosongkan jika belum terima)<textarea id="f_wish" rows="3" maxlength="320"></textarea></label>
+    <label class="fl">Daripada<input id="f_sender"></label></div></div>
+   <div class="card"><h2>Pembeli</h2><div class="fgrid">
+    <label class="fl">Nama pembeli<input id="f_bname"></label>
+    <label class="fl">No. WhatsApp pembeli<input id="f_bphone" type="tel" inputmode="tel" placeholder="01X-XXX XXXX"></label></div></div>
    <div class="card"><h2>Penerima & penghantaran</h2><div class="fgrid">
     <label class="fl">Nama penerima<input id="f_rname"></label>
     <label class="fl">Telefon penerima<input id="f_rphone" type="tel" inputmode="tel"></label>
-    <label class="fl full">Alamat penuh<textarea id="f_raddr" rows="2"></textarea></label>
+    <label class="fl full">Alamat penuh<textarea id="f_raddr" rows="3"></textarea></label>
     <label class="fl">Poskod<input id="f_rpost" inputmode="numeric" maxlength="5"></label>
     <label class="fl">Tarikh hantar<input id="f_date" type="date" value="${ymd(tom)}"></label>
     <label class="fl">Slot<select id="f_del">${Object.entries(DEL).map(([k,t])=>`<option value="${k}">${t}</option>`).join('')}</select></label>
     <label class="fl" id="w_time" hidden>Masa khusus<input id="f_time" type="time" min="09:00" max="22:00"></label></div></div>
-   <div class="card"><h2>Harga & bayaran</h2><div class="fgrid">
-    <label class="fl">Kod voucher (jika ada)<input id="f_voucher"></label>
-    <label class="fl">Pelarasan harga RM (+/−, tak wajib)<input id="f_adj" type="number" step="1" placeholder="Contoh: -10 atau 15"></label>
-    <label class="fl">Sebab pelarasan<input id="f_adjl" placeholder="Contoh: caj luar kawasan Kajang"></label>
-    <label class="fl full" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-weight:500"><input type="checkbox" id="f_ov" style="width:auto"> Abaikan had waktu tutup, tarikh ditutup, stok dan kawasan (kes khas)</label>
-    <label class="fl full">Nota dalaman<input id="f_notes" placeholder="Contoh: customer minta call sebelum hantar"></label></div>
+   <div class="card"><h2>Harga & bayaran</h2>
+    <details><summary class="mini" style="cursor:pointer">Voucher, pelarasan harga, kes khas</summary><div class="fgrid" style="margin-top:8px">
+     <label class="fl">Kod voucher<input id="f_voucher"></label>
+     <label class="fl">Kod agent<input id="f_ref"></label>
+     <label class="fl">Pelarasan harga RM (+/−)<input id="f_adj" type="number" step="1" placeholder="Contoh: -10 atau 15"></label>
+     <label class="fl">Sebab pelarasan<input id="f_adjl" placeholder="Contoh: caj luar kawasan Kajang"></label>
+     <label class="fl full" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-weight:500"><input type="checkbox" id="f_ov" style="width:auto"> Abaikan had waktu tutup, tarikh ditutup, stok dan kawasan</label>
+     <label class="fl full">Nota dalaman<input id="f_notes"></label></div></details>
     <h2 style="margin-top:14px">Cara bayar</h2><div class="opt2">
-     <label><input type="radio" name="pm" value="link" checked> Hantar link bayaran (DuitNow / FPX) kepada pembeli</label>
-     <label><input type="radio" name="pm" value="paid"> Pembeli dah bayar (transfer / QR akaun syarikat)</label></div>
+     <label><input type="radio" name="pm" value="invoice" checked> Invoice + QR bank (sahkan bila pembeli hantar resit)</label>
+     <label><input type="radio" name="pm" value="link"> Link bayaran online (DuitNow / FPX, automatik)</label>
+     <label><input type="radio" name="pm" value="paid"> Pembeli dah bayar</label></div>
     <label class="fl" id="w_pref" hidden style="margin-top:10px">Rujukan bayaran (no. transaksi)<input id="f_pref"></label></div>
    <div class="qbox" aria-live="polite"><div id="qv" class="mini">Isi borang untuk tengok harga.</div>
     <button class="btn" id="go" type="submit" style="width:100%;margin-top:10px" disabled>Cipta order</button></div></form>`;
   const V=id=>$('#'+id).value,photos=()=>$('#f_photos').files.length;
   const data=()=>{const xc={};el.querySelectorAll('[data-xc]').forEach(i=>{if(+i.value>0)xc[i.dataset.xc]=+i.value});
-    return{occ:V('f_occ'),rel:V('f_rel'),gender:V('f_gender'),call:V('f_call').trim(),bq:V('f_bq'),bal:V('f_bal'),cake:V('f_cake'),otherFl:V('f_ofl').split(',').map(x=>x.trim()).filter(Boolean).slice(0,5),
+    return{bq:V('f_bq'),bq_note:V('f_bqn'),bal:V('f_bal'),cake:V('f_cake'),otherFl:V('f_ofl').split(',').map(x=>x.trim()).filter(Boolean).slice(0,5),photo_count:+V('f_pc')||1,
       extraCakes:xc,wish:V('f_wish'),sender:V('f_sender'),rname:V('f_rname'),rphone:V('f_rphone'),raddr:V('f_raddr'),rpost:V('f_rpost').replace(/\D/g,''),date:V('f_date'),del:V('f_del'),time:V('f_time'),
       bname:V('f_bname'),bphone:V('f_bphone'),ref:V('f_ref').trim(),voucher:V('f_voucher').trim(),adj_amt:V('f_adj'),adj_label:V('f_adjl'),override:$('#f_ov').checked,notes:V('f_notes'),
       pay_mode:el.querySelector('[name=pm]:checked').value,pay_ref:V('f_pref')}};
@@ -336,23 +338,24 @@ function NewOrder(el){
     try{const j=await api('quote',{method:'POST',body:{data:d,photos:photos()}});
       if(j.errors){ok=false;$('#qv').innerHTML=`<div class="msg warn" style="margin:0">${j.errors.map(h).join('<br>')}</div>`}
       else{ok=true;$('#qv').innerHTML=j.lines.map(([l,p])=>`<div class="rowx"><span>${h(l)}</span><span>${p?rm(p):'Percuma'}</span></div>`).join('')+`<div class="rowx" style="font-weight:700"><span style="color:var(--ink)">Jumlah</span><span>${rm(j.total)}</span></div>${j.zone==='out'?'<div class="msg warn" style="margin:6px 0 0">Poskod di luar kawasan. Tambah caj melalui pelarasan harga jika perlu.</div>':''}`}
-      $('#go').disabled=!ok;$('#go').textContent=d.pay_mode==='paid'?'Cipta order (dah bayar)':'Cipta order & dapatkan link bayaran';}catch(e){}};
+      $('#go').disabled=!ok;$('#go').textContent={paid:'Cipta order (dah bayar)',link:'Cipta order & link bayaran',invoice:'Cipta order & invoice'}[d.pay_mode];}catch(e){}};
   el.querySelectorAll('input,select,textarea').forEach(i=>i.addEventListener(i.type==='file'||i.tagName==='SELECT'||i.type==='radio'||i.type==='checkbox'?'change':'input',()=>{clearTimeout(tm);tm=setTimeout(quote,350)}));
   quote();
   $('#nf').onsubmit=async e=>{e.preventDefault();if(!ok)return;const d=data(),fd=new FormData();fd.append('data',JSON.stringify(d));[...$('#f_photos').files].forEach(f=>fd.append('photo[]',f));
     $('#go').disabled=true;$('#go').textContent='Menyimpan…';
     let j;try{j=await api('manual',{method:'POST',body:fd})}catch(x){toast(x.message);$('#go').disabled=false;quote();return}
-    const first=d.bname.split(' ')[0],waTo=t=>'https://wa.me/'+d.bphone.replace(/\D/g,'').replace(/^0/,'60')+'?text='+encodeURIComponent(t);
-    const msg=j.paid?`Hai ${first}, terima kasih! Order ${j.code} (${rm(j.total)}) dah disahkan 🌸\nSemak status hadiah di sini: ${j.track_url}`
-      :`Hai ${first}, terima kasih order dengan 100 Blooms 🌸\nJumlah: ${rm(j.total)} (order ${j.code})\nBayar di sini (DuitNow / FPX): ${j.payUrl}\n\nSelepas bayar, semak status hadiah di sini: ${j.track_url}`;
-    el.innerHTML=`<div class="card"><h2>✅ Order ${h(j.code)} dicipta</h2><p style="margin:0 0 6px">Jumlah <b>${rm(j.total)}</b> · ${j.paid?'ditanda <b>dah bayar</b>':'menunggu bayaran pembeli'}</p>
-      ${j.warn?`<div class="msg bad">${h(j.warn)}</div>`:''}
-      ${!j.paid&&j.payUrl?`<div class="bar"><input value="${h(j.payUrl)}" readonly style="flex:1" aria-label="Link bayaran"><button class="btn ghost sm" id="cp">Salin link</button></div>`:''}
-      <div class="wishbox" style="font-size:13.5px">${h(msg)}</div>
-      <div class="bar"><a class="btn" style="text-decoration:none" href="${waTo(msg)}" target="_blank" rel="noopener">WhatsApp mesej ni kepada pembeli</a>
-       <button class="btn ghost" id="oo">Buka order</button><button class="btn ghost" id="nn2">Order baru</button></div></div>`;
-    if($('#cp'))$('#cp').onclick=()=>navigator.clipboard.writeText(j.payUrl).then(()=>toast('Link disalin'));
-    $('#oo').onclick=()=>openOrder(j.id);$('#nn2').onclick=()=>NewOrder(el);};
+    showInvoice(el,j,d.bphone,()=>NewOrder(el));};
+}
+function waLink(phone,text){return 'https://wa.me/'+String(phone).replace(/\D/g,'').replace(/^0/,'60')+'?text='+encodeURIComponent(text)}
+function showInvoice(el,j,phone,again){
+  el.innerHTML=`<div class="card"><h2>✅ Order ${h(j.code)} dicipta</h2><p style="margin:0 0 6px">Jumlah <b>${rm(j.total)}</b> · ${j.paid?'ditanda <b>dah bayar</b>':j.mode==='invoice'?'menunggu pembeli bayar melalui QR bank':'menunggu bayaran online'}</p>
+    ${j.warn?`<div class="msg bad">${h(j.warn)}</div>`:''}
+    <div class="wishbox" id="inv" style="font-size:13px;max-height:340px;overflow:auto">${h(j.invoice)}</div>
+    <div class="bar"><a class="btn" style="text-decoration:none" href="${waLink(phone,j.invoice)}" target="_blank" rel="noopener">WhatsApp invoice kepada pembeli</a><button class="btn ghost" id="cpi">Salin invoice</button></div>
+    ${j.mode==='invoice'?`<div class="msg warn">Langkah seterusnya: hantar QR bank kepada pembeli.${j.has_qr?` <a href="../api/bankqr.php" target="_blank" rel="noopener">Buka gambar QR</a> (tekan lama untuk simpan / kongsi).`:' Owner boleh upload gambar QR di tab Pengguna supaya ia juga muncul di link invoice.'} Bila pembeli hantar resit, buka order ni dan tekan <b>Sahkan bayaran</b>.</div>`:''}
+    <div class="bar"><button class="btn ghost" id="oo">Buka order</button>${again?'<button class="btn ghost" id="nn2">Order baru</button>':''}</div></div>`;
+  $('#cpi').onclick=()=>navigator.clipboard.writeText(j.invoice).then(()=>toast('Invoice disalin'),()=>toast('Tak dapat salin'));
+  $('#oo').onclick=()=>openOrder(j.id);if(again)$('#nn2').onclick=again;
 }
 
 /* ---------- shared: charts (plain SVG, no external library) ---------- */
@@ -492,10 +495,14 @@ async function Vouchers(el){
 /* ---------- stock ---------- */
 async function Stock(el){
   el.innerHTML='<div class="empty">Memuatkan…</div>';
-  const j=await api('products');const G={bq:'Bouquet',cake:'Kek',bal:'Balloon'};
-  el.innerHTML=`<p class="mini">Tutup item yang habis stok. Customer tak nampak item yang ditutup.</p>`+Object.entries(G).map(([t,n])=>`<div class="card"><h2>${n}</h2><div class="grid2">${j.rows.filter(r=>r.type===t).map(r=>`
-    <label class="tog"><span>${h(r.name)}</span><span class="sw"><input type="checkbox" data-t="${t}" data-i="${h(r.item_id)}" ${+r.active?'checked':''} aria-label="${h(r.name)} ada stok"><span></span></span></label>`).join('')}</div></div>`).join('');
+  const j=await api('products'),G={bq:'Bouquet',bal:'Balloon',cake:'Kek'},own=ME.role==='owner';
+  el.innerHTML=`<p class="mini">Tutup item yang habis stok. Customer tak nampak item yang ditutup.${own?' Kod (contoh FB02) dan harga runcit bouquet dipaparkan dalam borang order dan invoice WhatsApp.':''}</p>`+Object.entries(G).map(([t,n])=>`<div class="card"><h2>${n}</h2><div class="grid2">${j.rows.filter(r=>r.type===t).map(r=>`
+    <div class="tog" style="flex-wrap:wrap"><span style="flex:1;min-width:120px">${r.code?`<b>${h(r.code)}</b> · `:''}${h(r.name)}</span><span class="sw"><input type="checkbox" data-t="${t}" data-i="${h(r.item_id)}" ${+r.active?'checked':''} aria-label="${h(r.name)} ada stok"><span></span></span>
+     ${own&&t!=='cake'?`<span style="display:flex;gap:6px;width:100%"><input data-code="${t}|${h(r.item_id)}" value="${h(r.code||'')}" placeholder="Kod" aria-label="Kod ${h(r.name)}" style="width:90px;padding:6px 8px;text-transform:uppercase">${t==='bq'?`<input data-price="${t}|${h(r.item_id)}" type="number" min="0" step="1" value="${r.price!==null&&r.price!==undefined?+r.price:''}" placeholder="Harga runcit RM" aria-label="Harga runcit ${h(r.name)}" style="flex:1;padding:6px 8px">`:''}</span>`:''}</div>`).join('')}</div></div>`).join('');
   el.querySelectorAll('input[data-t]').forEach(c=>c.onchange=async()=>{try{await api('product',{method:'POST',body:{type:c.dataset.t,item_id:c.dataset.i,active:c.checked}});toast(c.checked?'Dibuka':'Ditutup')}catch(e){c.checked=!c.checked;toast(e.message)}});
+  const saveMeta=async k=>{const [t,i]=k.split('|'),code=el.querySelector(`[data-code="${CSS.escape(k)}"]`),pr=el.querySelector(`[data-price="${CSS.escape(k)}"]`);
+    try{await api('pmeta',{method:'POST',body:{type:t,item_id:i,code:code?code.value:'',price:pr?pr.value:''}});PM[t]=PM[t]||{};PM[t][i]={code:(code?code.value:'').toUpperCase()||null,price:pr&&pr.value!==''?+pr.value:null};toast('Disimpan')}catch(e){toast(e.message)}};
+  el.querySelectorAll('[data-code],[data-price]').forEach(i=>i.onchange=()=>saveMeta(i.dataset.code||i.dataset.price));
 }
 /* ---------- blocked dates ---------- */
 async function Dates(el){
@@ -512,12 +519,19 @@ async function Acc(el){
   if(ME.role==='owner'){const j=await api('users');users=`<div class="card"><h2>Pengguna admin</h2>${j.rows.map(u=>`<div class="rowx"><span><b style="color:var(--ink)">${h(u.name)}</b> ${h(u.email)} · ${u.role==='owner'?'Owner':'Staff'}</span><span>${u.id!=ME.id?`<button class="btn ghost sm" data-del="${u.id}">Padam</button>`:'Anda'}</span></div>`).join('')}
     <h2 style="margin-top:16px">Tambah pengguna</h2><div class="bar"><input id="un" placeholder="Nama" aria-label="Nama"><input id="ue" type="email" placeholder="Email" aria-label="Email"><input id="up" type="password" placeholder="Password (min 8)" aria-label="Password">
     <select id="ur" aria-label="Peranan"><option value="staff">Staff</option><option value="owner">Owner</option></select><button class="btn sm" id="ua">Tambah</button></div>
-    <p class="mini" style="margin:0">Staff boleh urus order, stok dan tarikh. Hanya Owner boleh tanda bayaran manual dan urus pengguna.</p></div>`;}
+    <p class="mini" style="margin:0">Staff boleh urus order, stok dan tarikh. Semua staff boleh sahkan bayaran (wajib isi rujukan). Hanya Owner boleh urus pengguna, kod/harga produk dan QR bank.</p></div>`;}
+  if(ME.role==='owner'){const ps=await api('payset');users+=`<div class="card"><h2>Bayaran QR bank</h2><p class="mini" style="margin-top:0">QR dan maklumat akaun ini dipaparkan pada halaman semak order untuk pembeli yang bayar ikut invoice.</p>
+    <img id="qrp" alt="QR bank" style="max-width:180px;border-radius:12px;border:1px solid var(--line);display:${ps.has_qr?'block':'none'};margin-bottom:10px" src="${ps.has_qr?'../api/bankqr.php?t='+Date.now():''}">
+    <div class="bar"><input type="file" id="qrf" accept="image/jpeg,image/png" aria-label="Gambar QR"><button class="btn ghost sm" id="qru">Muat naik QR</button></div>
+    <textarea id="bkt" rows="3" maxlength="300" placeholder="Contoh: Maybank 5123 4567 8901 (100 Blooms Enterprise)" aria-label="Maklumat akaun bank" style="width:100%">${h(ps.bank_text||'')}</textarea>
+    <button class="btn sm" id="bks" style="margin-top:8px">Simpan maklumat akaun</button></div>`;}
   if(ME.role==='owner')users+=`<div class="card"><h2>Notifikasi email</h2><p class="mini" style="margin-top:0">Hantar email ujian ke alamat NOTIFY_EMAIL dalam config.php.</p><button class="btn ghost sm" id="tm">Hantar email ujian</button> <span class="mini" id="tmr"></span></div>`;
   el.innerHTML=users+`<div class="card"><h2>Tukar password saya</h2><div class="bar"><input id="po" type="password" placeholder="Password lama" aria-label="Password lama" autocomplete="current-password"><input id="pn" type="password" placeholder="Password baru (min 8)" aria-label="Password baru" autocomplete="new-password"><button class="btn sm" id="pc">Tukar</button></div></div>`;
   if($('#ua'))$('#ua').onclick=async()=>{try{await api('adduser',{method:'POST',body:{name:$('#un').value,email:$('#ue').value,pw:$('#up').value,role:$('#ur').value}});toast('Pengguna ditambah');Acc(el)}catch(e){toast(e.message)}};
   el.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(confirm('Padam pengguna ini?')){await api('deluser',{method:'POST',body:{id:+b.dataset.del}});Acc(el)}});
   if($('#tm'))$('#tm').onclick=async()=>{$('#tmr').textContent='Menghantar…';try{const j=await api('testmail',{method:'POST'});$('#tmr').textContent=j.ok?`Server dah hantar ke ${j.to} (dari ${j.from}). Semak inbox dan spam.`:'Server gagal hantar email (fungsi mail() ditolak hosting).'}catch(e){$('#tmr').textContent=e.message}};
+  if($('#qru'))$('#qru').onclick=async()=>{const f=$('#qrf').files[0];if(!f)return toast('Pilih gambar QR dulu');const fd=new FormData();fd.append('file',f);try{await api('qrup',{method:'POST',body:fd});const im=$('#qrp');im.src='../api/bankqr.php?t='+Date.now();im.style.display='block';toast('QR disimpan')}catch(e){toast(e.message)}};
+  if($('#bks'))$('#bks').onclick=async()=>{try{await api('payset',{method:'POST',body:{bank_text:$('#bkt').value}});toast('Maklumat akaun disimpan')}catch(e){toast(e.message)}};
   $('#pc').onclick=async()=>{try{await api('passwd',{method:'POST',body:{old:$('#po').value,new:$('#pn').value}});toast('Password ditukar');$('#po').value=$('#pn').value=''}catch(e){toast(e.message)}};
 }
 boot();

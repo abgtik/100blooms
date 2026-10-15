@@ -70,7 +70,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 4) return;
+  if ($v >= 5) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -87,13 +87,18 @@ function migrate(PDO $pdo): void {
   $run('ALTER TABLE orders ADD COLUMN lalamove_url VARCHAR(300) NULL');
   // v4: who keyed in the order (null = customer via website)
   $run('ALTER TABLE orders ADD COLUMN created_by VARCHAR(100) NULL');
+  // v5: product codes / retail prices, bouquet wrapping note, payment mode
+  $run('ALTER TABLE products ADD COLUMN code VARCHAR(12) NULL');
+  $run('ALTER TABLE products ADD COLUMN price DECIMAL(8,2) NULL');
+  $run('ALTER TABLE orders ADD COLUMN bq_note VARCHAR(100) NULL');
+  $run("ALTER TABLE orders ADD COLUMN pay_mode VARCHAR(10) NOT NULL DEFAULT 'gateway'");
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','4')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','5')");
 }
 function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare($sql); $s->execute($p); return $s; }
 function setting(string $k, $default = null) { $r = q('SELECT v FROM settings WHERE k=?', [$k])->fetchColumn(); return $r === false ? $default : $r; }
@@ -153,6 +158,56 @@ function progress_text(array $o): string {
   $items = prep_items($o); return 'Penyediaan ' . count(array_intersect_key(jdec($o['prep'] ?? null), $items)) . '/' . count($items);
 }
 
+function bank_qr_path(): ?string { foreach (glob(UPLOAD_DIR . '/_site/bank-qr.*') ?: [] as $f) return $f; return null; }
+// ---------- product codes / retail prices (set in admin → Stok) ----------
+const RETAIL = ['cake' => 25, 'balloon' => 10, 'polaroid' => 20]; // shown on the WhatsApp invoice; the set price stays BASE_PRICE
+function product_meta(): array {
+  static $m = null; if ($m !== null) return $m;
+  $m = ['bq' => [], 'bal' => [], 'cake' => []];
+  try { foreach (q('SELECT type,item_id,code,price FROM products')->fetchAll() as $r) $m[$r['type']][$r['item_id']] = ['code' => $r['code'], 'price' => $r['price'] !== null ? (float)$r['price'] : null]; } catch (Throwable $e) {}
+  return $m;
+}
+const SLOT_EN = ['free' => '10:00 AM – 6:00 PM', 'A' => '9:00 AM – 12:00 PM', 'B' => '1:00 PM – 4:00 PM', 'C' => '5:00 PM – 8:00 PM'];
+/** WhatsApp invoice in the shop's usual format: retail item prices, then a discount down to the set price. */
+function invoice_text(array $o): string {
+  $C = catalog(); $M = product_meta(); $f = fn($n) => number_format((float)$n, 2, '.', '');
+  $lines = json_decode((string)$o['price_lines'], true) ?: [];
+  $bqName = $C['bq'][$o['bouquet']] ?? $o['bouquet']; $balName = $C['bal'][$o['balloon']] ?? $o['balloon'];
+  $balCode = $M['bal'][$o['balloon']]['code'] ?? ''; $bqCode = $M['bq'][$o['bouquet']]['code'] ?? '';
+  $cakeTxt = $o['cake'] === OTHER_CAKE ? implode(' / ', json_decode((string)$o['cake_flavours'], true) ?: []) . ' (ikut stok)' : $o['cake'];
+  $photos = max(1, (int)$o['photo_count']);
+  $bqPrice = $M['bq'][$o['bouquet']]['price'] ?? null;
+  if ($bqPrice === null) $bqPrice = BASE_PRICE - RETAIL['cake'] - RETAIL['balloon'] - RETAIL['polaroid']; // no retail price set: no discount shown
+  $items = []; $sub = 0;
+  $add = function (string $t, float $p, int $n = 1, string $sublines = '') use (&$items, &$sub, $f) { $items[] = "↳ $n x $t (" . $f($p) . " x $n = " . $f($p * $n) . ")" . ($sublines !== '' ? "\n        $sublines" : ''); $sub += $p * $n; };
+  $add(($bqCode ? "$bqCode - " : '') . "$bqName Bouquet", $bqPrice, 1, $o['bq_note'] ? '1 x ' . $o['bq_note'] : '');
+  $add("Secret Recipe Slice Cake ( $cakeTxt )", RETAIL['cake']);
+  $add('Balloon Foil ( ' . ($balCode ? "$balCode - " : '') . "$balName )", RETAIL['balloon']);
+  $add('Polaroid photo', RETAIL['polaroid'], 1);
+  $fees = 0; $delLabel = ''; $extra = [];
+  foreach (array_slice($lines, 1) as [$label, $amt]) { // everything after the set line
+    $amt = (float)$amt;
+    if (str_starts_with($label, 'Upgrade kek')) $add($label, $amt);
+    elseif (str_starts_with($label, 'Kek tambahan')) $add($label, $amt);
+    elseif (str_starts_with($label, 'Polaroid tambahan')) { $n = (int)preg_replace('/\D/', '', $label) ?: 1; $add('Polaroid photo (tambahan)', EXTRA_PHOTO, $n); }
+    elseif (str_starts_with($label, '🎁')) $items[] = '↳ 1 x ' . $label . ' (FREE)';
+    elseif (isset(DELIVERY[$o['del_type']]) && str_starts_with($label, DELIVERY[$o['del_type']]['label'])) { $delLabel = $label; $fees += $amt; }
+    elseif (str_starts_with($label, 'Caj kawasan')) { $fees += $amt; $extra[] = "$label: RM" . $f($amt); }
+    elseif ($amt > 0) $add($label, $amt);
+  }
+  $disc = round($sub + $fees - (float)$o['total'], 2);
+  $delName = ['free' => 'Free Delivery (10am-6pm)', 'A' => 'Slot A (9am-12pm)', 'B' => 'Slot B (1pm-4pm)', 'C' => 'Slot C (5pm-8pm)', 'spec' => 'Masa khusus ' . $o['del_time']][$o['del_type']] ?? $delLabel;
+  $date = date('l, j F Y', strtotime($o['del_date'])) . ' (' . ($o['del_type'] === 'spec' ? $o['del_time'] : (SLOT_EN[$o['del_type']] ?? '')) . ')';
+  $wish = $o['wish'] === '(Ayat wishcard belum diterima)' ? 'not receive yet' : $o['wish'] . ($o['sender'] ? "\n— " . $o['sender'] : '');
+  $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
+  return "[ Invoice No: {$o['code']} ]\n\nHi, I want to order:\n\n" . implode("\n \n", $items) . " \n \nSubtotal: RM" . $f($sub)
+    . "\n\nDelivery: $delName \nDelivery Fee: RM" . $f($fees) . ($extra ? "\n" . implode("\n", $extra) : '')
+    . "\n\nDiscount: RM" . $f(-$disc) . "\n\nTotal:\nRM" . $f($o['total'])
+    . "\n \nName:\n{$o['b_name']}\n\nPhone Number:\n" . '60' . norm_phone($o['b_phone']) . "\n\nAddress:\n\n{$o['r_addr']}\n\nPostcode:\n{$o['r_post']}"
+    . "\n\nReceiver Name:\n{$o['r_name']}\n\nReceiver Phone Number:\n{$o['r_phone']}\n\nWishcard (FREE):\n$wish\n\nDate & Time Slot:\n$date"
+    . "\n\n[ Invoice Link: $track ]";
+}
+
 // ---------- vouchers ----------
 const VOUCHER_TYPES = ['rm' => 'Diskaun RM', 'pct' => 'Diskaun %', 'photo' => 'Polaroid percuma', 'gift' => 'Hadiah percuma'];
 function norm_phone(string $p): string { $d = digits($p); if (str_starts_with($d, '60')) $d = '0' . substr($d, 2); return ltrim($d, '0'); }
@@ -206,6 +261,13 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
   $ov = !empty($opts['override']);
   $now = $now ?? new DateTimeImmutable('now');
   $C = catalog(); $off = off_items(); $E = [];
+  if (!empty($opts['manual'])) { // sales form does not ask these; the card is addressed to the receiver
+    $in['occ'] = isset($C['occ'][$in['occ'] ?? '']) ? $in['occ'] : 'saja'; $in['rel'] = isset($C['rel'][$in['rel'] ?? '']) ? $in['rel'] : 'kawan';
+    $in['gender'] = in_array($in['gender'] ?? '', ['l', 'p'], true) ? $in['gender'] : 'p';
+    if (trim((string)($in['call'] ?? '')) === '') $in['call'] = mb_substr(trim((string)($in['rname'] ?? '')), 0, 24) ?: 'Penerima';
+    if (trim((string)($in['wish'] ?? '')) === '') $in['wish'] = '(Ayat wishcard belum diterima)';
+    if (isset($opts['photo_count'])) $photoCount = max($photoCount, min(MAX_PHOTOS, (int)$opts['photo_count']));
+  }
   $occ = (string)($in['occ'] ?? ''); $rel = (string)($in['rel'] ?? '');
   if (!isset($C['occ'][$occ])) $E[] = 'Momen tidak sah.';
   if (!isset($C['rel'][$rel])) $E[] = 'Hubungan tidak sah.';
@@ -297,6 +359,7 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
     'b_name' => $bname, 'b_phone' => $bphone,
     'price_lines' => json_encode($L, JSON_UNESCAPED_UNICODE), 'total' => $total,
     'voucher' => $vcode, 'discount' => $discount,
+    'bq_note' => !empty($opts['manual']) ? (str_in($in['bq_note'] ?? '', 100) ?: null) : null,
   ]];
 }
 

@@ -24,6 +24,9 @@ function refresh_status(int $id): array {
   if ($st !== $o['status']) { q('UPDATE orders SET status=? WHERE id=?', [$st, $id]); $o['status'] = $st; }
   return $o;
 }
+function manual_opts(array $d): array {
+  return ['manual' => true, 'override' => !empty($d['override']), 'photo_count' => (int)($d['photo_count'] ?? 0), 'adjust' => [(float)($d['adj_amt'] ?? 0), (string)($d['adj_label'] ?? '')]];
+}
 function load_order(int $id): array { $o = q('SELECT * FROM orders WHERE id=?', [$id])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404); return $o; }
 
 if ($post && $a !== 'login') csrf_ok();
@@ -32,7 +35,7 @@ switch ($a) {
 case 'me':
   if (!$me) fail('Sila log masuk.', 401);
   if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(16));
-  json_out(['user' => $me, 'csrf' => $_SESSION['csrf'], 'catalog' => catalog(), 'status_label' => STATUS_LABEL, 'today' => date('Y-m-d'), 'site' => SITE_URL, 'gateway' => gateway_name()]);
+  json_out(['user' => $me, 'csrf' => $_SESSION['csrf'], 'catalog' => catalog(), 'status_label' => STATUS_LABEL, 'pmeta' => product_meta(), 'today' => date('Y-m-d'), 'site' => SITE_URL, 'gateway' => gateway_name()]);
 
 case 'login':
   if (!$post) fail('POST sahaja.', 405);
@@ -82,7 +85,7 @@ case 'order':
   $o = q('SELECT * FROM orders WHERE id=?', [(int)($_GET['id'] ?? 0)])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404);
   $o['track_url'] = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
   unset($o['token']);
-  $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS;
+  $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS; $o['invoice'] = invoice_text($o);
   foreach (['cake_flavours', 'extra_cakes', 'photos', 'price_lines', 'prep', 'del_steps'] as $k) $o[$k] = json_decode((string)$o[$k], true) ?: [];
   json_out(['order' => $o]);
 
@@ -103,9 +106,9 @@ case 'update':
     if (isset($body['del_type'])) { if (!isset(DELIVERY[$body['del_type']])) fail('Jenis penghantaran tidak sah.'); $set[] = 'del_type=?'; $P[] = $body['del_type']; }
     if (isset($body['del_time'])) { $set[] = 'del_time=?'; $P[] = preg_match('/^\d{2}:\d{2}$/', (string)$body['del_time']) ? $body['del_time'] : ''; }
   }
-  if (!empty($body['mark_paid'])) { // manual confirmation, e.g. paid by bank transfer
-    need_owner();
-    if ($o['pay_status'] !== 'paid') { $set[] = "pay_status='paid'"; $set[] = "status='baru'"; $set[] = 'paid_at=?'; $P[] = date('Y-m-d H:i:s'); $set[] = 'pay_channel=?'; $P[] = 'Manual'; $set[] = 'pay_ref=?'; $P[] = str_in($body['pay_ref'] ?? 'manual', 60); }
+  if (!empty($body['mark_paid'])) { // manual confirmation, e.g. bank QR / transfer checked by the sales team
+    if (trim((string)($body['pay_ref'] ?? '')) === '') fail('Isi rujukan bayaran (contoh no. transaksi).');
+    if ($o['pay_status'] !== 'paid') { $set[] = "pay_status='paid'"; $set[] = "status='baru'"; $set[] = 'paid_at=?'; $P[] = date('Y-m-d H:i:s'); $set[] = 'pay_channel=?'; $P[] = 'Manual (' . $m['name'] . ')'; $set[] = 'pay_ref=?'; $P[] = str_in($body['pay_ref'] ?? 'manual', 60); }
   }
   if (!$set) fail('Tiada perubahan.');
   $set[] = 'updated_by=?'; $P[] = $m['name']; $P[] = $o['id'];
@@ -172,7 +175,27 @@ case 'rphoto':
 
 case 'products':
   need_login();
-  json_out(['rows' => q('SELECT type,item_id,name,active FROM products ORDER BY type,name')->fetchAll()]);
+  json_out(['rows' => q('SELECT type,item_id,name,active,code,price FROM products ORDER BY type,name')->fetchAll()]);
+
+case 'pmeta': // product code (e.g. FB02) and retail price for the WhatsApp invoice
+  need_owner();
+  $code = strtoupper(preg_replace('/[^A-Za-z0-9-]/', '', (string)($body['code'] ?? '')));
+  $price = (string)($body['price'] ?? '') === '' ? null : max(0, (float)$body['price']);
+  q('UPDATE products SET code=?, price=? WHERE type=? AND item_id=?', [$code !== '' ? substr($code, 0, 12) : null, $price, (string)($body['type'] ?? ''), (string)($body['item_id'] ?? '')]);
+  json_out(['ok' => true]);
+
+case 'payset': // bank QR + account text shown to customers paying an invoice
+  if ($post) { need_owner(); q("DELETE FROM settings WHERE k='bank_text'"); q("INSERT INTO settings (k,v) VALUES ('bank_text',?)", [str_in($body['bank_text'] ?? '', 300)]); json_out(['ok' => true]); }
+  need_login(); json_out(['bank_text' => setting('bank_text', ''), 'has_qr' => bank_qr_path() !== null]);
+
+case 'qrup':
+  need_owner();
+  $f = $_FILES['file'] ?? null; if (!$f || $f['error'] !== UPLOAD_ERR_OK) fail('Gambar gagal dimuat naik.');
+  $info = @getimagesize($f['tmp_name']); if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true)) fail('Guna gambar JPG atau PNG.');
+  $dir = UPLOAD_DIR . '/_site'; if (!is_dir($dir)) mkdir($dir, 0755, true);
+  foreach (glob("$dir/bank-qr.*") ?: [] as $old) @unlink($old);
+  if (!move_uploaded_file($f['tmp_name'], "$dir/bank-qr." . ($info[2] === IMAGETYPE_PNG ? 'png' : 'jpg'))) fail('Simpan gambar gagal.', 500);
+  json_out(['ok' => true]);
 
 case 'product':
   need_login();
@@ -282,7 +305,7 @@ case 'calendar':
 case 'quote': // live price preview for the manual order form
   need_login();
   $d = is_array($body['data'] ?? null) ? $body['data'] : [];
-  $r = build_order($d, max(0, (int)($body['photos'] ?? 0)), null, ['override' => !empty($d['override']), 'adjust' => [(float)($d['adj_amt'] ?? 0), (string)($d['adj_label'] ?? '')]]);
+  $r = build_order($d, max(0, (int)($body['photos'] ?? 0)), null, manual_opts($d));
   if (isset($r['errors'])) json_out(['errors' => $r['errors']]);
   json_out(['lines' => json_decode($r['order']['price_lines'], true), 'total' => $r['order']['total'], 'zone' => $r['order']['zone']]);
 
@@ -290,15 +313,15 @@ case 'manual': // sales team keys in an order taken on WhatsApp
   $m = need_login();
   $d = json_decode((string)($_POST['data'] ?? ''), true); if (!is_array($d)) fail('Data tidak lengkap.');
   $files = collect_photos();
-  $r = build_order($d, count($files), null, ['override' => !empty($d['override']), 'adjust' => [(float)($d['adj_amt'] ?? 0), (string)($d['adj_label'] ?? '')]]);
+  $r = build_order($d, count($files), null, manual_opts($d));
   if (isset($r['errors'])) fail(implode(' ', $r['errors']), 422);
-  $mode = ($d['pay_mode'] ?? '') === 'paid' ? 'paid' : 'link';
+  $mode = in_array($d['pay_mode'] ?? '', ['paid', 'link'], true) ? $d['pay_mode'] : 'invoice';
   $payRef = str_in($d['pay_ref'] ?? '', 60);
   if ($mode === 'paid' && $payRef === '') fail('Isi rujukan bayaran (contoh no. transaksi atau "tunai").');
   $o = $r['order'];
   $o['code'] = new_code(); $o['token'] = bin2hex(random_bytes(12)); $o['created_at'] = date('Y-m-d H:i:s');
   $ref = preg_replace('/[^A-Za-z0-9]/', '', (string)($d['ref'] ?? '')); $o['agent_ref'] = $ref !== '' ? substr($ref, 0, 20) : null;
-  $o['created_by'] = $m['name'];
+  $o['created_by'] = $m['name']; $o['pay_mode'] = $mode === 'link' ? 'gateway' : 'invoice';
   $note = trim('Order WhatsApp oleh ' . $m['name'] . (!empty($d['override']) ? ' (had waktu/kawasan diabaikan)' : '') . '. ' . str_in($d['notes'] ?? '', 500));
   $o['notes'] = $note;
   if ($mode === 'paid') { $o['pay_status'] = 'paid'; $o['status'] = 'baru'; $o['paid_at'] = date('Y-m-d H:i:s'); $o['pay_channel'] = 'Manual (' . $m['name'] . ')'; $o['pay_ref'] = $payRef; }
@@ -309,10 +332,12 @@ case 'manual': // sales team keys in an order taken on WhatsApp
     $o['id'] = (int)db()->lastInsertId();
   } catch (Throwable $e) { error_log('100blooms manual: ' . $e->getMessage()); fail('Order tak dapat disimpan. Cuba lagi.', 500); }
   $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
-  if ($mode === 'paid') { notify_paid($o); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => true, 'track_url' => $track]); }
+  $inv = invoice_text($o);
+  if ($mode === 'paid') { notify_paid($o); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => true, 'track_url' => $track, 'invoice' => $inv]); }
+  if ($mode === 'invoice') json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'mode' => 'invoice', 'track_url' => $track, 'invoice' => $inv, 'has_qr' => bank_qr_path() !== null]);
   try { [$bill, $url] = pay_create($o); q('UPDATE orders SET bill_code=? WHERE id=?', [$bill, $o['id']]); }
   catch (Throwable $e) { error_log('100blooms manual bill: ' . $e->getMessage()); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'payUrl' => null, 'track_url' => $track, 'warn' => 'Order disimpan tapi link bayaran gagal dicipta: ' . mb_substr($e->getMessage(), 0, 150)]); }
-  json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'payUrl' => $url, 'track_url' => $track]);
+  json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'payUrl' => $url, 'track_url' => $track, 'invoice' => $inv . "\n\n[ Pay online (DuitNow / FPX): $url ]"]);
 
 case 'vouchers':
   need_login();
