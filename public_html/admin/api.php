@@ -18,7 +18,13 @@ function need_owner(): void { $m = need_login(); if ($m['role'] !== 'owner') fai
 function csrf_ok(): void { if (!hash_equals($_SESSION['csrf'] ?? 'x', (string)($_SERVER['HTTP_X_CSRF'] ?? ''))) fail('Sesi tamat. Muat semula halaman.', 419); }
 function ip(): string { return substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45); }
 
-const ORDER_STATUS = ['menunggu_bayaran', 'baru', 'disiapkan', 'dalam_penghantaran', 'selesai', 'batal'];
+function refresh_status(int $id): array {
+  $o = q('SELECT * FROM orders WHERE id=?', [$id])->fetch();
+  $st = derive_status($o);
+  if ($st !== $o['status']) { q('UPDATE orders SET status=? WHERE id=?', [$st, $id]); $o['status'] = $st; }
+  return $o;
+}
+function load_order(int $id): array { $o = q('SELECT * FROM orders WHERE id=?', [$id])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404); return $o; }
 
 if ($post && $a !== 'login') csrf_ok();
 
@@ -26,7 +32,7 @@ switch ($a) {
 case 'me':
   if (!$me) fail('Sila log masuk.', 401);
   if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(16));
-  json_out(['user' => $me, 'csrf' => $_SESSION['csrf'], 'catalog' => catalog(), 'today' => date('Y-m-d'), 'site' => SITE_URL, 'gateway' => gateway_name()]);
+  json_out(['user' => $me, 'csrf' => $_SESSION['csrf'], 'catalog' => catalog(), 'status_label' => STATUS_LABEL, 'today' => date('Y-m-d'), 'site' => SITE_URL, 'gateway' => gateway_name()]);
 
 case 'login':
   if (!$post) fail('POST sahaja.', 405);
@@ -60,7 +66,8 @@ case 'orders':
   $where = $W ? 'WHERE ' . implode(' AND ', $W) : '';
   $order = $f === 'pending' || $by === 'created_at' ? 'created_at DESC' : "del_date ASC, CASE del_type WHEN 'A' THEN 1 WHEN 'spec' THEN 2 WHEN 'free' THEN 3 WHEN 'B' THEN 4 ELSE 5 END, created_at";
   if ($f === 'all' || $f === 'delivered') $order = 'created_at DESC';
-  $rows = q("SELECT id,code,created_at,pay_status,status,bouquet,cake,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
+  $rows = q("SELECT id,code,created_at,pay_status,status,bouquet,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
+  foreach ($rows as &$r) { $r['progress'] = progress_text($r); unset($r['price_lines'], $r['prep'], $r['del_steps']); } unset($r);
   $t = date('Y-m-d');
   $counts = [
     'today' => (int)q("SELECT COUNT(*) FROM orders WHERE del_date=? AND pay_status='paid' AND status<>'batal'", [$t])->fetchColumn(),
@@ -75,17 +82,18 @@ case 'order':
   $o = q('SELECT * FROM orders WHERE id=?', [(int)($_GET['id'] ?? 0)])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404);
   $o['track_url'] = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
   unset($o['token']);
-  foreach (['cake_flavours', 'extra_cakes', 'photos', 'price_lines'] as $k) $o[$k] = json_decode((string)$o[$k], true);
+  $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS;
+  foreach (['cake_flavours', 'extra_cakes', 'photos', 'price_lines', 'prep', 'del_steps'] as $k) $o[$k] = json_decode((string)$o[$k], true) ?: [];
   json_out(['order' => $o]);
 
 case 'update':
   $m = need_login();
   $o = q('SELECT * FROM orders WHERE id=?', [(int)($body['id'] ?? 0)])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404);
   $set = []; $P = [];
-  if (isset($body['status'])) {
-    if (!in_array($body['status'], ORDER_STATUS, true)) fail('Status tidak sah.');
-    if ($o['pay_status'] !== 'paid' && !in_array($body['status'], ['menunggu_bayaran', 'batal'], true)) fail('Order belum dibayar. Sahkan bayaran dulu.');
-    $set[] = 'status=?'; $P[] = $body['status'];
+  if (isset($body['status'])) { // only cancel / restore by hand; everything else is derived from the checklist and delivery steps
+    if ($body['status'] === 'batal') { $set[] = "status='batal'"; }
+    elseif ($body['status'] === 'aktif') { $set[] = "status='baru'"; }
+    else fail('Status tidak sah.');
   }
   if (array_key_exists('notes', $body)) { $set[] = 'notes=?'; $P[] = str_in($body['notes'], 2000); }
   if (isset($body['del_date'])) { // customer may change the delivery date (no refunds policy)
@@ -102,7 +110,45 @@ case 'update':
   if (!$set) fail('Tiada perubahan.');
   $set[] = 'updated_by=?'; $P[] = $m['name']; $P[] = $o['id'];
   q('UPDATE orders SET ' . implode(',', $set) . ' WHERE id=?', $P);
+  if (($body['status'] ?? '') !== 'batal') refresh_status($o['id']);
   json_out(['ok' => true]);
+
+case 'prep': // tick / untick a production checklist item
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
+  if ($o['pay_status'] !== 'paid' || $o['status'] === 'batal') fail('Order belum dibayar atau dibatalkan.');
+  $item = (string)($body['item'] ?? ''); if (!isset(prep_items($o)[$item])) fail('Item tidak sah.');
+  $d = jdec($o['del_steps']); if (isset($d['otw_pickup'])) fail('Runner dah ambil barang. Undo langkah penghantaran dulu.');
+  $p = jdec($o['prep']);
+  if (!empty($body['on'])) $p[$item] = ['by' => $m['name'], 'at' => date('Y-m-d H:i:s')]; else unset($p[$item]);
+  q('UPDATE orders SET prep=?, updated_by=? WHERE id=?', [json_encode($p ?: new stdClass, JSON_UNESCAPED_UNICODE), $m['name'], $o['id']]);
+  json_out(['ok' => true, 'status' => refresh_status($o['id'])['status']]);
+
+case 'dstep': // advance delivery by exactly one step
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
+  if ($o['pay_status'] !== 'paid' || $o['status'] === 'batal') fail('Order belum dibayar atau dibatalkan.');
+  $step = (string)($body['step'] ?? ''); if (!isset(DEL_STEPS[$step])) fail('Langkah tidak sah.');
+  $d = jdec($o['del_steps']); $keys = array_keys(DEL_STEPS); $next = $keys[count(array_intersect_key(DEL_STEPS, $d))] ?? null;
+  if ($step !== $next) fail('Ikut urutan: langkah seterusnya ialah "' . (DEL_STEPS[$next] ?? '-') . '".');
+  if ($step === 'booked' && derive_status($o) !== 'siap' && empty($body['force'])) fail('Penyediaan belum lengkap. Tick semua item dulu.');
+  if ($step === 'booked' && !empty($body['force'])) need_owner();
+  if ($step === 'delivered' && !$o['recipient_photo']) fail('Upload gambar penerima dulu.');
+  $d[$step] = ['by' => $m['name'], 'at' => date('Y-m-d H:i:s')];
+  $set = 'del_steps=?'; $P = [json_encode($d, JSON_UNESCAPED_UNICODE)];
+  if ($step === 'booked' && isset($body['url'])) { $u = trim((string)$body['url']); if ($u !== '' && !preg_match('#^https://#i', $u)) fail('Link mesti bermula dengan https://'); $set .= ', lalamove_url=?'; $P[] = mb_substr($u, 0, 300) ?: null; }
+  q("UPDATE orders SET $set, updated_by=? WHERE id=?", [...$P, $m['name'], $o['id']]);
+  json_out(['ok' => true, 'status' => refresh_status($o['id'])['status']]);
+
+case 'dundo': // undo the last delivery step
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
+  $d = jdec($o['del_steps']); if (!$d) fail('Tiada langkah untuk di-undo.');
+  $last = array_key_last(array_intersect_key(DEL_STEPS, $d)); unset($d[$last]);
+  q('UPDATE orders SET del_steps=?, updated_by=? WHERE id=?', [$d ? json_encode($d, JSON_UNESCAPED_UNICODE) : null, $m['name'], $o['id']]);
+  json_out(['ok' => true, 'status' => refresh_status($o['id'])['status']]);
+
+case 'lalamove':
+  need_login(); $o = load_order((int)($body['id'] ?? 0)); $u = trim((string)($body['url'] ?? ''));
+  if ($u !== '' && !preg_match('#^https://#i', $u)) fail('Link mesti bermula dengan https://');
+  q('UPDATE orders SET lalamove_url=? WHERE id=?', [$u !== '' ? mb_substr($u, 0, 300) : null, $o['id']]); json_out(['ok' => true]);
 
 case 'recheck':
   need_login();

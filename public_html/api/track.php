@@ -40,7 +40,7 @@ json_out([
   'bouquet' => ['id' => $o['bouquet'], 'name' => $C['bq'][$o['bouquet']] ?? $o['bouquet']],
   'balloon' => ['id' => $o['balloon'], 'name' => $C['bal'][$o['balloon']] ?? $o['balloon']],
   'cake' => $o['cake'], 'cake_flavours' => json_decode((string)$o['cake_flavours'], true) ?: [], 'extra_cakes' => $extra,
-  'photos' => json_decode((string)$o['photos'], true) ?: [], 'recipient_photo' => $o['status'] === 'selesai' ? $o['recipient_photo'] : null,
+  'photos' => json_decode((string)$o['photos'], true) ?: [], 'recipient_photo' => in_array($o['status'], ['sampai', 'selesai'], true) ? $o['recipient_photo'] : null,
   'sender' => $o['sender'], 'total' => (float)$o['total'], 'b_name' => explode(' ', $o['b_name'])[0],
   'payUrl' => ($o['pay_status'] !== 'paid' && $o['bill_code'] && $o['status'] !== 'batal') ? pay_url($o['bill_code']) : null,
   'wa' => WA_MAIN,

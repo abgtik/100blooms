@@ -111,8 +111,8 @@ function form(err,code,phone){
 
 function show(o){
   const I=window.IMG||{};
-  const steps=[['Order diterima',fmtDT(o.created_at)],['Bayaran diterima',fmtDT(o.paid_at)],['Hadiah sedang disiapkan','Team kami sedang susun bouquet, kek dan balloon'],['Dalam penghantaran','Runner dalam perjalanan ke penerima'],['Hadiah dah sampai','Terima kasih kerana memilih 100 Blooms']];
-  const idx=o.status==='batal'?-1:!o.paid?0:({baru:1,disiapkan:2,dalam_penghantaran:3,selesai:4}[o.status]??1);
+  const steps=[['Order diterima',fmtDT(o.created_at)],['Bayaran diterima',fmtDT(o.paid_at)],['Hadiah sedang disiapkan',o.status==='siap'?'Hadiah dah siap dan menunggu runner':'Team kami sedang susun bouquet, kek dan balloon'],['Dalam penghantaran','Runner dalam perjalanan ke penerima'],['Hadiah dah sampai','Terima kasih kerana memilih 100 Blooms']];
+  const idx=o.status==='batal'?-1:!o.paid?0:({baru:1,disiapkan:2,siap:2,dalam_penghantaran:3,sampai:4,selesai:4}[o.status]??1);
   const ph=f=>`/api/photo.php?c=${encodeURIComponent(o.code)}&k=${encodeURIComponent(o.k)}&f=${encodeURIComponent(f)}`;
   const bq=(I[o.bouquet.id]||{}).bq, bal=(I.bal||{})[o.balloon.id], cake=(I.cake||{})[o.cake];
   const cakeTxt=o.cake_flavours.length?'Pilihan: '+o.cake_flavours.join(' / '):o.cake;
@@ -137,7 +137,7 @@ function show(o){
     <h2 style="margin-top:16px">Wishcard</h2>
     <div class="wc" role="img" aria-label="Muka depan wishcard untuk ${h(o.call)}">${FLOWER}<span class="to">Untuk ${h(o.call)}</span>${o.sender?`<span class="from">daripada ${h(o.sender)}</span>`:''}</div>
     <p class="hint" style="margin:8px 0 0">Isi ucapan kekal rahsia sampai kad dibuka 💌</p></section>
-   ${o.status!=='batal'&&o.status!=='selesai'?`<a class="btn ghost" href="${wa}" target="_blank" rel="noopener">Minta tukar tarikh delivery</a><p class="hint" style="text-align:center;margin:8px 0 0">Order yang dah dibayar tak boleh di-refund, tapi tarikh boleh ditukar.</p>`:''}
+   ${!['batal','selesai','sampai','dalam_penghantaran'].includes(o.status)?`<a class="btn ghost" href="${wa}" target="_blank" rel="noopener">Minta tukar tarikh delivery</a><p class="hint" style="text-align:center;margin:8px 0 0">Order yang dah dibayar tak boleh di-refund, tapi tarikh boleh ditukar.</p>`:''}
    <p class="foot"><a href="/semak/">Semak order lain</a> · <a href="https://wa.me/601165862584" target="_blank" rel="noopener">WhatsApp kami</a></p>`;
   document.querySelectorAll('[data-z]').forEach(i=>i.onclick=()=>{const z=document.createElement('div');z.className='zoom';z.innerHTML=`<img src="${i.src}" alt="">`;z.onclick=()=>z.remove();document.body.appendChild(z)});
 }

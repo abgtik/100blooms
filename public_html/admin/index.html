@@ -36,7 +36,7 @@ input[type=search]{flex:1;min-width:180px}
 .ord .r{text-align:right}.ord .t{font:600 16px var(--display);font-variant-numeric:tabular-nums}
 .pill{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:99px;white-space:nowrap}
 .p-menunggu_bayaran,.p-pending{background:var(--warnb);color:var(--warn)}.p-baru{background:var(--infob);color:var(--info)}
-.p-disiapkan{background:#efe7fb;color:#6a4bb5}.p-dalam_penghantaran{background:#e3f1f5;color:#21788f}.p-selesai{background:var(--okb);color:var(--ok)}
+.p-disiapkan{background:#efe7fb;color:#6a4bb5}.p-siap{background:#fff1d6;color:#9a6512}.p-sampai{background:#dff3ec;color:#1f7a5a}.p-dalam_penghantaran{background:#e3f1f5;color:#21788f}.p-selesai{background:var(--okb);color:var(--ok)}
 .p-batal,.p-failed{background:#eee;color:#666}
 .empty{background:var(--card);border-radius:16px;padding:28px;text-align:center;color:var(--soft)}
 .card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px}
@@ -83,6 +83,24 @@ a{color:var(--accent)}
 .cal .d{font-weight:700;font-size:13px}.cal .c{font:600 12px var(--body);background:var(--accent);color:#fff;border-radius:99px;padding:1px 7px;align-self:flex-start}
 .cal .c.pend{background:var(--warnb);color:var(--warn)}
 @media (max-width:560px){.cal button{min-height:56px;padding:4px}.cal .d{font-size:12px}.cal .lbl{display:none}}
+
+.wf{display:flex;flex-direction:column;gap:6px}
+.ck{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:var(--bg);cursor:pointer;font-size:14.5px}
+.ck input{width:22px;height:22px;accent-color:var(--ok);flex:none;margin:0}
+.ck.on{background:var(--okb)}.ck.on span b{text-decoration:line-through;color:var(--soft);font-weight:500}
+.ck small{display:block;color:var(--soft);font-size:11.5px}
+.ck.dis{opacity:.6;cursor:default}
+.pbar{height:8px;border-radius:9px;background:var(--bg);overflow:hidden;margin:4px 0 10px}.pbar b{display:block;height:100%;background:var(--ok);border-radius:9px;transition:width .3s}
+.st{position:relative;padding:0 0 14px 34px}.st:last-child{padding-bottom:0}
+.st::before{content:"";position:absolute;left:11px;top:24px;bottom:0;width:2px;background:var(--line)}.st:last-child::before{display:none}
+.st.done::before{background:var(--ok)}
+.st .dt{position:absolute;left:0;top:0;width:24px;height:24px;border-radius:50%;border:2px solid var(--line);background:#fff;display:grid;place-items:center;font-size:12px;color:#fff}
+.st.done .dt{background:var(--ok);border-color:var(--ok)}.st.next .dt{border-color:var(--accent)}
+.st b{font-size:14.5px}.st.fut b{color:var(--soft);font-weight:500}
+.st small{display:block;color:var(--soft);font-size:12px}
+.st .act{margin-top:8px;background:var(--bg);border-radius:12px;padding:10px}
+.lock{font-size:13px;color:var(--warn);background:var(--warnb);border-radius:10px;padding:8px 10px}
+.ord .pg{display:inline-block;margin-top:3px;font-size:12px;font-weight:600;color:var(--ink);background:var(--bg);border-radius:8px;padding:1px 8px}
 @media print{body *{visibility:hidden}}
 </style>
 </head>
@@ -122,7 +140,7 @@ function login(err){
   $('#le').focus();
 }
 async function boot(){
-  try{const j=await api('me');ME=j.user;CSRF=j.csrf;GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
+  try{const j=await api('me');ME=j.user;CSRF=j.csrf;if(j.status_label)Object.assign(ST,j.status_label);GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
 }
 function render(){
   const T=[['dash','Dashboard'],['orders','Order'],['cal','Kalendar'],['report','Report'],['vouch','Voucher'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
@@ -153,29 +171,55 @@ async function Orders(el){
       <div class="kpi"><small>Menunggu bayaran (24 jam)</small><b>${c.pending}</b></div><div class="kpi"><small>Bayaran diterima hari ini</small><b>${rm(c.paid_today_rm)}</b></div>`;
     $('#ol').innerHTML=j.rows.length?j.rows.map(o=>`<button class="ord" data-id="${o.id}">
       <div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">Hantar <b style="color:var(--ink)">${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</div>
-       <div class="m">Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
+       ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}<div class="m">Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
       <div class="r"><div class="t">${rm(o.total)}</div><div class="m">Order ${fmtDT(o.created_at)}</div></div></button>`).join('')
       :`<div class="empty">Tiada order${f==='today'?' untuk dihantar hari ini':''}.</div>`;
     document.querySelectorAll('.ord').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,load));
   }
   load();
 }
+function wfCards(o){
+  const ph=n=>`photo.php?o=${encodeURIComponent(o.code)}&f=${encodeURIComponent(n)}`;
+  const who=x=>x?`${h(x.by)}, ${fmtDT(x.at)}`:'';
+  if(o.status==='batal')return `<div class="card"><h2>Order dibatalkan</h2><p class="mini" style="margin-top:0">Order ni tak dikira dalam jualan.</p><button class="btn ghost sm" id="rs">Aktifkan semula</button></div>`;
+  if(o.pay_status!=='paid')return `<div class="card"><h2>💳 Bayaran belum diterima</h2><p class="mini" style="margin-top:0">Order disimpan ${fmtDT(o.created_at)}. Customer mungkin belum habis bayar, atau bayaran gagal.</p>
+     <div class="bar" style="margin:0"><button class="btn sm" id="rc">Semak semula dengan ${h(GW)}</button>
+     ${ME.role==='owner'?`<button class="btn ghost sm" id="mp">Tanda dibayar (manual)</button>`:''}<button class="btn ghost sm" id="cn">Batalkan</button></div></div>`;
+  const items=Object.entries(o.prep_items),P=o.prep||{},nDone=items.filter(([k])=>P[k]).length,D=o.del_steps||{},steps=Object.entries(o.del_labels);
+  const dN=steps.filter(([k])=>D[k]).length,lockPrep=!!D.otw_pickup,ready=nDone===items.length;
+  const act=(k)=>{
+    if(k==='booked'){
+      const lock=!ready?`<div class="lock">🔒 Siapkan semua item penyediaan dulu (${nDone}/${items.length}).</div>`:'';
+      return `<div class="act">${lock}<label class="mini" for="llm" style="display:block;margin:${lock?'8px':'0'} 0 4px">Link tracking Lalamove (tak wajib, untuk team sahaja)</label><input id="llm" type="url" placeholder="https://share.lalamove.com/…" style="width:100%">
+       <div class="bar" style="margin:8px 0 0"><button class="btn sm" data-step="booked" ${ready?'':'disabled'}>Lalamove dah ditempah</button>${!ready&&ME.role==='owner'?`<button class="btn ghost sm" data-step="booked" data-force="1">Teruskan juga (Owner)</button>`:''}</div></div>`;}
+    if(k==='otw_pickup')return `<div class="act"><button class="btn sm" data-step="otw_pickup">Runner OTW ambil barang</button></div>`;
+    if(k==='picked')return `<div class="act"><button class="btn sm" data-step="picked">Runner dah ambil barang</button></div>`;
+    if(k==='delivered')return `<div class="act">${o.recipient_photo?`<div class="thumbs" style="margin-bottom:8px"><a href="${ph(o.recipient_photo)}&dl=1"><img src="${ph(o.recipient_photo)}" alt="Gambar penerima"></a></div>`:'<p class="mini" style="margin:0 0 6px">Wajib upload gambar penerima dulu.</p>'}
+      <div class="bar" style="margin:0"><input type="file" id="rpf" accept="image/*" aria-label="Pilih gambar penerima"><button class="btn ${o.recipient_photo?'ghost ':''}sm" id="rpu">${o.recipient_photo?'Tukar gambar':'Upload gambar'}</button></div>
+      ${o.recipient_photo?`<button class="btn sm" data-step="delivered" style="margin-top:8px">Tandakan dah sampai</button>`:''}</div>`;
+    return `<div class="act"><button class="btn sm" data-step="done">Hantar gambar ke pembeli &amp; selesaikan</button><p class="mini" style="margin:6px 0 0">WhatsApp pembeli akan dibuka dengan link Semak Order (ada gambar penerima).</p></div>`;
+  };
+  return `<div class="card"><h2>💳 Bayaran</h2><p style="margin:0">✅ Dibayar ${fmtDT(o.paid_at)} melalui ${h(o.pay_channel||'-')}</p><p class="mini" style="margin:2px 0 0">Ruj: ${h(o.pay_ref||'-')}${o.updated_by?` · kemas kini terakhir oleh ${h(o.updated_by)}`:''}</p></div>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">🌸 Penyediaan</h2><b class="mini" style="color:${ready?'var(--ok)':'var(--ink)'}">${ready?'✅ Siap untuk dihantar':nDone+'/'+items.length}</b></div>
+    <div class="pbar"><b style="width:${items.length?nDone/items.length*100:0}%"></b></div>
+    <div class="wf">${items.map(([k,l])=>`<label class="ck ${P[k]?'on':''} ${lockPrep?'dis':''}"><input type="checkbox" data-prep="${k}" ${P[k]?'checked':''} ${lockPrep?'disabled':''}><span><b>${h(l)}</b>${P[k]?`<small>${who(P[k])}</small>`:''}</span></label>`).join('')}</div>
+    ${lockPrep?'<p class="mini" style="margin:8px 0 0">Dikunci sebab runner dah ambil barang.</p>':''}</div>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="margin:0">🛵 Penghantaran</h2>${dN?`<a href="#" id="dundo" class="mini">Undo langkah terakhir</a>`:''}</div>
+    ${steps.map(([k,l],i)=>`<div class="st ${D[k]?'done':i===dN?'next':'fut'}"><span class="dt">${D[k]?'✓':''}</span><b>${h(l)}</b>${D[k]?`<small>${who(D[k])}</small>`:''}${i===dN?act(k):''}
+      ${k==='booked'&&D.booked?`<div class="bar" style="margin:6px 0 0">${o.lalamove_url?`<a class="mini" href="${h(o.lalamove_url)}" target="_blank" rel="noopener">Buka tracking Lalamove ↗</a>`:''}<input id="lle" type="url" value="${h(o.lalamove_url||'')}" placeholder="Link tracking Lalamove" aria-label="Link tracking Lalamove" style="flex:1;min-width:160px"><button class="btn ghost sm" id="llsave">Simpan link</button></div>`:''}</div>`).join('')}
+    ${!dN?'<div style="text-align:right;margin-top:10px"><button class="btn ghost sm" id="cn2">Batalkan order</button></div>':''}</div>`;
+}
 async function openOrder(id,reload){
   let o;try{o=(await api('order',{params:{id}})).order}catch(e){toast(e.message);return}
   const ph=(n,dl)=>`photo.php?o=${encodeURIComponent(o.code)}&f=${encodeURIComponent(n)}${dl?'&dl=1':''}`;
   const wa=(n,t)=>'https://wa.me/'+n.replace(/\D/g,'').replace(/^0/,'60')+(t?'?text='+encodeURIComponent(t):'');
-  const paid=o.pay_status==='paid',flow=['baru','disiapkan','dalam_penghantaran','selesai'];
   const cakeTxt=o.cake+(o.cake_flavours&&o.cake_flavours.length?` → pilihan: ${o.cake_flavours.join(' / ')}`:'');
   const ext=o.extra_cakes&&Object.keys(o.extra_cakes).length?Object.entries(o.extra_cakes).map(([k,n])=>`${k} × ${n}`).join(', '):'Tiada';
   $('#layer').innerHTML=`<div class="scrim" id="sc"><div class="panel" role="dialog" aria-modal="true" aria-label="Order ${h(o.code)}">
    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 style="font:600 20px var(--display);margin:0">${h(o.code)} ${pill(o)}</h2><button class="btn ghost sm" id="cx">Tutup</button></div>
    <div id="om"></div>
-   ${paid?`<div class="card"><h2>Status order</h2><div class="steps">${flow.map(s=>`<button class="chip" data-s="${s}" aria-pressed="${o.status===s}">${ST[s]}</button>`).join('')}</div>
-     <p class="mini" style="margin:8px 0 0">Dibayar ${fmtDT(o.paid_at)} melalui ${h(o.pay_channel||'-')} (${h(o.pay_ref||'-')})${o.updated_by?` · kemas kini terakhir oleh ${h(o.updated_by)}`:''}</p></div>`
-    :`<div class="card"><h2>Bayaran belum diterima</h2><p class="mini" style="margin-top:0">Order disimpan ${fmtDT(o.created_at)}. Customer mungkin belum habis bayar, atau bayaran gagal.</p>
-     <div class="bar" style="margin:0"><button class="btn sm" id="rc">Semak semula dengan ${h(GW)}</button>
-     ${ME.role==='owner'?`<button class="btn ghost sm" id="mp">Tanda dibayar (manual)</button>`:''}<button class="btn ghost sm" id="cn">Batalkan</button></div></div>`}
-   <div class="card"><h2>Penghantaran</h2>
+   ${wfCards(o)}
+   <div class="card"><h2>Butiran penghantaran</h2>
     <div class="rowx"><span>Tarikh</span><span><b>${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</span></div>
     <div class="rowx"><span>Penerima</span><span>${h(o.r_name)}</span></div>
     <div class="rowx"><span>Telefon</span><span><a href="tel:${h(o.r_phone)}">${h(o.r_phone)}</a> · <a href="${wa(o.r_phone)}" target="_blank" rel="noopener">WhatsApp</a></span></div>
@@ -202,10 +246,6 @@ async function openOrder(id,reload){
     ${o.agent_ref?`<div class="rowx"><span>Link agent</span><span>${h(o.agent_ref)}</span></div>`:''}</div>
    <div class="card"><h2>Harga</h2>${o.price_lines.map(([l,p])=>`<div class="rowx"><span>${h(l)}</span><span>${p?rm(p):'Percuma'}</span></div>`).join('')}
     <div class="rowx" style="font-weight:700"><span style="color:var(--ink)">Jumlah</span><span>${rm(o.total)}</span></div></div>
-   <div class="card"><h2>Gambar penerima</h2>
-    ${o.recipient_photo?`<div class="thumbs" style="margin-bottom:8px"><a href="${ph(o.recipient_photo,1)}"><img src="${ph(o.recipient_photo)}" alt="Gambar penerima"></a></div>`:'<p class="mini" style="margin-top:0">Belum ada. Runner upload gambar penerima di sini, kemudian hantar kepada pembeli.</p>'}
-    <div class="bar" style="margin:0"><input type="file" id="rpf" accept="image/*" aria-label="Pilih gambar penerima"><button class="btn sm" id="rpu">Upload</button>
-    ${o.recipient_photo?`<a class="btn ghost sm" style="text-decoration:none" href="${wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}! Hadiah untuk ${o.call_name} dah selamat sampai 🌸 Gambar penerima ada di sini: ${o.track_url} Terima kasih pilih 100 Blooms!`)}" target="_blank" rel="noopener">WhatsApp pembeli</a>`:''}</div></div>
    <div class="card"><h2>Nota dalaman</h2><textarea id="nn" rows="3" style="width:100%" placeholder="Contoh: perisa kek ditukar, customer minta call dulu">${h(o.notes||'')}</textarea>
     <button class="btn ghost sm" id="sn" style="margin-top:8px">Simpan nota</button></div>
   </div></div>`;
@@ -213,7 +253,16 @@ async function openOrder(id,reload){
   const done=async(p,msg)=>{try{await p;toast(msg);reload&&reload();openOrder(id,reload)}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}};
   $('#cx').onclick=close;$('#sc').onclick=e=>{if(e.target.id==='sc')close()};
   document.addEventListener('keydown',function k(e){if(e.key==='Escape'){close();document.removeEventListener('keydown',k)}});
-  document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>done(api('update',{method:'POST',body:{id,status:b.dataset.s}}),'Status dikemas kini'));
+  document.querySelectorAll('[data-prep]').forEach(c=>c.onchange=()=>done(api('prep',{method:'POST',body:{id,item:c.dataset.prep,on:c.checked}}),c.checked?'Ditick':'Tick dibuang'));
+  document.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>{const st=b.dataset.step,body={id,step:st};
+    if(st==='booked'&&$('#llm'))body.url=$('#llm').value.trim();
+    if(b.dataset.force){if(!confirm('Penyediaan belum lengkap. Teruskan juga?'))return;body.force=1}
+    if(st==='done'){window.open(wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}! Hadiah untuk ${o.call_name} dah selamat sampai 🌸 Gambar penerima dan status order ada di sini: ${o.track_url}\n\nTerima kasih pilih 100 Blooms!`),'_blank','noopener')}
+    done(api('dstep',{method:'POST',body}),'Dikemas kini')});
+  if($('#dundo'))$('#dundo').onclick=e=>{e.preventDefault();if(confirm('Undo langkah terakhir?'))done(api('dundo',{method:'POST',body:{id}}),'Langkah di-undo')};
+  if($('#llsave'))$('#llsave').onclick=()=>done(api('lalamove',{method:'POST',body:{id,url:$('#lle').value.trim()}}),'Link disimpan');
+  if($('#cn2'))$('#cn2').onclick=()=>{if(confirm('Batalkan order '+o.code+'? Order batal tak dikira dalam jualan.'))done(api('update',{method:'POST',body:{id,status:'batal'}}),'Order dibatalkan')};
+  if($('#rs'))$('#rs').onclick=()=>done(api('update',{method:'POST',body:{id,status:'aktif'}}),'Order diaktifkan semula');
   if($('#rc'))$('#rc').onclick=async()=>{try{const j=await api('recheck',{method:'POST',body:{id}});toast(j.paid?'Bayaran disahkan':'Masih belum dibayar');if(j.paid){reload&&reload();openOrder(id,reload)}}catch(e){toast(e.message)}};
   if($('#mp'))$('#mp').onclick=()=>{const r=prompt('Rujukan bayaran (contoh: no. transaksi bank)');if(r!==null)done(api('update',{method:'POST',body:{id,mark_paid:1,pay_ref:r||'manual'}}),'Ditanda dibayar')};
   if($('#cn'))$('#cn').onclick=()=>{if(confirm('Batalkan order '+o.code+'?'))done(api('update',{method:'POST',body:{id,status:'batal'}}),'Order dibatalkan')};
@@ -222,7 +271,7 @@ async function openOrder(id,reload){
   $('#sn').onclick=()=>done(api('update',{method:'POST',body:{id,notes:$('#nn').value}}),'Nota disimpan');
   $('#cw').onclick=()=>{navigator.clipboard.writeText($('#wb').innerText).then(()=>toast('Ayat disalin'),()=>toast('Tak dapat salin'))};
   $('#pw').onclick=()=>{const w=window.open('','_blank');w.document.write(`<!doctype html><title>Wishcard ${h(o.code)}</title><style>@page{size:A6;margin:12mm}body{font:15pt/1.6 Georgia,serif;color:#3b2732;white-space:pre-wrap;display:flex;align-items:center;min-height:90vh}</style><body>${$('#wb').innerHTML}<script>print()<\/script>`);w.document.close()};
-  $('#rpu').onclick=()=>{const f=$('#rpf').files[0];if(!f)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fd.append('file',f);done(api('rphoto',{method:'POST',body:fd}),'Gambar dimuat naik')};
+  if($('#rpu'))$('#rpu').onclick=()=>{const f=$('#rpf').files[0];if(!f)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fd.append('file',f);done(api('rphoto',{method:'POST',body:fd}),'Gambar dimuat naik')};
 }
 
 /* ---------- shared: charts (plain SVG, no external library) ---------- */
@@ -260,7 +309,7 @@ async function Dash(el){
     <div class="chartbox"><div id="ch1" style="height:260px"></div></div><p class="mini" style="margin:8px 0 0">Order yang dah dibayar sahaja, ikut tarikh bayaran. Order batal tak dikira.</p></div>
    <div class="ranks">
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Hantar hari ni</h2><span class="pill p-baru">${tdN} order</span></div>
-     ${[['baru','Baru (belum disiapkan)'],['disiapkan','Sedang disiapkan'],['dalam_penghantaran','Dalam penghantaran'],['selesai','Selesai']].map(([k,t])=>`<div class="rowx"><span>${t}</span><span><b>${td[k]||0}</b></span></div>`).join('')}
+     ${[['baru','Baru (belum mula)'],['disiapkan','Sedang disiapkan'],['siap','Siap dihantar'],['dalam_penghantaran','Dalam penghantaran'],['sampai','Dah sampai'],['selesai','Selesai']].map(([k,t])=>`<div class="rowx"><span>${t}</span><span><b>${td[k]||0}</b></span></div>`).join('')}
      <button class="btn ghost sm" id="goToday" style="margin-top:10px">Buka order hari ni</button></div>
     <div class="card"><h2>Bouquet laris bulan ni</h2>${j.top_bq.length?j.top_bq.map((b,i)=>`<div class="hbar"><span class="n">${i+1}</span><span>${h(b.name)}</span><b>${b.n}</b><i><b style="width:${b.n/mx*100}%"></b></i></div>`).join(''):'<p class="mini">Belum ada order dibayar bulan ni.</p>'}</div>
    </div>`;

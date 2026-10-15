@@ -70,7 +70,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 2) return;
+  if ($v >= 3) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -81,8 +81,17 @@ function migrate(PDO $pdo): void {
     note VARCHAR(200) NULL, created_at DATETIME NOT NULL)$tail");
   $run('ALTER TABLE orders ADD COLUMN voucher VARCHAR(30) NULL');
   $run('ALTER TABLE orders ADD COLUMN discount DECIMAL(8,2) NOT NULL DEFAULT 0');
+  // v3: production checklist + delivery steps
+  $run('ALTER TABLE orders ADD COLUMN prep TEXT NULL');
+  $run('ALTER TABLE orders ADD COLUMN del_steps TEXT NULL');
+  $run('ALTER TABLE orders ADD COLUMN lalamove_url VARCHAR(300) NULL');
+  if ($v < 3) { // carry over orders already marked done with the old single status
+    $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
+    $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
+    $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
+  }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','2')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','3')");
 }
 function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare($sql); $s->execute($p); return $s; }
 function setting(string $k, $default = null) { $r = q('SELECT v FROM settings WHERE k=?', [$k])->fetchColumn(); return $r === false ? $default : $r; }
@@ -104,6 +113,42 @@ function off_items(): array {
 }
 function blocked_dates(): array {
   return array_column(q("SELECT d FROM blocked_dates WHERE d >= ? ORDER BY d", [date('Y-m-d')])->fetchAll(), 'd');
+}
+
+// ---------- order workflow: payment → production checklist → delivery steps ----------
+// Delivery labels are for the team only; customers never see the courier's name.
+const DEL_STEPS = ['booked' => 'Lalamove ditempah', 'otw_pickup' => 'Runner OTW ambil barang', 'picked' => 'Runner dah ambil, dalam perjalanan',
+  'delivered' => 'Dah sampai kepada penerima', 'done' => 'Order selesai'];
+const STATUS_LABEL = ['menunggu_bayaran' => 'Menunggu bayaran', 'baru' => 'Baru (dibayar)', 'disiapkan' => 'Sedang disiapkan', 'siap' => 'Siap dihantar',
+  'dalam_penghantaran' => 'Dalam penghantaran', 'sampai' => 'Dah sampai', 'selesai' => 'Selesai', 'batal' => 'Batal'];
+/** Checklist items for this order: [key => label]. Polaroid only if photos were sent, gift only if a gift voucher was used. */
+function prep_items(array $o): array {
+  $C = catalog();
+  $it = ['bouquet' => 'Bouquet ' . ($C['bq'][$o['bouquet']] ?? $o['bouquet']), 'balloon' => 'Balloon ' . ($C['bal'][$o['balloon']] ?? $o['balloon']),
+    'cake' => 'Kek dibeli (' . $o['cake'] . ')'];
+  if ((int)$o['photo_count'] > 0) $it['polaroid'] = 'Polaroid dicetak (' . (int)$o['photo_count'] . ' keping)';
+  $it['wishcard'] = 'Wishcard ditulis';
+  foreach (json_decode((string)$o['price_lines'], true) ?: [] as $l) if (str_starts_with((string)$l[0], '🎁 ')) $it['gift'] = 'Hadiah voucher: ' . preg_replace('/^🎁 | \(voucher .*\)$/u', '', $l[0]);
+  return $it;
+}
+function jdec($v): array { return is_array($v) ? $v : (json_decode((string)$v, true) ?: []); }
+/** Overall status is derived, never set by hand (except Batal). */
+function derive_status(array $o): string {
+  if ($o['status'] === 'batal') return 'batal';
+  if ($o['pay_status'] !== 'paid') return 'menunggu_bayaran';
+  $d = jdec($o['del_steps'] ?? null); $p = jdec($o['prep'] ?? null);
+  if (isset($d['done'])) return 'selesai';
+  if (isset($d['delivered'])) return 'sampai';
+  if (isset($d['otw_pickup']) || isset($d['picked'])) return 'dalam_penghantaran';
+  $items = prep_items($o); $doneN = count(array_intersect_key($p, $items));
+  if ($doneN === count($items)) return 'siap';
+  return $doneN > 0 ? 'disiapkan' : 'baru';
+}
+function progress_text(array $o): string {
+  if ($o['pay_status'] !== 'paid' || $o['status'] === 'batal') return '';
+  $d = jdec($o['del_steps'] ?? null);
+  if ($d) { $last = array_key_last(array_intersect_key(DEL_STEPS, $d)); return DEL_STEPS[$last]; }
+  $items = prep_items($o); return 'Penyediaan ' . count(array_intersect_key(jdec($o['prep'] ?? null), $items)) . '/' . count($items);
 }
 
 // ---------- vouchers ----------

@@ -6,7 +6,7 @@ $o = q('SELECT code, token, photos, recipient_photo, status FROM orders WHERE co
 if (!$o || !hash_equals($o['token'], (string)($_GET['k'] ?? ''))) { http_response_code(404); exit; }
 $f = basename((string)($_GET['f'] ?? ''));
 $allowed = json_decode((string)$o['photos'], true) ?: [];
-if ($o['status'] === 'selesai' && $o['recipient_photo']) $allowed[] = $o['recipient_photo'];
+if (in_array($o['status'], ['sampai', 'selesai'], true) && $o['recipient_photo']) $allowed[] = $o['recipient_photo'];
 if (!in_array($f, $allowed, true)) { http_response_code(404); exit; }
 $path = UPLOAD_DIR . '/' . $o['code'] . '/' . $f;
 if (!is_file($path)) { http_response_code(404); exit; }
