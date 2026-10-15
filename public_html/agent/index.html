@@ -37,6 +37,7 @@ input:focus-visible,button:focus-visible,a:focus-visible,select:focus-visible{ou
 .stat.hero{background:linear-gradient(140deg,var(--accent),var(--accent2));color:#fff}.stat.hero small{color:#ffe3ea}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 /* bottom nav */
+nav[hidden]{display:none!important}
 nav{position:fixed;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));background:#4a2330;border-radius:22px;display:flex;justify-content:center;gap:4px;padding:7px;z-index:5;box-shadow:0 10px 28px -8px rgba(74,35,48,.55);max-width:520px;margin:0 auto}
 nav button{flex:1;max-width:130px;border:0;background:none;font:600 12px var(--body);color:#e9c6d1;padding:7px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border-radius:16px;transition:background .15s,color .15s}
 nav button svg{width:22px;height:22px}
@@ -177,7 +178,7 @@ function landing(){
      <div><b>${near(PER_DAY.wed,100)}</b><span>pasangan berkahwin setiap hari, dan setiap pasangan ada ulang tahun setiap tahun</span></div></div>
     <div class="live" aria-live="off">Sejak tengah malam tadi, kira-kira <b id="bc">0</b> orang di Malaysia dah sambut hari jadi. Berapa ramai yang dapat hadiah?</div>
     <h3>Musim yang buat order melonjak</h3>
-    <div class="chips">${['Valentine · Feb','Hari Ibu · Mei','Hari Guru · 16 Mei','Hari Bapa · Jun','Musim konvokesyen','Hujung tahun & cuti sekolah','Setiap hari: birthday, anniversary, pujuk, rindu'].map(t=>`<span>${t}</span>`).join('')}</div>
+    <div class="chips">${['Hari Ibu · Mei','Hari Guru · 16 Mei','Hari Bapa · Jun','Musim konvokesyen','Hujung tahun & cuti sekolah','Setiap hari: birthday, anniversary, pujuk, rindu'].map(t=>`<span>${t}</span>`).join('')}</div>
     <h3>Contoh kiraan komisen</h3>
     <div class="ex"><div><small>1 order seminggu</small><b>${rm(wk)}+</b><small>sebulan</small></div><div><small>1 order sehari</small><b>${rm(r*30)}</b><small>sebulan</small></div><div><small>3 order sehari</small><b>${rm(r*90).replace(/(\d)(\d{3})$/,'$1,$2')}</b><small>sebulan</small></div></div>
     <p class="fine">Contoh kiraan pada ${rm(r)} setiap order dibayar, bulan 30 hari. Bukan jaminan pendapatan. Angka penduduk dan kelahiran dianggarkan daripada data Jabatan Perangkaan Malaysia (DOSM): penduduk 34.4 juta (2026), 414,918 kelahiran (2024), 188,100 perkahwinan (2023), dibahagi 365 hari.</p></section>
