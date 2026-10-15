@@ -248,6 +248,21 @@ case 'payout': // owner: record that the agent's whole unpaid balance has been t
   } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
   json_out(['ok' => true, 'amount' => $due]);
 
+case 'showcase': // owner: recipient photos for the agent sign-up page
+  if (!$post) { need_login(); json_out(['files' => showcase_files()]); }
+  need_owner();
+  if (isset($body['del'])) { $f = basename((string)$body['del']); if (in_array($f, showcase_files(), true)) @unlink(UPLOAD_DIR . '/_site/' . $f); json_out(['ok' => true]); }
+  $files = collect_photos(); if (!$files) fail('Pilih gambar dulu.');
+  if (count(showcase_files()) + count($files) > 8) fail('Maksimum 8 gambar. Padam yang lama dulu.');
+  $dir = UPLOAD_DIR . '/_site'; if (!is_dir($dir)) mkdir($dir, 0755, true);
+  foreach ($files as [$tmp]) save_jpeg($tmp, $dir . '/showcase-' . date('YmdHis') . '-' . bin2hex(random_bytes(2)) . '.jpg');
+  json_out(['ok' => true]);
+
+case 'showpic':
+  need_login(); $f = basename((string)($_GET['f'] ?? ''));
+  if (!in_array($f, showcase_files(), true)) { http_response_code(404); exit; }
+  header('Content-Type: image/jpeg'); header('Cache-Control: private, max-age=600'); readfile(UPLOAD_DIR . '/_site/' . $f); exit;
+
 case 'agset': // owner: default commission + minimum payout
   need_owner();
   $rate = max(0, min(500, (float)($body['rate'] ?? AGENT_RATE))); $min = max(0, min(5000, (float)($body['payout_min'] ?? PAYOUT_MIN)));

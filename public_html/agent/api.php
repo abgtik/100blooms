@@ -38,7 +38,13 @@ const AG_STATUS = ['menunggu_bayaran' => 'Menunggu bayaran', 'baru' => 'Dibayar'
 
 switch ($a) {
 case 'info': // public: terms shown on the sign-up page
-  json_out(['rate' => agent_rate_default(), 'payout_min' => payout_min()]);
+  json_out(['rate' => agent_rate_default(), 'payout_min' => payout_min(), 'pics' => showcase_files() ? array_map(fn($f) => 'api.php?a=pic&f=' . rawurlencode($f), showcase_files())
+    : array_map(fn($n) => "/assets/img/bouquet/$n-c1.webp", ['glam', 'rossa', 'sunny', 'jessie', 'kiddo', 'walter'])]); // default until the owner uploads photos
+
+case 'pic': // public showcase photo
+  $f = basename((string)($_GET['f'] ?? ''));
+  if (!in_array($f, showcase_files(), true)) { http_response_code(404); exit; }
+  header('Content-Type: image/jpeg'); header('Cache-Control: public, max-age=86400'); readfile(UPLOAD_DIR . '/_site/' . $f); exit;
 
 case 'me':
   $m = need_agent(); sync_commissions();

@@ -473,6 +473,9 @@ async function Cal(el){
 }
 
 /* ---------- vouchers ---------- */
+/* shrink a photo in the browser (keeps uploads small for the hosting limit) */
+const shrink=(f,max=1200)=>new Promise(res=>{const u=URL.createObjectURL(f),im=new Image();im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>res(b||f),'image/jpeg',.85)};im.onerror=()=>res(f);im.src=u});
 /* ---------- agents ---------- */
 async function Agents(el){
   const own=ME.role==='owner';let j;
@@ -499,6 +502,9 @@ async function Agents(el){
         <button class="btn ghost sm" data-act="${a.id}" data-on="${a.active?0:1}">${a.active?'Nyahaktif':'Aktifkan'}</button><button class="btn ghost sm" data-rpw="${a.id}">Set semula password</button></div>`:''}</div></details>`).join('')}</div></div>
    ${own?`<div class="card"><h2>Tetapan agent</h2><div class="bar"><label class="mini">Komisen default RM <input type="number" id="gr" min="0" step="1" value="${j.rate}" style="width:100px"></label><label class="mini">Minimum bayaran RM <input type="number" id="gm" min="0" step="1" value="${j.payout_min}" style="width:100px"></label><button class="btn sm" id="gs">Simpan</button></div>
     <p class="mini" style="margin:0">Komisen dikira pada masa pelanggan bayar. Tukar kadar tak ubah komisen yang dah direkod.</p></div>`:''}
+   ${own?`<div class="card"><h2>Gambar halaman daftar agent</h2><p class="mini" style="margin-top:0">Gambar penerima dengan hadiah, dipaparkan di bahagian atas halaman daftar agent (maks 8). Gambar dikecilkan secara automatik.</p>
+    <div class="thumbs" id="scl"></div>
+    <div class="bar" style="margin:10px 0 0"><input type="file" id="scf" accept="image/*" multiple aria-label="Pilih gambar"><button class="btn ghost sm" id="scu">Upload gambar</button></div></div>`:''}
    <div class="card"><h2>Rekod bayaran</h2>${j.payouts.length?j.payouts.map(p=>`<div class="rowx"><span>${fmtDT(p.created_at)} · <b style="color:var(--ink)">${h(p.name)}</b><br><span class="mini">Ruj: ${h(p.ref||'-')} · oleh ${h(p.paid_by||'-')}</span></span><span><b style="color:var(--ink)">${rm(p.amount)}</b></span></div>`).join(''):'<p class="mini">Belum ada bayaran.</p>'}</div>`;
   $('#cpr').onclick=()=>navigator.clipboard.writeText(j.portal+'?daftar').then(()=>toast('Link disalin'));
   $('#as').oninput=e=>{const t=e.target.value.toLowerCase();el.querySelectorAll('.ag').forEach(d=>d.hidden=t&&!d.dataset.s.includes(t))};
@@ -507,6 +513,11 @@ async function Agents(el){
   el.querySelectorAll('[data-rate]').forEach(i=>i.onchange=async()=>{try{await api('agent_set',{method:'POST',body:{id:+i.dataset.rate,rate:i.value}});toast('Komisen agent disimpan')}catch(e){toast(e.message)}});
   el.querySelectorAll('[data-act]').forEach(b=>b.onclick=async()=>{if(b.dataset.on==='0'&&!confirm('Nyahaktif agent ni? Link dia tak lagi beri komisen.'))return;try{await api('agent_set',{method:'POST',body:{id:+b.dataset.act,active:+b.dataset.on}});Agents(el)}catch(e){toast(e.message)}});
   el.querySelectorAll('[data-rpw]').forEach(b=>b.onclick=async()=>{if(!confirm('Set semula password agent ni?'))return;try{const r=await api('agent_pw',{method:'POST',body:{id:+b.dataset.rpw}});prompt('Password sementara (hantar kepada agent melalui WhatsApp, minta dia tukar selepas login):',r.pw)}catch(e){toast(e.message)}});
+  const scLoad=async()=>{if(!$('#scl'))return;const r=await api('showcase');$('#scl').innerHTML=r.files.length?r.files.map(f=>`<span class="tw"><a href="api.php?a=showpic&f=${encodeURIComponent(f)}" target="_blank" rel="noopener"><img src="api.php?a=showpic&f=${encodeURIComponent(f)}" alt="Gambar showcase"></a><button class="tx" data-scdel="${h(f)}" aria-label="Padam gambar">×</button></span>`).join(''):'<p class="mini" style="margin:0">Belum ada gambar. Halaman daftar guna 6 gambar pelanggan dari katalog buat sementara.</p>';
+    $('#scl').querySelectorAll('[data-scdel]').forEach(b=>b.onclick=async()=>{if(!confirm('Padam gambar ni?'))return;await api('showcase',{method:'POST',body:{del:b.dataset.scdel}});scLoad()})};
+  scLoad();
+  if($('#scu'))$('#scu').onclick=async()=>{const fs=[...$('#scf').files];if(!fs.length)return toast('Pilih gambar dulu');const fd=new FormData();$('#scu').disabled=true;for(const f of fs)fd.append('photo[]',await shrink(f),'g.jpg');
+    try{await api('showcase',{method:'POST',body:fd});toast('Gambar dimuat naik');$('#scf').value='';scLoad()}catch(e){toast(e.message)}$('#scu').disabled=false};
   if($('#gs'))$('#gs').onclick=async()=>{try{await api('agset',{method:'POST',body:{rate:$('#gr').value,payout_min:$('#gm').value}});toast('Tetapan disimpan');Agents(el)}catch(e){toast(e.message)}};
 }
 async function Vouchers(el){

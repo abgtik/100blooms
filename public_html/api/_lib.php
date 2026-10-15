@@ -223,6 +223,21 @@ function area_of(string $addr, string $post): string {
   return $post;
 }
 
+/** Recipient photos shown on the agent sign-up page (owner uploads them in admin → Agent). */
+function showcase_files(): array { $f = glob(UPLOAD_DIR . '/_site/showcase-*.jpg') ?: []; sort($f); return array_map('basename', $f); }
+/** Saves an uploaded image as a JPEG no wider than $max px (falls back to the original if GD is missing). */
+function save_jpeg(string $tmp, string $dest, int $max = 900): void {
+  if (function_exists('imagecreatefromstring') && ($src = @imagecreatefromstring((string)file_get_contents($tmp)))) {
+    $w = imagesx($src); $h = imagesy($src); $k = min(1, $max / max($w, $h));
+    $dst = imagecreatetruecolor((int)round($w * $k), (int)round($h * $k));
+    imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, imagesx($dst), imagesy($dst), $w, $h);
+    if (!imagejpeg($dst, $dest, 82)) fail('Simpan gambar gagal.', 500);
+    return;
+  }
+  if (!move_uploaded_file($tmp, $dest)) fail('Simpan gambar gagal.', 500);
+}
+
 // ---------- wishcard + polaroids sent in after the order (tracking page and admin) ----------
 const WISH_NONE = '(Ayat wishcard belum diterima)';
 const WISH_EDITS = 3; // edits the buyer gets after the first time the wish is written

@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Agent · 100 Blooms</title>
-<meta name="theme-color" content="#fbeef0">
+<meta name="theme-color" content="#fbeef0" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#1d1517" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap">
 <style>
-:root{--bg:#fbeef0;--bg2:#f6dbe1;--ink:#3b2732;--soft:#7d6370;--card:#fff;--line:#ecd6dc;--accent:#d94f74;--accent2:#b93a5e;--ok:#2f8f63;--okb:#e3f4ea;--warn:#a8691b;--warnb:#fbefd9;--bad:#b6404f;--badb:#f8e0e3;--info:#2f6fc1;--infob:#e4eefb;
+:root{--field:#fff;--bg:#fbeef0;--bg2:#f6dbe1;--ink:#3b2732;--soft:#7d6370;--card:#fff;--line:#ecd6dc;--accent:#d94f74;--accent2:#b93a5e;--ok:#2f8f63;--okb:#e3f4ea;--warn:#a8691b;--warnb:#fbefd9;--bad:#b6404f;--badb:#f8e0e3;--info:#2f6fc1;--infob:#e4eefb;
   --display:"Fredoka",ui-rounded,system-ui,sans-serif;--body:"Figtree",system-ui,-apple-system,sans-serif;color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-webkit-tap-highlight-color:transparent}
@@ -17,16 +17,16 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-w
 a{color:var(--accent)}
 .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
-.brand svg{width:32px;height:32px}.brand b{font:600 19px var(--display)}.brand small{font:600 11px var(--body);letter-spacing:.08em;color:var(--accent);background:#fff;border-radius:99px;padding:2px 8px;margin-left:2px}
+.brand svg{width:32px;height:32px}.brand b{font:600 19px var(--display)}.brand small{font:600 11px var(--body);letter-spacing:.08em;color:var(--accent);background:var(--card);border-radius:99px;padding:2px 8px;margin-left:2px}
 h1{font:600 25px/1.15 var(--display);margin:0 0 6px;text-wrap:balance}
 h2{font:600 17px var(--display);margin:0 0 12px}
 .sub{color:var(--soft);margin:0 0 16px;font-size:14px}
 .card{background:var(--card);border-radius:22px;padding:18px;margin-bottom:14px}
 label{display:block;font-size:13px;font-weight:600;margin:12px 0 6px}
-input,select,textarea{width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(--line);font:inherit;color:inherit;background:#fff}
+input,select,textarea{width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(--line);font:inherit;color:inherit;background:var(--field)}
 input:focus-visible,button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .btn{display:block;width:100%;border:0;border-radius:16px;padding:14px;margin-top:16px;font:600 16px var(--display);background:var(--accent);color:#fff;cursor:pointer;text-align:center;text-decoration:none}
-.btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--line)}
+.btn.ghost{background:var(--field);color:var(--ink);border:1.5px solid var(--line)}
 .btn.sm{display:inline-block;width:auto;padding:9px 14px;font-size:14px;margin:0;border-radius:12px}
 .btn:disabled{opacity:.5}
 .msg{padding:11px 13px;border-radius:12px;font-size:13.5px;margin-top:12px}.msg.bad{background:var(--badb);color:var(--bad)}.msg.warn{background:var(--warnb);color:var(--warn)}.msg.ok{background:var(--okb);color:var(--ok)}
@@ -37,7 +37,7 @@ input:focus-visible,button:focus-visible,a:focus-visible,select:focus-visible{ou
 .stat.hero{background:linear-gradient(140deg,var(--accent),var(--accent2));color:#fff}.stat.hero small{color:#ffe3ea}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 /* bottom nav */
-nav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 8px max(6px,env(safe-area-inset-bottom));z-index:5}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 8px max(6px,env(safe-area-inset-bottom));z-index:5}
 nav button{flex:1;max-width:130px;border:0;background:none;font:600 12px var(--body);color:var(--soft);padding:6px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border-radius:12px}
 nav button svg{width:22px;height:22px}
 nav button[aria-current=page]{color:var(--accent);background:var(--bg)}
@@ -65,6 +65,38 @@ nav button[aria-current=page]{color:var(--accent);background:var(--bg)}
 .qr{max-width:200px;border-radius:12px;border:1px solid var(--line);display:block;margin:6px 0 10px}
 .empty{text-align:center;color:var(--soft);padding:18px 6px;font-size:14px}
 .toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:9;max-width:90%}
+.wide .wrap{max-width:1100px}
+/* landing */
+.hero{background:#4a2330;color:#fff;border-radius:26px;padding:26px 22px;margin-bottom:16px;overflow:hidden}
+.eyebrow{font:700 11.5px var(--body);letter-spacing:.12em;text-transform:uppercase;color:#f59ab2;margin:0 0 8px}
+.hero h1{font:700 clamp(27px,4.4vw,40px)/1.12 var(--display);color:#fff;max-width:900px;margin:0 0 10px}
+.hero p{color:#f3dfe5;max-width:560px;margin:0 0 18px;font-size:15.5px}
+.pics{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px;margin-bottom:18px}
+.pics img{flex:none;width:150px;height:188px;object-fit:cover;border-radius:16px;scroll-snap-align:start;background:#5d3040}
+.hero .cta{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.hero .cta .btn{width:auto;margin:0;padding:13px 22px}
+.hero .cta a.lk{color:#f3dfe5;font-size:14px}
+.sec{background:var(--card);border-radius:24px;padding:22px 20px;margin-bottom:16px}
+.sec h2{font:700 22px/1.2 var(--display);margin:0 0 8px}.sec .lead{color:var(--soft);max-width:640px;margin:0 0 18px}
+.big{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px 20px;margin-bottom:18px}
+.big b{display:block;font:700 30px/1.1 var(--display);color:var(--accent)}.big span{font-size:13.5px}
+.live{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg);border-radius:18px;padding:14px 16px;margin-bottom:22px;font-size:14.5px}
+.live b{font:700 30px var(--display);color:var(--accent);font-variant-numeric:tabular-nums}
+.sec h3{font:700 17px var(--display);margin:0 0 10px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}.chips span{border:1.5px solid var(--line);border-radius:99px;padding:6px 13px;font-size:13px;font-weight:600}
+.ex{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.ex div{background:var(--bg);border-radius:16px;padding:14px 16px}
+.ex small{display:block;color:var(--soft);font-size:12.5px}.ex b{display:block;font:700 26px var(--display);margin:2px 0}
+.fine{font-size:12px;color:var(--soft);margin:14px 0 0}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;counter-reset:s;margin:0;padding:0;list-style:none}
+.steps li{background:var(--bg);border-radius:18px;padding:16px;counter-increment:s}
+.steps li::before{content:counter(s);display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;font:700 15px var(--display);margin-bottom:8px}
+.steps b{display:block;font:600 16px var(--display);margin-bottom:2px}.steps span{font-size:13.5px;color:var(--soft)}
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px 18px;margin:0;padding:0;list-style:none}.feat li{padding-left:26px;position:relative;font-size:14.5px}
+.feat li::before{content:"✓";position:absolute;left:0;top:0;color:var(--ok);font-weight:700}
+.rate{display:inline-flex;gap:6px;align-items:center;background:var(--warnb);color:var(--warn);border-radius:99px;padding:4px 12px;font-weight:700;font-size:13px;margin-bottom:10px}
+.two{display:grid;grid-template-columns:1fr;gap:16px}@media (min-width:860px){.two{grid-template-columns:1.1fr .9fr;align-items:start}}
+#daftar{scroll-margin-top:16px}
+@media (prefers-color-scheme:dark){:root{--bg:#1d1517;--bg2:#3a2229;--ink:#f5e9ec;--soft:#c6a9b2;--card:#2a1d21;--line:#47323a;--field:#211719;--okb:#183a2a;--ok:#7fd3a7;--warnb:#3d2d14;--warn:#f0c27a;--badb:#43202a;--bad:#ff9aa9;--infob:#1d2c44;--info:#9cc2ff}
+  .hero{background:#4a2330}.btn.ghost{background:var(--field)}nav{background:var(--card)!important}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -82,8 +114,8 @@ const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const rm=n=>'RM'+Number(n||0).toFixed(Number(n)%1?2:0);
 const fmtD=(s,o)=>s?new Date(s.slice(0,10)+'T00:00').toLocaleDateString('ms-MY',o||{weekday:'short',day:'numeric',month:'short'}):'-';
 const toast=t=>{const d=document.createElement('div');d.className='toast';d.setAttribute('role','status');d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2400)};
-let ME=null,CSRF='',tab='home',cal={m:'',sel:''},INFO={rate:20,payout_min:40};
-fetch('api.php?a=info').then(r=>r.json()).then(j=>{if(j.rate){INFO=j;const t=document.getElementById('terms');if(t)t.innerHTML=TERMS(j.rate,j.payout_min)}}).catch(()=>{});
+let ME=null,CSRF='',tab='home',cal={m:'',sel:''},INFO={rate:20,payout_min:40,pics:[]};
+const INFO_P=fetch('api.php?a=info').then(r=>r.json()).then(j=>{if(j.rate!==undefined)INFO=j}).catch(()=>{});
 async function api(a,{method='GET',body,params}={}){
   const o={method,headers:{}};if(method==='POST'){o.headers['X-CSRF']=CSRF;if(body instanceof FormData)o.body=body;else{o.headers['Content-Type']='application/json';o.body=JSON.stringify(body||{})}}
   const r=await fetch('api.php?a='+a+(params?'&'+new URLSearchParams(params):''),o);let j={};try{j=await r.json()}catch(e){}
@@ -100,20 +132,12 @@ const TERMS=(rate,min)=>`<ol class="terms">
   <li>Voucher tertentu tak boleh digunakan bersama link agent.</li></ol>`;
 
 /* ---------- login / register ---------- */
-function auth(mode,err){
+async function auth(mode){
+  await INFO_P;
   $('#nav').hidden=true;$('#tr').innerHTML='';
   const reg=mode==='register';
-  $('#main').innerHTML=reg?`<h1>Jadi agent 100 Blooms</h1><p class="sub">Kongsi link order awak dan dapat komisen untuk setiap hadiah yang dibeli. Link aktif terus selepas daftar.</p>
-   <form class="card" id="f" novalidate>
-    <label for="n">Nama penuh</label><input id="n" autocomplete="name">
-    <label for="p">No. telefon (WhatsApp)</label><input id="p" type="tel" inputmode="tel" autocomplete="tel" placeholder="01X-XXX XXXX">
-    <label for="e">Email</label><input id="e" type="email" autocomplete="email">
-    <label for="w">Password (min 8 aksara)</label><input id="w" type="password" autocomplete="new-password">
-    <h2 style="margin-top:18px">Terma agent</h2><div id="terms">${TERMS(INFO.rate,INFO.payout_min)}</div>
-    <label class="ck" style="margin-top:14px"><input type="checkbox" id="t"> Saya setuju dengan terma agent</label>
-    <div id="err"></div>
-    <button class="btn" id="go">Daftar &amp; dapatkan link</button></form>
-   <p class="hint" style="text-align:center">Dah ada akaun? <a href="#" id="sw">Log masuk</a></p>`
+  document.body.classList.toggle('wide',reg);
+  $('#main').innerHTML=reg?landing()
   :`<h1>Log masuk agent</h1><p class="sub">Semak order, komisen dan bayaran awak.</p>
    <form class="card" id="f" novalidate>
     <label for="l">Email atau no. telefon</label><input id="l" autocomplete="username">
@@ -123,10 +147,70 @@ function auth(mode,err){
     <p class="hint" style="margin:12px 0 0">Lupa password? WhatsApp 100 Blooms untuk set semula.</p></form>
    <p class="hint" style="text-align:center">Belum jadi agent? <a href="#" id="sw">Daftar sekarang</a></p>`;
   $('#sw').onclick=e=>{e.preventDefault();auth(reg?'login':'register')};
+  if(reg)startLanding();
   $('#f').onsubmit=async e=>{e.preventDefault();$('#go').disabled=true;
     try{if(reg)await api('register',{method:'POST',body:{name:$('#n').value,phone:$('#p').value,email:$('#e').value,pw:$('#w').value,terms:$('#t').checked}});
       else await api('login',{method:'POST',body:{login:$('#l').value,pw:$('#w').value}});
-      boot(reg)}catch(x){$('#err').innerHTML=`<div class="msg bad" role="alert">${h(x.message)}</div>`;$('#go').disabled=false}};
+      document.body.classList.remove('wide');boot(reg)}catch(x){$('#err').innerHTML=`<div class="msg bad" role="alert">${h(x.message)}</div>`;$('#go').disabled=false}};
+}
+
+/* ---------- sign-up landing ---------- */
+// DOSM: population 34.4 juta (2026), 414,918 kelahiran (2024), 188,100 perkahwinan (2023); Selangor ~7.4 juta
+const PER_DAY={bday:Math.round(34.4e6/365),sel:Math.round(7.4e6/365),birth:Math.round(414918/365),wed:Math.round(188100/365)};
+const near=(n,step)=>'~'+(Math.round(n/step)*step).toLocaleString('en-MY');
+function landing(){
+  const r=INFO.rate,min=INFO.payout_min,wk=Math.floor(r*30/7/10)*10;
+  return `<section class="hero" aria-labelledby="hh"><p class="eyebrow">Program agent 100 Blooms</p>
+    <h1 id="hh">Jual hadiah yang buat orang senyum, dapat ${rm(r)} setiap order.</h1>
+    <p>Tak perlu stok, tak perlu hantar sendiri. Kongsi link awak, team 100 Blooms siapkan dan hantar hadiah tu sampai ke tangan penerima.</p>
+    ${INFO.pics&&INFO.pics.length?`<div class="pics">${INFO.pics.map((u,i)=>`<img src="${h(u)}" alt="Penerima hadiah 100 Blooms ${i+1}" loading="${i<4?'eager':'lazy'}">`).join('')}</div>`:''}
+    <div class="cta"><a class="btn" href="#daftar">Daftar sekarang, percuma</a><a class="lk" href="#" data-login>Dah ada akaun? Log masuk</a></div></section>
+
+   <section class="sec" aria-labelledby="h2a"><p class="eyebrow" style="color:var(--accent)">Peluang ada setiap hari</p>
+    <h2 id="h2a">Setiap hari, ada sebab untuk orang beri hadiah.</h2>
+    <p class="lead">Hari jadi, kelahiran bayi, ulang tahun perkahwinan. Belum dikira pasangan yang merajuk, anak yang rindu mak, dan kawan yang baru grad. Selagi ada orang yang sayang, peluang tu tak pernah habis.</p>
+    <div class="big"><div><b>${near(PER_DAY.bday,1000)}</b><span>orang di Malaysia sambut hari jadi <strong>setiap hari</strong></span></div>
+     <div><b>${near(PER_DAY.sel,1000)}</b><span>daripadanya di Selangor sahaja, setiap hari</span></div>
+     <div><b>${near(PER_DAY.birth,100)}</b><span>bayi lahir setiap hari, setiap satu ada ibu bapa untuk diraikan</span></div>
+     <div><b>${near(PER_DAY.wed,100)}</b><span>pasangan berkahwin setiap hari, dan setiap pasangan ada ulang tahun setiap tahun</span></div></div>
+    <div class="live" aria-live="off">Sejak tengah malam tadi, kira-kira <b id="bc">0</b> orang di Malaysia dah sambut hari jadi. Berapa ramai yang dapat hadiah?</div>
+    <h3>Musim yang buat order melonjak</h3>
+    <div class="chips">${['Valentine · Feb','Hari Ibu · Mei','Hari Guru · 16 Mei','Hari Bapa · Jun','Musim konvokesyen','Hujung tahun & cuti sekolah','Setiap hari: birthday, anniversary, pujuk, rindu'].map(t=>`<span>${t}</span>`).join('')}</div>
+    <h3>Contoh kiraan komisen</h3>
+    <div class="ex"><div><small>1 order seminggu</small><b>${rm(wk)}+</b><small>sebulan</small></div><div><small>1 order sehari</small><b>${rm(r*30)}</b><small>sebulan</small></div><div><small>3 order sehari</small><b>${rm(r*90).replace(/(\d)(\d{3})$/,'$1,$2')}</b><small>sebulan</small></div></div>
+    <p class="fine">Contoh kiraan pada ${rm(r)} setiap order dibayar, bulan 30 hari. Bukan jaminan pendapatan. Angka penduduk dan kelahiran dianggarkan daripada data Jabatan Perangkaan Malaysia (DOSM): penduduk 34.4 juta (2026), 414,918 kelahiran (2024), 188,100 perkahwinan (2023), dibahagi 365 hari.</p></section>
+
+   <section class="sec" aria-labelledby="h2b"><div class="rate">★ 5.0 · 680+ ulasan Google</div><h2 id="h2b">Kenali 100 Blooms</h2>
+    <p class="lead" style="margin-bottom:12px">100 Blooms bermula dengan jualan bunga sempena konvokesyen UiTM Shah Alam, dan kini menghantar hadiah lengkap ke seluruh Klang Valley. Kami bantu orang sampaikan perasaan kepada orang tersayang: birthday, anniversary, minta maaf, tahniah, atau sekadar ingat.</p>
+    <p class="lead" style="margin:0">Produk yang awak jual: <strong>Combo Jimat RM128</strong>. Satu set lengkap dengan bouquet pilihan, sepotong kek Secret Recipe, balloon, foto polaroid dan wishcard, dengan delivery percuma. Penerima pun dapat gambar kenangan masa hadiah sampai.</p></section>
+
+   <section class="sec" aria-labelledby="h2c"><h2 id="h2c">Macam mana ia berfungsi</h2><p class="lead">Awak fokus kongsi. Yang lain kami uruskan.</p>
+    <ol class="steps"><li><b>Daftar 2 minit</b><span>Isi nama, telefon dan email. Link awak terus aktif, tak perlu tunggu kelulusan.</span></li>
+     <li><b>Kongsi link</b><span>WhatsApp, status, Instagram, TikTok, Facebook. Awak juga boleh buat iklan berbayar sendiri.</span></li>
+     <li><b>Pelanggan order &amp; bayar</b><span>Team kami siapkan hadiah, hantar ke penerima, dan layan soalan pelanggan.</span></li>
+     <li><b>Komisen masuk</b><span>${rm(r)} untuk setiap order yang dibayar. Dibayar setiap Jumaat bila baki capai ${rm(min)}.</span></li></ol></section>
+
+   <div class="two"><section class="sec" aria-labelledby="h2d"><h2 id="h2d">Apa awak dapat</h2>
+    <ul class="feat"><li>Link order peribadi yang terus aktif</li><li>Dashboard order ikut kalendar</li><li>Status setiap order, dari bayaran sampai hadiah sampai</li><li>Baki komisen dan tarikh bayaran</li><li>Rekod semua bayaran yang diterima</li><li>Tiada yuran pendaftaran, tiada sasaran jualan</li></ul>
+    <h3 style="margin-top:20px">Terma agent</h3>${TERMS(r,min)}</section>
+
+   <section class="sec" id="daftar" aria-labelledby="h2e"><h2 id="h2e">Daftar jadi agent</h2><p class="lead" style="margin-bottom:6px">Percuma. Link aktif terus selepas daftar.</p>
+    <form id="f" novalidate>
+    <label for="n">Nama penuh</label><input id="n" autocomplete="name">
+    <label for="p">No. telefon (WhatsApp)</label><input id="p" type="tel" inputmode="tel" autocomplete="tel" placeholder="01X-XXX XXXX">
+    <label for="e">Email</label><input id="e" type="email" autocomplete="email">
+    <label for="w">Password (min 8 aksara)</label><input id="w" type="password" autocomplete="new-password">
+    <label class="ck" style="margin-top:16px"><input type="checkbox" id="t"> Saya setuju dengan terma agent</label>
+    <div id="err"></div>
+    <button class="btn" id="go">Daftar &amp; dapatkan link</button></form>
+    <p class="hint" style="text-align:center;margin:12px 0 0">Dah ada akaun? <a href="#" id="sw">Log masuk</a></p></section></div>`;
+}
+let bcT;
+function startLanding(){
+  document.querySelectorAll('[data-login]').forEach(a=>a.onclick=e=>{e.preventDefault();auth('login')});
+  const el=$('#bc');clearInterval(bcT);if(!el)return;
+  const tick=()=>{const ms=(Date.now()+8*3600e3)%864e5;el.textContent=Math.floor(PER_DAY.bday*ms/864e5).toLocaleString('en-MY')};
+  tick();bcT=setInterval(tick,1000);
 }
 
 /* ---------- shell ---------- */
