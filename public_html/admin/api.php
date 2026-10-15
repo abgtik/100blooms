@@ -7,6 +7,12 @@ session_name('hbadmin');
 session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'secure' => $https, 'httponly' => true, 'samesite' => 'Lax']);
 session_start();
 
+// Unexpected server errors: log them, and show the reason to signed-in staff instead of a bare "500".
+set_exception_handler(function (Throwable $e) {
+  error_log('100blooms admin: ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
+  if (!headers_sent()) { http_response_code(500); header('Content-Type: application/json; charset=utf-8'); }
+  echo json_encode(['error' => !empty($_SESSION['uid']) ? 'Ralat server: ' . mb_substr($e->getMessage(), 0, 300) : 'Ralat server. Cuba lagi.'], JSON_UNESCAPED_UNICODE);
+});
 $a = (string)($_GET['a'] ?? '');
 $post = $_SERVER['REQUEST_METHOD'] === 'POST';
 $body = $post ? (json_decode(file_get_contents('php://input') ?: '', true) ?: $_POST) : [];
@@ -192,9 +198,9 @@ case 'pdel':
 
 case 'agents': // agent list with sales, commission balance and payout info
   $m = need_login(); sync_commissions(); $own = $m['role'] === 'owner';
-  $rows = q("SELECT a.*, (SELECT COUNT(*) FROM orders o WHERE o.agent_ref = CAST(a.id AS CHAR) AND o.pay_status='paid' AND o.status<>'batal') AS n_paid,
-      (SELECT COALESCE(SUM(o.total),0) FROM orders o WHERE o.agent_ref = CAST(a.id AS CHAR) AND o.pay_status='paid' AND o.status<>'batal') AS sales,
-      (SELECT COUNT(*) FROM orders o WHERE o.agent_ref = CAST(a.id AS CHAR) AND o.pay_status<>'paid' AND o.status<>'batal') AS n_pending
+  $rows = q("SELECT a.*, (SELECT COUNT(*) FROM orders o WHERE (o.agent_ref + 0) = a.id AND o.pay_status='paid' AND o.status<>'batal') AS n_paid,
+      (SELECT COALESCE(SUM(o.total),0) FROM orders o WHERE (o.agent_ref + 0) = a.id AND o.pay_status='paid' AND o.status<>'batal') AS sales,
+      (SELECT COUNT(*) FROM orders o WHERE (o.agent_ref + 0) = a.id AND o.pay_status<>'paid' AND o.status<>'batal') AS n_pending
     FROM agents a ORDER BY a.id")->fetchAll();
   $out = [];
   foreach ($rows as $r) {

@@ -9,6 +9,11 @@ session_name('hbagent');
 session_set_cookie_params(['lifetime' => 60 * 60 * 24 * 30, 'path' => '/', 'secure' => $https, 'httponly' => true, 'samesite' => 'Lax']);
 session_start();
 
+set_exception_handler(function (Throwable $e) {
+  error_log('100blooms agent: ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
+  if (!headers_sent()) { http_response_code(500); header('Content-Type: application/json; charset=utf-8'); }
+  echo json_encode(['error' => 'Ralat server. Cuba lagi sebentar, atau WhatsApp 100 Blooms.'], JSON_UNESCAPED_UNICODE);
+});
 $a = (string)($_GET['a'] ?? '');
 $post = $_SERVER['REQUEST_METHOD'] === 'POST';
 $body = $post ? (json_decode(file_get_contents('php://input') ?: '', true) ?: $_POST) : [];
