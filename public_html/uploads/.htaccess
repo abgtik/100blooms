@@ -1,0 +1,2 @@
+# Customer photos are private: served only through admin/photo.php after login
+Require all denied

@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>100 Blooms Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+:root{--bg:#f7f1f3;--card:#fff;--ink:#3b2732;--soft:#7d6370;--line:#ecdde2;--accent:#d94f74;--ok:#2f8f63;--okb:#e3f4ea;--warn:#a8691b;--warnb:#fbefd9;--bad:#b6404f;--badb:#f8e0e3;--info:#2f6fc1;--infob:#e4eefb;
+  --display:"Fredoka",ui-rounded,system-ui,sans-serif;--body:"Figtree",system-ui,-apple-system,sans-serif;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 var(--body);-webkit-tap-highlight-color:transparent}
+.wrap{max-width:1000px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-left)) 80px}
+header{display:flex;align-items:center;gap:10px;padding:14px 0 10px}
+header h1{font:600 20px var(--display);margin:0;flex:1}
+header .who{font-size:12.5px;color:var(--soft);text-align:right;line-height:1.3}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px;scrollbar-width:none}
+.tab,.chip{flex:none;border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:8px 14px;font:600 13.5px var(--body);cursor:pointer}
+.tab[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chip[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:6px 0 12px}
+.kpi{background:var(--card);border-radius:16px;padding:12px 14px}
+.kpi small{color:var(--soft);font-size:12px;display:block}.kpi b{font:600 22px var(--display);font-variant-numeric:tabular-nums}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 12px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:9px 11px;min-width:0}
+input[type=search]{flex:1;min-width:180px}
+.btn{border:0;border-radius:12px;padding:10px 16px;font:600 14px var(--body);background:var(--accent);color:#fff;cursor:pointer}
+.btn.ghost{background:var(--card);color:var(--ink);border:1.5px solid var(--line)}.btn.sm{padding:7px 12px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.list{display:flex;flex-direction:column;gap:8px}
+.ord{display:grid;grid-template-columns:1fr auto;gap:4px 12px;background:var(--card);border-radius:16px;padding:12px 14px;cursor:pointer;border:1.5px solid transparent;text-align:left;font:inherit;color:inherit;width:100%}
+.ord:hover{border-color:var(--line)}
+.ord .c{font-weight:700;font-variant-numeric:tabular-nums}.ord .m{color:var(--soft);font-size:13px}
+.ord .r{text-align:right}.ord .t{font:600 16px var(--display);font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-menunggu_bayaran,.p-pending{background:var(--warnb);color:var(--warn)}.p-baru{background:var(--infob);color:var(--info)}
+.p-disiapkan{background:#efe7fb;color:#6a4bb5}.p-dalam_penghantaran{background:#e3f1f5;color:#21788f}.p-selesai{background:var(--okb);color:var(--ok)}
+.p-batal,.p-failed{background:#eee;color:#666}
+.empty{background:var(--card);border-radius:16px;padding:28px;text-align:center;color:var(--soft)}
+.card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px}
+.card h2{font:600 16px var(--display);margin:0 0 10px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.tog{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);border-radius:12px;padding:9px 12px;font-size:13.5px}
+.sw{position:relative;width:44px;height:26px;flex:none}.sw input{opacity:0;width:0;height:0;position:absolute}
+.sw span{position:absolute;inset:0;background:#cdbfc4;border-radius:99px;transition:.2s;cursor:pointer}.sw span:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.sw input:checked+span{background:var(--ok)}.sw input:checked+span:before{transform:translateX(18px)}
+.sw input:focus-visible+span{outline:3px solid var(--accent);outline-offset:2px}
+.rowx{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:14px}.rowx:last-child{border:0}
+.rowx span:first-child{color:var(--soft);flex:none}.rowx span:last-child{text-align:right;overflow-wrap:anywhere}
+.scrim{position:fixed;inset:0;background:rgba(40,20,30,.4);z-index:20;display:flex;justify-content:flex-end}
+.panel{width:min(560px,100%);height:100%;overflow:auto;background:var(--bg);padding:16px max(16px,env(safe-area-inset-right)) 40px 16px;animation:sl .25s ease}
+@keyframes sl{from{transform:translateX(40px);opacity:0}}
+.steps{display:flex;gap:6px;flex-wrap:wrap}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}.thumbs a{display:block;width:96px;height:96px;border-radius:10px;overflow:hidden;background:#eee}.thumbs img{width:100%;height:100%;object-fit:cover}
+.wishbox{white-space:pre-wrap;background:#fffdf9;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:14.5px}
+.msg{padding:10px 12px;border-radius:10px;font-size:13.5px;margin:8px 0}.msg.bad{background:var(--badb);color:var(--bad)}.msg.ok{background:var(--okb);color:var(--ok)}.msg.warn{background:var(--warnb);color:var(--warn)}
+.login{max-width:380px;margin:12vh auto 0;background:var(--card);border-radius:20px;padding:24px}
+.login h1{font:600 24px var(--display);margin:0 0 4px}.login label{display:block;font-size:13px;font-weight:600;margin:12px 0 4px}.login input{width:100%}
+.mini{font-size:12.5px;color:var(--soft)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;z-index:50;font-size:13.5px}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media print{body *{visibility:hidden}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div id="layer"></div>
+<script>
+const $=s=>document.querySelector(s);
+const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rm=n=>'RM'+(+n).toFixed(+n%1?2:0);
+let ME=null,CSRF='',CAT=null,TODAY='',tab='orders',f='today',qs='',dfrom='',dto='';
+const ST={menunggu_bayaran:'Menunggu bayaran',baru:'Baru (dibayar)',disiapkan:'Sedang disiapkan',dalam_penghantaran:'Dalam penghantaran',selesai:'Selesai',batal:'Batal'};
+const DEL={free:'Percuma 10am–6pm',A:'Slot A 9am–12pm',B:'Slot B 1pm–4pm',C:'Slot C 5pm–8pm',spec:'Masa khusus'};
+const OCC_T=()=>CAT.occ,REL_T=()=>CAT.rel;
+function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}
+async function api(a,{method='GET',body,params}={}){
+  const u='api.php?a='+a+(params?'&'+new URLSearchParams(params):'');
+  const o={method,headers:{}};if(method==='POST'){o.headers['X-CSRF']=CSRF;if(body instanceof FormData)o.body=body;else{o.headers['Content-Type']='application/json';o.body=JSON.stringify(body||{})}}
+  const r=await fetch(u,o);let j={};try{j=await r.json()}catch(e){}
+  if(r.status===401&&a!=='login'&&a!=='me'){ME=null;login();throw new Error('auth')}
+  if(!r.ok)throw new Error(j.error||'Ralat '+r.status);return j;
+}
+const fmtD=s=>s?new Date(s+'T00:00').toLocaleDateString('ms-MY',{weekday:'short',day:'numeric',month:'short'}):'-';
+const fmtDT=s=>s?new Date(s.replace(' ','T')).toLocaleString('ms-MY',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'-';
+const delTxt=o=>DEL[o.del_type]+(o.del_type==='spec'&&o.del_time?' '+o.del_time:'');
+const pill=o=>o.pay_status!=='paid'?`<span class="pill p-${o.pay_status==='failed'?'failed':'pending'}">${o.pay_status==='failed'?'Bayaran gagal':'Menunggu bayaran'}</span>`:`<span class="pill p-${o.status}">${ST[o.status]||o.status}</span>`;
+
+/* ---------- login ---------- */
+function login(err){
+  $('#layer').innerHTML='';
+  $('#app').innerHTML=`<form class="login" id="lf"><h1>100 Blooms Admin</h1><p class="mini" style="margin:0">Log masuk untuk Owner dan Staff.</p>
+   ${err?`<div class="msg bad">${h(err)}</div>`:''}
+   <label for="le">Email</label><input id="le" type="email" autocomplete="username" required>
+   <label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password" required>
+   <button class="btn" style="width:100%;margin-top:16px">Log masuk</button></form>`;
+  $('#lf').onsubmit=async e=>{e.preventDefault();try{await api('login',{method:'POST',body:{email:$('#le').value,pw:$('#lp').value}});boot()}catch(x){login(x.message)}};
+  $('#le').focus();
+}
+async function boot(){
+  try{const j=await api('me');ME=j.user;CSRF=j.csrf;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
+}
+function render(){
+  const T=[['orders','Order'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
+  $('#app').innerHTML=`<header><h1>100 Blooms Admin</h1><div class="who">${h(ME.name)}<br>${ME.role==='owner'?'Owner':'Staff'} · <a href="#" id="lo">Log keluar</a></div></header>
+   <nav class="tabs" aria-label="Menu">${T.map(([k,t])=>`<button class="tab" data-t="${k}" aria-pressed="${tab===k}">${t}</button>`).join('')}</nav><main id="main"></main>`;
+  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
+  $('#lo').onclick=async e=>{e.preventDefault();await api('logout',{method:'POST'}).catch(()=>{});ME=null;login()};
+  ({orders:Orders,stock:Stock,dates:Dates,acc:Acc})[tab]($('#main'));
+}
+
+/* ---------- orders ---------- */
+async function Orders(el){
+  const F=[['today','Hantar hari ini'],['paid','Perlu diuruskan'],['pending','Menunggu bayaran'],['delivered','Selesai'],['all','Semua']];
+  el.innerHTML=`<div class="kpis" id="kp"></div>
+   <div class="bar">${F.map(([k,t])=>`<button class="chip" data-f="${k}" aria-pressed="${f===k}">${t}</button>`).join('')}</div>
+   <div class="bar"><input type="search" id="qs" placeholder="Cari kod, nama atau telefon" value="${h(qs)}" aria-label="Cari order">
+    ${f==='today'?'':`<label class="mini">Tarikh hantar <input type="date" id="df" value="${dfrom}" aria-label="Dari"></label><label class="mini">hingga <input type="date" id="dt" value="${dto}" aria-label="Hingga"></label>`}
+    <button class="btn ghost sm" id="rf">Muat semula</button></div>
+   <div class="list" id="ol"><div class="empty">Memuatkan…</div></div>`;
+  el.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{f=b.dataset.f;Orders(el)});
+  let tm;$('#qs').oninput=e=>{qs=e.target.value;clearTimeout(tm);tm=setTimeout(load,300)};
+  if($('#df')){$('#df').onchange=e=>{dfrom=e.target.value;load()};$('#dt').onchange=e=>{dto=e.target.value;load()};}
+  $('#rf').onclick=load;
+  async function load(){
+    let j;try{j=await api('orders',{params:{f,q:qs,from:f==='today'?'':dfrom,to:f==='today'?'':dto}})}catch(e){if(e.message!=='auth')$('#ol').innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+    const c=j.counts;
+    $('#kp').innerHTML=`<div class="kpi"><small>Hantar hari ini</small><b>${c.today}</b> <span class="mini">${c.today_left} belum selesai</span></div>
+      <div class="kpi"><small>Menunggu bayaran (24 jam)</small><b>${c.pending}</b></div><div class="kpi"><small>Bayaran diterima hari ini</small><b>${rm(c.paid_today_rm)}</b></div>`;
+    $('#ol').innerHTML=j.rows.length?j.rows.map(o=>`<button class="ord" data-id="${o.id}">
+      <div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">Hantar <b style="color:var(--ink)">${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</div>
+       <div class="m">Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.notes?' · 📝':''}</div></div>
+      <div class="r"><div class="t">${rm(o.total)}</div><div class="m">Order ${fmtDT(o.created_at)}</div></div></button>`).join('')
+      :`<div class="empty">Tiada order${f==='today'?' untuk dihantar hari ini':''}.</div>`;
+    document.querySelectorAll('.ord').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,load));
+  }
+  load();
+}
+async function openOrder(id,reload){
+  let o;try{o=(await api('order',{params:{id}})).order}catch(e){toast(e.message);return}
+  const ph=(n,dl)=>`photo.php?o=${encodeURIComponent(o.code)}&f=${encodeURIComponent(n)}${dl?'&dl=1':''}`;
+  const wa=(n,t)=>'https://wa.me/'+n.replace(/\D/g,'').replace(/^0/,'60')+(t?'?text='+encodeURIComponent(t):'');
+  const paid=o.pay_status==='paid',flow=['baru','disiapkan','dalam_penghantaran','selesai'];
+  const cakeTxt=o.cake+(o.cake_flavours&&o.cake_flavours.length?` → pilihan: ${o.cake_flavours.join(' / ')}`:'');
+  const ext=o.extra_cakes&&Object.keys(o.extra_cakes).length?Object.entries(o.extra_cakes).map(([k,n])=>`${k} × ${n}`).join(', '):'Tiada';
+  $('#layer').innerHTML=`<div class="scrim" id="sc"><div class="panel" role="dialog" aria-modal="true" aria-label="Order ${h(o.code)}">
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 style="font:600 20px var(--display);margin:0">${h(o.code)} ${pill(o)}</h2><button class="btn ghost sm" id="cx">Tutup</button></div>
+   <div id="om"></div>
+   ${paid?`<div class="card"><h2>Status order</h2><div class="steps">${flow.map(s=>`<button class="chip" data-s="${s}" aria-pressed="${o.status===s}">${ST[s]}</button>`).join('')}</div>
+     <p class="mini" style="margin:8px 0 0">Dibayar ${fmtDT(o.paid_at)} melalui ${h(o.pay_channel||'-')} (${h(o.pay_ref||'-')})${o.updated_by?` · kemas kini terakhir oleh ${h(o.updated_by)}`:''}</p></div>`
+    :`<div class="card"><h2>Bayaran belum diterima</h2><p class="mini" style="margin-top:0">Order disimpan ${fmtDT(o.created_at)}. Customer mungkin belum habis bayar, atau bayaran gagal.</p>
+     <div class="bar" style="margin:0"><button class="btn sm" id="rc">Semak semula dengan ToyyibPay</button>
+     ${ME.role==='owner'?`<button class="btn ghost sm" id="mp">Tanda dibayar (manual)</button>`:''}<button class="btn ghost sm" id="cn">Batalkan</button></div></div>`}
+   <div class="card"><h2>Penghantaran</h2>
+    <div class="rowx"><span>Tarikh</span><span><b>${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</span></div>
+    <div class="rowx"><span>Penerima</span><span>${h(o.r_name)}</span></div>
+    <div class="rowx"><span>Telefon</span><span><a href="tel:${h(o.r_phone)}">${h(o.r_phone)}</a> · <a href="${wa(o.r_phone)}" target="_blank" rel="noopener">WhatsApp</a></span></div>
+    <div class="rowx"><span>Alamat</span><span>${h(o.r_addr)}, ${h(o.r_post)}<br><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.r_addr+' '+o.r_post)}" target="_blank" rel="noopener">Buka di Google Maps</a></span></div>
+    <div class="rowx"><span>Zon</span><span>${o.zone==='plus20'?'Merah (+RM20)':'Biru (percuma)'}</span></div>
+    <details style="margin-top:10px"><summary class="mini" style="cursor:pointer">Tukar tarikh delivery (permintaan customer)</summary>
+     <div class="bar"><input type="date" id="nd" value="${o.del_date}" aria-label="Tarikh baru"><select id="nt" aria-label="Slot">${Object.entries(DEL).map(([k,t])=>`<option value="${k}" ${k===o.del_type?'selected':''}>${t}</option>`).join('')}</select>
+     <input type="time" id="ntm" value="${h(o.del_time||'')}" aria-label="Masa khusus"><button class="btn sm" id="sd">Simpan</button></div>
+     <p class="mini" style="margin:0">Caj tidak dikira semula. Kutip beza harga (jika ada) secara manual.</p></details></div>
+   <div class="card"><h2>Isi hadiah</h2>
+    <div class="rowx"><span>Momen</span><span>${h(OCC_T()[o.occasion]||o.occasion)} · ${h(REL_T()[o.relation]||o.relation)} (${o.gender==='l'?'L':'P'}) · panggil "${h(o.call_name)}"</span></div>
+    <div class="rowx"><span>Bouquet</span><span><b>${h(CAT.bq[o.bouquet]||o.bouquet)}</b></span></div>
+    <div class="rowx"><span>Balloon</span><span>${h(CAT.bal[o.balloon]||o.balloon)}</span></div>
+    <div class="rowx"><span>Kek</span><span>${h(cakeTxt)}</span></div>
+    <div class="rowx"><span>Kek tambahan</span><span>${h(ext)}</span></div>
+    <div class="rowx"><span>Polaroid</span><span>${o.photos.length} gambar</span></div>
+    ${o.photos.length?`<div class="thumbs" style="margin:8px 0">${o.photos.map(n=>`<a href="${ph(n,1)}" title="Muat turun ${h(n)}"><img src="${ph(n)}" alt="Polaroid ${h(n)}" loading="lazy"></a>`).join('')}</div><p class="mini" style="margin:0">Tekan gambar untuk muat turun dan cetak.</p>`:''}
+    <h2 style="margin-top:14px">Wishcard</h2><div class="wishbox" id="wb">${h(o.wish)}${o.sender?`\n\n— ${h(o.sender)}`:''}</div>
+    <div class="bar" style="margin-bottom:0"><button class="btn ghost sm" id="cw">Salin ayat</button><button class="btn ghost sm" id="pw">Cetak kad</button></div></div>
+   <div class="card"><h2>Pembeli</h2>
+    <div class="rowx"><span>Nama</span><span>${h(o.b_name)}</span></div>
+    <div class="rowx"><span>WhatsApp</span><span><a href="${wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}, ini 100 Blooms tentang order ${o.code}.`)}" target="_blank" rel="noopener">${h(o.b_phone)}</a></span></div>
+    ${o.agent_ref?`<div class="rowx"><span>Link agent</span><span>${h(o.agent_ref)}</span></div>`:''}</div>
+   <div class="card"><h2>Harga</h2>${o.price_lines.map(([l,p])=>`<div class="rowx"><span>${h(l)}</span><span>${p?rm(p):'Percuma'}</span></div>`).join('')}
+    <div class="rowx" style="font-weight:700"><span style="color:var(--ink)">Jumlah</span><span>${rm(o.total)}</span></div></div>
+   <div class="card"><h2>Gambar penerima</h2>
+    ${o.recipient_photo?`<div class="thumbs" style="margin-bottom:8px"><a href="${ph(o.recipient_photo,1)}"><img src="${ph(o.recipient_photo)}" alt="Gambar penerima"></a></div>`:'<p class="mini" style="margin-top:0">Belum ada. Runner upload gambar penerima di sini, kemudian hantar kepada pembeli.</p>'}
+    <div class="bar" style="margin:0"><input type="file" id="rpf" accept="image/*" aria-label="Pilih gambar penerima"><button class="btn sm" id="rpu">Upload</button>
+    ${o.recipient_photo?`<a class="btn ghost sm" style="text-decoration:none" href="${wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}! Hadiah untuk ${o.call_name} dah selamat sampai 🌸 Ini gambar penerima. Terima kasih pilih 100 Blooms!`)}" target="_blank" rel="noopener">WhatsApp pembeli</a>`:''}</div></div>
+   <div class="card"><h2>Nota dalaman</h2><textarea id="nn" rows="3" style="width:100%" placeholder="Contoh: perisa kek ditukar, customer minta call dulu">${h(o.notes||'')}</textarea>
+    <button class="btn ghost sm" id="sn" style="margin-top:8px">Simpan nota</button></div>
+  </div></div>`;
+  const close=()=>{$('#layer').innerHTML=''};
+  const done=async(p,msg)=>{try{await p;toast(msg);reload&&reload();openOrder(id,reload)}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}};
+  $('#cx').onclick=close;$('#sc').onclick=e=>{if(e.target.id==='sc')close()};
+  document.addEventListener('keydown',function k(e){if(e.key==='Escape'){close();document.removeEventListener('keydown',k)}});
+  document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>done(api('update',{method:'POST',body:{id,status:b.dataset.s}}),'Status dikemas kini'));
+  if($('#rc'))$('#rc').onclick=async()=>{try{const j=await api('recheck',{method:'POST',body:{id}});toast(j.paid?'Bayaran disahkan':'Masih belum dibayar');if(j.paid){reload&&reload();openOrder(id,reload)}}catch(e){toast(e.message)}};
+  if($('#mp'))$('#mp').onclick=()=>{const r=prompt('Rujukan bayaran (contoh: no. transaksi bank)');if(r!==null)done(api('update',{method:'POST',body:{id,mark_paid:1,pay_ref:r||'manual'}}),'Ditanda dibayar')};
+  if($('#cn'))$('#cn').onclick=()=>{if(confirm('Batalkan order '+o.code+'?'))done(api('update',{method:'POST',body:{id,status:'batal'}}),'Order dibatalkan')};
+  $('#sd').onclick=()=>done(api('update',{method:'POST',body:{id,del_date:$('#nd').value,del_type:$('#nt').value,del_time:$('#ntm').value}}),'Tarikh dikemas kini');
+  $('#sn').onclick=()=>done(api('update',{method:'POST',body:{id,notes:$('#nn').value}}),'Nota disimpan');
+  $('#cw').onclick=()=>{navigator.clipboard.writeText($('#wb').innerText).then(()=>toast('Ayat disalin'),()=>toast('Tak dapat salin'))};
+  $('#pw').onclick=()=>{const w=window.open('','_blank');w.document.write(`<!doctype html><title>Wishcard ${h(o.code)}</title><style>@page{size:A6;margin:12mm}body{font:15pt/1.6 Georgia,serif;color:#3b2732;white-space:pre-wrap;display:flex;align-items:center;min-height:90vh}</style><body>${$('#wb').innerHTML}<script>print()<\/script>`);w.document.close()};
+  $('#rpu').onclick=()=>{const f=$('#rpf').files[0];if(!f)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fd.append('file',f);done(api('rphoto',{method:'POST',body:fd}),'Gambar dimuat naik')};
+}
+
+/* ---------- stock ---------- */
+async function Stock(el){
+  el.innerHTML='<div class="empty">Memuatkan…</div>';
+  const j=await api('products');const G={bq:'Bouquet',cake:'Kek',bal:'Balloon'};
+  el.innerHTML=`<p class="mini">Tutup item yang habis stok. Customer tak nampak item yang ditutup.</p>`+Object.entries(G).map(([t,n])=>`<div class="card"><h2>${n}</h2><div class="grid2">${j.rows.filter(r=>r.type===t).map(r=>`
+    <label class="tog"><span>${h(r.name)}</span><span class="sw"><input type="checkbox" data-t="${t}" data-i="${h(r.item_id)}" ${+r.active?'checked':''} aria-label="${h(r.name)} ada stok"><span></span></span></label>`).join('')}</div></div>`).join('');
+  el.querySelectorAll('input[data-t]').forEach(c=>c.onchange=async()=>{try{await api('product',{method:'POST',body:{type:c.dataset.t,item_id:c.dataset.i,active:c.checked}});toast(c.checked?'Dibuka':'Ditutup')}catch(e){c.checked=!c.checked;toast(e.message)}});
+}
+/* ---------- blocked dates ---------- */
+async function Dates(el){
+  const j=await api('blocked');
+  el.innerHTML=`<div class="card"><h2>Tutup tarikh</h2><p class="mini" style="margin-top:0">Customer tak boleh pilih tarikh yang ditutup (contoh: cuti, slot penuh).</p>
+   <div class="bar"><input type="date" id="bd" min="${TODAY}" aria-label="Tarikh"><input id="br" placeholder="Sebab (tak wajib)" aria-label="Sebab"><button class="btn sm" id="ba">Tutup tarikh</button></div>
+   ${j.rows.length?j.rows.map(r=>`<div class="rowx"><span><b style="color:var(--ink)">${fmtD(r.d)}</b> ${h(r.reason||'')}</span><span><button class="btn ghost sm" data-d="${r.d}">Buka semula</button></span></div>`).join(''):'<p class="mini">Tiada tarikh ditutup.</p>'}</div>`;
+  $('#ba').onclick=async()=>{if(!$('#bd').value)return toast('Pilih tarikh');try{await api('block',{method:'POST',body:{d:$('#bd').value,reason:$('#br').value}});Dates(el)}catch(e){toast(e.message)}};
+  el.querySelectorAll('[data-d]').forEach(b=>b.onclick=async()=>{await api('unblock',{method:'POST',body:{d:b.dataset.d}});Dates(el)});
+}
+/* ---------- accounts ---------- */
+async function Acc(el){
+  let users='';
+  if(ME.role==='owner'){const j=await api('users');users=`<div class="card"><h2>Pengguna admin</h2>${j.rows.map(u=>`<div class="rowx"><span><b style="color:var(--ink)">${h(u.name)}</b> ${h(u.email)} · ${u.role==='owner'?'Owner':'Staff'}</span><span>${u.id!=ME.id?`<button class="btn ghost sm" data-del="${u.id}">Padam</button>`:'Anda'}</span></div>`).join('')}
+    <h2 style="margin-top:16px">Tambah pengguna</h2><div class="bar"><input id="un" placeholder="Nama" aria-label="Nama"><input id="ue" type="email" placeholder="Email" aria-label="Email"><input id="up" type="password" placeholder="Password (min 8)" aria-label="Password">
+    <select id="ur" aria-label="Peranan"><option value="staff">Staff</option><option value="owner">Owner</option></select><button class="btn sm" id="ua">Tambah</button></div>
+    <p class="mini" style="margin:0">Staff boleh urus order, stok dan tarikh. Hanya Owner boleh tanda bayaran manual dan urus pengguna.</p></div>`;}
+  el.innerHTML=users+`<div class="card"><h2>Tukar password saya</h2><div class="bar"><input id="po" type="password" placeholder="Password lama" aria-label="Password lama" autocomplete="current-password"><input id="pn" type="password" placeholder="Password baru (min 8)" aria-label="Password baru" autocomplete="new-password"><button class="btn sm" id="pc">Tukar</button></div></div>`;
+  if($('#ua'))$('#ua').onclick=async()=>{try{await api('adduser',{method:'POST',body:{name:$('#un').value,email:$('#ue').value,pw:$('#up').value,role:$('#ur').value}});toast('Pengguna ditambah');Acc(el)}catch(e){toast(e.message)}};
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(confirm('Padam pengguna ini?')){await api('deluser',{method:'POST',body:{id:+b.dataset.del}});Acc(el)}});
+  $('#pc').onclick=async()=>{try{await api('passwd',{method:'POST',body:{old:$('#po').value,new:$('#pn').value}});toast('Password ditukar');$('#po').value=$('#pn').value=''}catch(e){toast(e.message)}};
+}
+boot();
+</script>
+</body>
+</html>

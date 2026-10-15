@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Combo Jimat RM128: bouquet, kek Secret Recipe, balloon, polaroid dan wishcard, dihantar terus ke pintu penerima.">
+<title>100 Blooms · Combo Jimat RM128</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#fbeef0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one phone-width "app" column; each step is a full screen that slides in. Background tint follows the chosen occasion. */
+:root{
+  --bg:#fbeef0;          /* changes per occasion */
+  --bg2:#f6dbe1;
+  --ink:#3b2732;         /* plum ink */
+  --soft:#7d6370;
+  --card:#ffffff;
+  --line:#ecd6dc;
+  --accent:#d94f74;      /* rose */
+  --accent-ink:#ffffff;
+  --ok:#2f8f63; --warn:#b7791f; --bad:#b6404f;
+  --display:"Fredoka","Baloo 2",ui-rounded,"Segoe UI",system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  transition:background-color .6s ease;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+.app{max-width:440px;margin:0 auto;min-height:100%;position:relative;display:flex;flex-direction:column;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.blob{position:fixed;border-radius:50%;filter:blur(40px);opacity:.55;z-index:0;pointer-events:none;background:var(--bg2);transition:background-color .6s}
+.blob.a{width:260px;height:260px;top:-80px;right:-80px}.blob.b{width:220px;height:220px;bottom:-60px;left:-70px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;align-items:center;gap:12px;padding-block:14px 8px;background:transparent}
+.back{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:18px;cursor:pointer;flex:none}
+.back:disabled{visibility:hidden}
+.prog{flex:1;height:6px;border-radius:9px;background:rgba(59,39,50,.08);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--accent);border-radius:9px;transition:width .4s ease}
+.stepn{font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
+main{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;padding-block:6px 120px}
+.screen{display:flex;flex-direction:column;gap:16px;animation:in .45s cubic-bezier(.2,.8,.2,1)}
+.screen.backward{animation:inb .45s cubic-bezier(.2,.8,.2,1)}
+@keyframes in{from{opacity:.0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes inb{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+h1,h2{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:28px;line-height:1.15}h2{font-size:18px}
+.sub{color:var(--soft);margin:0;font-size:14px}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.footer{position:fixed;left:0;right:0;bottom:0;z-index:6;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));padding-top:14px;
+  background:linear-gradient(to top,var(--bg) 65%,transparent);transition:background .6s}
+.footer .in{max-width:440px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;gap:10px;align-items:center}
+.total{font-size:12px;color:var(--soft);line-height:1.2}.total b{display:block;font-family:var(--display);font-size:20px;color:var(--ink);font-variant-numeric:tabular-nums}
+.btn{flex:1;border:0;border-radius:18px;padding:15px 18px;font:600 16px var(--display);background:var(--accent);color:var(--accent-ink);cursor:pointer;
+  box-shadow:0 8px 20px -10px var(--accent);transition:transform .15s,opacity .2s}
+.btn:active{transform:scale(.97)}.btn:disabled{opacity:.4;box-shadow:none;cursor:default}
+.btn.ghost{background:var(--card);color:var(--ink);box-shadow:none;border:1px solid var(--line)}
+.link{background:none;border:0;color:var(--accent);font:600 14px var(--body);cursor:pointer;padding:6px 0;text-decoration:underline;text-underline-offset:3px}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* splash */
+.splash{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:#fbeef0;transition:opacity .6s}
+.splash.gone{opacity:0;pointer-events:none}
+.logo{text-align:center}
+.logo .mark{width:92px;height:92px;margin:0 auto 14px;animation:bloom 1.2s cubic-bezier(.2,.9,.3,1.4) both}
+.logo .word{font-family:var(--display);font-size:30px;font-weight:600;letter-spacing:-.01em;animation:up .8s .5s both}
+.logo .tag{color:var(--soft);font-size:13px;animation:up .8s .75s both}
+@keyframes bloom{from{transform:scale(.2) rotate(-90deg);opacity:0}to{transform:none;opacity:1}}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* occasion list */
+.occ{display:flex;flex-direction:column;gap:10px}
+.opt{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px 16px;border-radius:20px;border:2px solid transparent;
+  background:var(--card);color:var(--ink);font:500 15px var(--body);cursor:pointer;transition:transform .15s,border-color .2s,box-shadow .2s}
+.opt:active{transform:scale(.98)}
+.opt[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 10px 24px -16px var(--accent)}
+.opt .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none}
+.opt .ic svg{width:26px;height:26px}
+.opt b{font-family:var(--display);font-weight:600;font-size:16px;display:block}
+.opt small{color:var(--soft);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:10px 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:500 14px var(--body);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:600}
+input[type=text],input[type=tel],input[type=date],input[type=time],textarea{width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(--line);
+  background:var(--card);color:var(--ink);font:400 15px var(--body)}
+textarea{min-height:150px;resize:vertical;line-height:1.6}
+.hint{font-size:12px;color:var(--soft)}
+.note{font-size:12px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.6);color:var(--soft)}
+
+/* chat bubble */
+.bubble{background:var(--card);border-radius:22px 22px 22px 6px;padding:18px;box-shadow:0 12px 30px -22px rgba(59,39,50,.5);animation:up .5s both}
+.bubble p{margin:0 0 10px}.bubble p:last-child{margin:0}
+.pickrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.tagp{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--bg);color:var(--ink);font-weight:600}
+.typing{display:inline-flex;gap:4px}.typing i{width:6px;height:6px;border-radius:50%;background:var(--soft);animation:dot 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes dot{0%,100%{opacity:.25}50%{opacity:1}}
+
+/* grid cards */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{position:relative;text-align:left;border-radius:22px;border:2px solid transparent;background:var(--card);padding:10px 10px 12px;cursor:pointer;color:var(--ink);font:inherit;transition:transform .15s,border-color .2s}
+.card:active{transform:scale(.97)}
+.card[aria-pressed="true"]{border-color:var(--accent)}
+.card .art{aspect-ratio:1/1;max-width:100%;border-radius:16px;display:grid;place-items:center;margin-bottom:8px;overflow:hidden}
+.card .art svg{width:82%;height:82%}
+.card b{font-family:var(--display);font-weight:600;font-size:16px;display:block}
+.card small{color:var(--soft);font-size:12px;display:block;line-height:1.35}
+.badge{position:absolute;top:14px;left:14px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--accent);color:#fff;padding:3px 8px;border-radius:99px}
+.price{font-size:12px;font-weight:700;color:var(--accent);margin-top:4px;display:block}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(40,20,30,.35);z-index:30;display:flex;align-items:flex-end;justify-content:center;animation:fade .25s}
+@keyframes fade{from{opacity:0}}
+.sheet{width:100%;max-width:440px;max-height:82%;overflow:auto;background:var(--card);border-radius:26px 26px 0 0;
+  padding:20px max(18px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));animation:sheet .35s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;gap:14px}
+@keyframes sheet{from{transform:translateY(100%)}}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto}
+.stepper{display:flex;align-items:center;gap:14px}
+.stepper button{width:40px;height:40px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);font:600 20px var(--display);color:var(--ink);cursor:pointer}
+.stepper button:disabled{opacity:.35;cursor:default}
+.stepper output{font:600 22px var(--display);min-width:24px;text-align:center;font-variant-numeric:tabular-nums}
+.grouph{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);margin:6px 0 -4px}
+
+/* photo */
+.drop{position:relative;overflow:hidden;border:2px dashed var(--accent);border-radius:24px;padding:26px 18px;text-align:center;background:rgba(255,255,255,.65);cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:center}
+.drop input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:200px;z-index:2;-webkit-appearance:none;appearance:none}
+.polas{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pola{background:#fff;padding:6px 6px 18px;border-radius:4px;box-shadow:0 8px 18px -10px rgba(0,0,0,.35);position:relative;animation:drop .5s cubic-bezier(.2,.9,.3,1.3) both}
+.pola:nth-child(odd){transform:rotate(-3deg)}.pola:nth-child(even){transform:rotate(2.5deg)}
+@keyframes drop{from{opacity:0;transform:translateY(-20px) rotate(-12deg)}}
+.pola img{aspect-ratio:1/1;max-width:100%;width:100%;object-fit:cover;display:block;background:#eee}
+.pola .x{position:absolute;top:-8px;right:-8px;width:24px;height:24px;border-radius:50%;border:0;background:var(--ink);color:#fff;font-size:13px;cursor:pointer}
+.pola .free{position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:10px;color:#7d6370;font-weight:600}
+
+/* envelope */
+.env{position:relative;width:220px;height:150px;margin:88px auto 4px}
+.env .bk{position:absolute;inset:0;border-radius:10px;background:#e9b8c4;visibility:visible;width:auto;height:auto;border:0}
+.env .letter{position:absolute;left:14px;right:14px;top:14px;bottom:10px;background:#fffdf9;border-radius:6px;transition:transform .9s .5s cubic-bezier(.2,.8,.2,1);
+  display:flex;flex-direction:column;gap:6px;padding:16px}
+.env .letter i{height:6px;border-radius:4px;background:#f1dfe3;display:block}
+.env .front{position:absolute;inset:0;border-radius:10px;background:linear-gradient(160deg,transparent 49.5%,#f3cbd5 50%) ,linear-gradient(200deg,transparent 49.5%,#f0c2ce 50%);z-index:2}
+.env .flap{position:absolute;left:0;right:0;top:0;height:90px;background:#dc9bad;clip-path:polygon(0 0,100% 0,50% 100%);transform-origin:top;z-index:3;transition:transform .6s ease}
+.env .seal{position:absolute;left:50%;top:70px;width:30px;height:30px;margin-left:-15px;border-radius:50%;background:var(--accent);z-index:4;transition:opacity .3s}
+.env.open .flap{transform:rotateX(180deg);z-index:1}
+.env.open .seal{opacity:0}
+.env.open .letter{transform:translateY(-70px)}
+.sugg{display:flex;flex-direction:column;gap:10px}
+.sug{text-align:left;padding:14px 16px;border-radius:18px;border:2px solid transparent;background:var(--card);font:400 14px/1.55 var(--body);color:var(--ink);cursor:pointer;white-space:pre-line}
+.sug[aria-pressed="true"]{border-color:var(--accent)}
+.sug em{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:4px}
+
+/* delivery */
+.dopt{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;padding:14px 16px;border-radius:18px;border:2px solid transparent;background:var(--card);cursor:pointer;font:inherit;color:var(--ink)}
+.dopt[aria-pressed="true"]{border-color:var(--accent)}
+.dopt:disabled{opacity:.45;cursor:default}
+.dopt .r{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);flex:none;margin-top:2px}
+.dopt[aria-pressed="true"] .r{border:6px solid var(--accent)}
+.dopt div{flex:1;min-width:0}.dopt b{font-family:var(--display);font-weight:600}
+.dopt .p{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.status{font-size:13px;padding:10px 12px;border-radius:12px;font-weight:500}
+.status.ok{background:#e3f4ea;color:var(--ok)}.status.warn{background:#fbefd9;color:var(--warn)}.status.bad{background:#f8e0e3;color:var(--bad)}
+
+.qdate{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.qd{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:76px;padding:8px 4px;border-radius:16px;border:2px solid transparent;background:var(--card);color:var(--ink);font:inherit;cursor:pointer;text-align:center;transition:transform .15s,border-color .2s}
+.qd:active{transform:scale(.96)}
+.qd small{font-size:11.5px;color:var(--soft);line-height:1.2}
+.qd b{font:600 22px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.qd[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.qd[aria-pressed="true"] small{color:var(--accent-ink);opacity:.9}
+.qd.cal{color:var(--accent);border:2px dashed var(--line)}
+.qd.cal svg{width:24px;height:24px;margin-bottom:3px}
+.qd.cal[aria-pressed="true"]{border-style:solid;color:var(--accent-ink)}
+.qd.cal input{position:absolute;inset:0;width:100%;height:100%;min-height:100%;opacity:0;cursor:pointer;padding:0;margin:0;border:0;border-radius:inherit;font-size:16px;color:transparent;background:transparent;z-index:2;display:block;-webkit-appearance:none;appearance:none}
+.qd.cal input::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:auto;height:auto;margin:0;padding:0;opacity:0;cursor:pointer;background:transparent}
+.qd.cal input::-webkit-date-and-time-value{min-height:100%}
+/* summary */
+.sum{background:var(--card);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+.row span:first-child{color:var(--soft);min-width:0}
+.row span:last-child{text-align:right;font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere}
+.row.tot{border-top:1.5px dashed var(--line);padding-top:10px;font-weight:700;font-size:16px}
+.row.tot span{color:var(--ink)}
+.edit{font-size:12px}
+.qr{width:200px;height:200px;margin:0 auto;background:#fff;border-radius:16px;padding:12px;display:grid}
+.qr canvas{width:100%;height:100%;image-rendering:pixelated}
+.done{text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;padding-top:30px}
+.done .tick{width:84px;height:84px;border-radius:50%;background:var(--accent);display:grid;place-items:center;animation:bloom .8s both}
+.proto{font-size:11px;text-align:center;color:var(--soft);margin-top:4px}
+/* path preview (non-interactive) */
+.path{display:flex;align-items:flex-start;justify-content:space-between;position:relative;padding:4px 2px 0}
+.path::before{content:"";position:absolute;left:22px;right:22px;top:21px;border-top:2px dashed var(--bg2)}
+.path span{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11.5px;color:var(--soft);width:20%;text-align:center}
+.path i{width:36px;height:36px;border-radius:50%;background:var(--bg);border:2px solid var(--bg2);display:grid;place-items:center;font:700 13px var(--display);color:var(--accent);font-style:normal}
+.path span:first-child i{background:var(--accent);border-color:var(--accent);color:#fff}
+.path span:first-child{color:var(--ink);font-weight:600}
+.btn.nudge{animation:nudge 1.6s ease-in-out infinite}
+.footer .in{position:relative}
+.arrow{position:absolute;left:50%;top:-34px;margin-left:-14px;width:28px;height:28px;color:var(--accent);animation:bob 1.1s ease-in-out infinite;pointer-events:none}
+@keyframes bob{0%,100%{transform:translateY(0);opacity:.6}50%{transform:translateY(8px);opacity:1}}
+@keyframes nudge{0%,100%{transform:scale(1);box-shadow:0 8px 20px -10px var(--accent)}50%{transform:scale(1.04);box-shadow:0 0 0 8px color-mix(in srgb,var(--accent) 22%,transparent)}}
+.cdel{margin-top:4px;padding:4px 10px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);color:var(--bad);font:600 12px var(--body);cursor:pointer}
+.cartbtn{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:8px 12px;text-align:left;cursor:pointer;font-family:var(--body);flex:none}
+.cartbtn .cv{color:var(--accent);font-weight:700;font-size:11px;margin-left:4px}
+/* bouquet photos + detail sheet */
+.card .art.photo{aspect-ratio:4/5}
+.card .art img{width:100%;height:100%;object-fit:contain;padding:4px}
+.card .peek{position:absolute;top:14px;right:14px;font-size:10.5px;font-weight:700;background:rgba(255,255,255,.92);color:var(--ink);padding:3px 8px;border-radius:99px}
+.sheet>*{flex-shrink:0}
+.gal{display:flex;flex:none;gap:10px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;margin:0 -2px;padding-bottom:4px;scrollbar-width:none}
+.gal::-webkit-scrollbar{display:none}
+.gal figure{flex:0 0 78%;margin:0;scroll-snap-align:center;border-radius:20px;overflow:hidden;background:var(--bg);position:relative}
+.gal img{display:block;width:100%;aspect-ratio:4/5;max-width:100%;object-fit:cover}
+.gal figure.prod img{object-fit:contain;background:#fff;padding:10px}
+.gal figcaption{position:absolute;left:10px;bottom:10px;font-size:11px;font-weight:700;background:rgba(255,255,255,.92);color:var(--ink);padding:4px 10px;border-radius:99px}
+.dots{display:flex;gap:6px;justify-content:center}.dots i{width:6px;height:6px;border-radius:50%;background:var(--line)}.dots i.on{background:var(--accent);width:16px;border-radius:4px}
+.trust{display:flex;flex-direction:column;gap:8px;background:var(--bg);border-radius:18px;padding:14px}
+.trust div{display:flex;gap:10px;font-size:13px;align-items:flex-start}
+.trust svg{flex:none;width:18px;height:18px;margin-top:1px}
+.wa{font-size:12.5px;color:var(--soft);text-align:center}
+.wa a{color:var(--accent);font-weight:600}
+/* intro */
+.hero{background:var(--card);border-radius:28px;padding:22px 20px;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden}
+.hero .pr{font-family:var(--display);font-weight:700;font-size:54px;line-height:1;color:var(--accent);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.hero .pr small{font-size:18px;font-weight:600;vertical-align:top;margin-right:2px}
+.hero .flr{position:absolute;right:-18px;top:-18px;width:120px;height:120px;opacity:.9;animation:bloom 1.2s .3s both}
+.items{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.items li{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:16px;padding:10px 12px;animation:up .5s both}
+.items li:nth-child(2){animation-delay:.08s}.items li:nth-child(3){animation-delay:.16s}.items li:nth-child(4){animation-delay:.24s}.items li:nth-child(5){animation-delay:.32s}
+.items .n{width:30px;height:30px;border-radius:10px;background:var(--bg2);color:var(--accent);font:700 14px var(--display);display:grid;place-items:center;flex:none}
+.items b{font-family:var(--display);font-weight:600;display:block;font-size:15px}
+.items small{color:var(--soft);font-size:12.5px}
+.perks{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.perk{background:rgba(255,255,255,.7);border-radius:16px;padding:12px;font-size:12.5px;color:var(--soft)}
+.perk b{display:block;color:var(--ink);font-family:var(--display);font-weight:600;font-size:14px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.rate{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;margin-top:6px;padding:6px 12px;border-radius:99px;background:var(--bg);font-size:13px;color:var(--soft)}.rate .st{color:#f2a900;letter-spacing:1px}.rate b{color:var(--ink);font-family:var(--display)}
+.testi h3{font-size:16px;margin:4px 0 8px;display:flex;justify-content:space-between;align-items:baseline}.testi h3 span{font-size:12px;font-weight:600;color:#b07a2a}
+.trow{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;margin:0 -2px 6px}.trow img{flex:none;height:260px;width:auto;border-radius:14px;scroll-snap-align:start;box-shadow:0 2px 10px rgba(0,0,0,.08);cursor:zoom-in}
+.zoom{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px}.zoom img{max-width:100%;max-height:100%;border-radius:12px}
+</style>
+
+</head>
+<body>
+<div class="splash" id="splash" role="img" aria-label="100 Blooms">
+  <div class="logo">
+    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+      <g fill="#d94f74">
+        <ellipse cx="50" cy="26" rx="14" ry="22"/><ellipse cx="50" cy="74" rx="14" ry="22"/>
+        <ellipse cx="26" cy="50" rx="22" ry="14"/><ellipse cx="74" cy="50" rx="22" ry="14"/>
+      </g>
+      <g fill="#f19bb2" transform="rotate(45 50 50)">
+        <ellipse cx="50" cy="28" rx="11" ry="18"/><ellipse cx="50" cy="72" rx="11" ry="18"/>
+        <ellipse cx="28" cy="50" rx="18" ry="11"/><ellipse cx="72" cy="50" rx="18" ry="11"/>
+      </g>
+      <circle cx="50" cy="50" r="12" fill="#ffd36e"/>
+    </svg>
+    <div class="word">100 Blooms</div>
+    <div class="tag">Hadiah lengkap, terus ke pintu dia</div>
+  </div>
+</div>
+
+<div class="blob a"></div><div class="blob b"></div>
+<div class="app">
+  <header class="top">
+    <button class="back" id="back" aria-label="Kembali">‹</button>
+    <div class="prog" aria-hidden="true"><i id="bar"></i></div>
+    <div class="stepn" id="stepn"></div>
+  </header>
+  <main id="main"></main>
+</div>
+<div class="footer"><div class="in" id="foot"></div></div>
+<div id="layer"></div>
+
+<script src="assets/img.js"></script>
+<script>
+/* ---------- DATA ---------- */
+const BASE=128;
+const OCC=[
+ {id:'birthday',t:'Birthday',d:'Hari jadi yang dia tak sangka',bg:'#fdeedd',bg2:'#f9d3a8',ac:'#e0702f',ic:'cake'},
+ {id:'anniv',t:'Anniversary',d:'Raikan tarikh istimewa berdua',bg:'#fbe7ec',bg2:'#f3b8c7',ac:'#c9305a',ic:'heart'},
+ {id:'pujuk',t:'Pujuk orang merajuk',d:'Bila "sorry" saja tak cukup',bg:'#ece9fb',bg2:'#c9c1f2',ac:'#6a55c9',ic:'cloud'},
+ {id:'convo',t:'Konvokesyen',d:'Tahniah, akhirnya grad!',bg:'#e6f0fb',bg2:'#b9d3f3',ac:'#2f6fc1',ic:'cap'},
+ {id:'rindu',t:'Rindu',d:'Jauh di mata, dekat di hati',bg:'#e8f5f1',bg2:'#b6e2d3',ac:'#2b8a6e',ic:'moon'},
+ {id:'thanks',t:'Terima kasih',d:'Hargai orang yang banyak membantu',bg:'#f3f4e3',bg2:'#dde2a9',ac:'#7a8a1f',ic:'star'},
+ {id:'sembuh',t:'Cepat sembuh',d:'Ceriakan hari dia yang tak sihat',bg:'#e7f4f8',bg2:'#b3dde9',ac:'#2489a6',ic:'sun'},
+ {id:'baby',t:'Kelahiran bayi',d:'Sambut ahli keluarga yang baru lahir',bg:'#eef3fd',bg2:'#cdd9f6',ac:'#4f6fd1',ic:'baby'},
+ {id:'saja',t:'Saja-saja',d:'Tak perlu sebab untuk buat dia senyum',bg:'#fdf3e6',bg2:'#f8d9b5',ac:'#c46a2b',ic:'spark'}
+];
+const ICON={
+ cake:'<path d="M5 20h14v-7H5zM5 13c2 2 3-1 5 0s3 2 4 0 3-2 5 0M12 4v4M10.5 5.5 12 4l1.5 1.5"/>',
+ heart:'<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+ cloud:'<path d="M7 17h10a4 4 0 0 0 0-8 5 5 0 0 0-9.6-1A4 4 0 0 0 7 17zM9 20l-1 2M13 20l-1 2"/>',
+ cap:'<path d="m2 9 10-5 10 5-10 5zM6 11v5c3 2 9 2 12 0v-5M22 9v6"/>',
+ moon:'<path d="M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z"/>',
+ star:'<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+ baby:'<circle cx="12" cy="13" r="7"/><path d="M9.5 12h.01M14.5 12h.01M10 15.5c1.2.8 2.8.8 4 0M12 6c-1-2 1-3 2-2"/>',
+ spark:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/>'
+};
+// relationships: g = implied gender (null = ask)
+const REL=[
+ {id:'isteri',t:'Isteri',g:'p'},{id:'suami',t:'Suami',g:'l'},{id:'tunang',t:'Tunang',g:null},{id:'kekasih',t:'Kekasih',g:null},
+ {id:'ibu',t:'Ibu',g:'p'},{id:'ayah',t:'Ayah',g:'l'},{id:'adik',t:'Adik / Kakak / Abang',g:null},{id:'makcik',t:'Mak saudara / Pak saudara',g:null},
+ {id:'cikgu',t:'Cikgu / Pensyarah',g:null},{id:'kawan',t:'Kawan baik',g:null},{id:'kerja',t:'Rakan sekerja / Bos',g:null},{id:'kenal',t:'Baru nak berkenalan',g:null}
+];
+const CALL={
+ isteri:['Sayang','Cinta','Honey','Awak','Isteriku'], suami:['Abang','Sayang','Hubby','Awak','Cinta'],
+ tunang:['Sayang','Awak','Cinta','Bakal isteri','Bakal suami'], kekasih:['Sayang','Awak','Baby','Cinta'],
+ ibu:['Mak','Mama','Ummi','Mummy','Ibu'], ayah:['Abah','Ayah','Papa','Daddy','Walid'],
+ adik:['Adik','Kakak','Abang','Along','Angah'], makcik:['Mak Long','Mak Ngah','Mak Su','Pak Long','Pak Su'],
+ cikgu:['Cikgu','Puan','Cik','Encik','Sir','Teacher'], kawan:['Bestie','Awak','Geng','Bro','Babe'],
+ kerja:['Boss','Puan','Encik','Kak','Abang'], kenal:['Awak','Cik','Encik','Kamu']
+};
+// bouquets: tags give fit score per occasion / relationship
+const BQ=[
+ {id:'glam',t:'Glam',d:'3 rose + 5 Ferrero Rocher',fl:'#c4314b',wr:'#5b1a2b',rb:'#fff',kind:'rose',choc:true,occ:['anniv','birthday','pujuk','rindu'],rel:['isteri','kekasih','tunang']},
+ {id:'rossa',t:'Rossa',d:'5 rose merah',fl:'#d0263f',wr:'#ffffff',rb:'#c4314b',kind:'rose',occ:['anniv','pujuk','rindu','birthday'],rel:['isteri','kekasih','tunang','ibu']},
+ {id:'jessie',t:'Jessie',d:'5 gerbera pink',fl:'#f06aa0',wr:'#e7c8e6',rb:'#8a59b5',kind:'gerbera',occ:['baby','birthday','thanks','sembuh','saja'],rel:['ibu','kawan','adik','cikgu','makcik']},
+ {id:'sunny',t:'Sunny',d:'3 sunflower + baby’s breath',fl:'#f4b62c',wr:'#a9b89a',rb:'#f4b62c',kind:'sun',occ:['baby','convo','sembuh','thanks','saja','birthday'],rel:['kawan','cikgu','kerja','ayah','adik']},
+ {id:'sugar',t:'Sugar',d:'Baby’s breath biru',fl:'#9cc3ea',wr:'#3c6fae',rb:'#d6b25e',kind:'baby',occ:['baby','rindu','saja','thanks','convo'],rel:['kenal','kawan','cikgu','ibu']},
+ {id:'walter',t:'Walter',d:'5 Ferrero Rocher + foil balloon 10"',fl:'#a8742f',wr:'#2a2420',rb:'#e6cfa3',kind:'choc',choc:true,occ:['birthday','convo','thanks'],rel:['suami','ayah','kerja','kawan','adik']},
+ {id:'kiddo',t:'Kiddo',d:'Hershey’s, KitKat, Dairy Milk, Ferrero',fl:'#c0392b',wr:'#f2c230',rb:'#222',kind:'choc',choc:true,occ:['birthday','saja','sembuh'],rel:['adik','kawan']},
+ {id:'romeo',t:'Romeo',d:'8 Ferrero Rocher',fl:'#a8742f',wr:'#1f1a17',rb:'#d6b25e',kind:'choc',choc:true,occ:['pujuk','anniv','convo','birthday'],rel:['suami','kekasih','tunang','kerja']}
+];
+// balloons: occ = momen yang sesuai, rel = hanya dicadang untuk hubungan ini, grp = kumpulan dalam senarai penuh
+const BALLOON=[
+ {id:'hb-pink',t:'Happy Birthday Pink',occ:['birthday'],g:'p',grp:'Birthday'},
+ {id:'hb-blue',t:'Happy Birthday Biru',occ:['birthday'],g:'l',grp:'Birthday'},
+ {id:'hb-floral',t:'Happy Birthday Floral',occ:['birthday'],g:'p',grp:'Birthday'},
+ {id:'hb-retro',t:'Happy Birthday To You',occ:['birthday'],grp:'Birthday'},
+ {id:'hb-jungle',t:'Happy Birthday Jungle',occ:['birthday'],rel:['adik','kawan'],grp:'Birthday'},
+ {id:'anniv',t:'Happy Anniversary',occ:['anniv'],grp:'Love'},
+ {id:'ily-red',t:'I Love You Merah',occ:['anniv','pujuk','rindu'],grp:'Love'},
+ {id:'ily-rw',t:'I Love You Putih-Merah',occ:['anniv','pujuk','rindu'],grp:'Love'},
+ {id:'roses',t:'Heart Roses',occ:['thanks','anniv','rindu','pujuk','saja'],grp:'Love'},
+ {id:'ly-gold',t:'Love You Gold',occ:['rindu','saja','sembuh','anniv','thanks'],grp:'Love'},
+ {id:'candy',t:'Sweet Heart',occ:['saja','pujuk','sembuh','rindu'],grp:'Love'},
+ {id:'sorry-dots',t:"I'm Sorry Polka Dot",occ:['pujuk'],grp:'Pujuk & maaf'},
+ {id:'sorry-stripe',t:"I'm Sorry Pelangi",occ:['pujuk'],grp:'Pujuk & maaf'},
+ {id:'gws-sun',t:'Get Well Soon Matahari',occ:['sembuh'],grp:'Cepat sembuh'},
+ {id:'gws-wishes',t:'Get Well Soon Wishes',occ:['sembuh'],grp:'Cepat sembuh'},
+ {id:'gws-plaster',t:'Get Well Soon Plaster',occ:['sembuh'],grp:'Cepat sembuh'},
+ {id:'grad-gold',t:'Congrats Grad Gold',occ:['convo'],grp:'Konvokesyen'},
+ {id:'grad-black',t:'Congrats Graduate',occ:['convo'],grp:'Konvokesyen'},
+ {id:'grad-white',t:'Congrats Grad Putih',occ:['convo'],grp:'Konvokesyen'},
+ {id:'grad-pink',t:'Congrats Grad Pink',occ:['convo'],g:'p',grp:'Konvokesyen'},
+ {id:'grad-key',t:'Congrats Grad Key',occ:['convo'],grp:'Konvokesyen'},
+ {id:'mom',t:'Love You Mom',occ:['birthday','thanks','sembuh','rindu','saja'],rel:['ibu'],grp:'Keluarga'},
+ {id:'dad',t:'Best Dad Ever',occ:['birthday','thanks','sembuh','rindu','saja'],rel:['ayah'],grp:'Keluarga'},
+ {id:'baby-boy',t:'New Baby Boy',occ:['baby'],grp:'Kelahiran bayi'},
+ {id:'baby-girl',t:'New Baby Girl',occ:['baby'],grp:'Kelahiran bayi'}
+];
+const BAL_GRP=['Birthday','Love','Pujuk & maaf','Cepat sembuh','Konvokesyen','Keluarga','Kelahiran bayi'];
+const CAKE_FREE=['Chocolate Chip Walnut','Chocolate Moist','Carrot Cake','Chocolate Fudge'];
+const CAKE_UP=['Chocolate Indulgence','Red Velvet','Pilihan lain (ikut stok)'];
+const OTHER='Pilihan lain (ikut stok)';
+const otherFl=()=>(S.otherFl||[]).map(x=>(x||'').trim()).filter(Boolean);
+const cakeName=()=>S.cake===OTHER?('Perisa pilihan: '+(otherFl().join(' / ')||'-')):S.cake;
+const WISH={
+ birthday:['Selamat hari jadi, {p}! Terima kasih sebab wujud dalam hidup saya. Semoga tahun ni lebih banyak senyum daripada penat.',
+  'Happy birthday {p}! Umur bertambah, tapi bagi saya {p} tetap orang yang sama yang saya sayang. Semoga dimurahkan rezeki dan dipanjangkan umur.',
+  '{p}, hari ni hari {p}. Rehat sekejap, makan kek, dan ingat ada orang yang sentiasa doakan {p} bahagia.'],
+ anniv:['{p}, satu lagi tahun kita lalui sama-sama. Terima kasih sebab sabar, setia dan tetap pilih saya.',
+  'Happy anniversary {p}. Banyak benda berubah, tapi rasa sayang ni makin bertambah. Jom cipta lebih banyak kenangan.',
+  'Kalau boleh ulang semula, saya tetap akan pilih {p}. Selamat ulang tahun, sayang saya.'],
+ pujuk:['{p}, saya tahu saya salah. Saya tak pandai cakap, jadi biar bunga ni tolong sampaikan: saya minta maaf.',
+  'Maaf ya {p}. Senyum sikit? Saya rindu nak tengok {p} gelak macam selalu.',
+  '{p}, merajuk pun tetap comel. Tapi saya lagi suka {p} yang senyum. Maafkan saya ya?'],
+ convo:['Tahniah {p}! Semua malam berjaga dan penat lelah akhirnya berbaloi. Saya bangga dengan {p}.',
+  'Congrats {p}! Hari ni {p} pakai jubah, esok {p} kejar impian. Teruskan melangkah.',
+  'Tahniah atas kejayaan ni, {p}. Ini baru permulaan, dan saya akan sentiasa sokong {p}.'],
+ rindu:['{p}, jauh ni bukan alasan untuk lupa. Saya rindu {p} setiap hari.',
+  'Kalau tak boleh peluk, biar hadiah ni yang sampai dulu. Rindu {p} sangat-sangat.',
+  '{p}, jaga diri ya. Tunggu masa kita jumpa nanti. Rindu.'],
+ thanks:['Terima kasih {p} atas semua tunjuk ajar dan kebaikan. Jasa {p} saya takkan lupa.',
+  '{p}, terima kasih sebab selalu ada bila saya perlukan. Hadiah kecil ni tanda penghargaan saya.',
+  'Sedikit tanda terima kasih untuk {p}. Semoga {p} sentiasa dirahmati dan dimudahkan urusan.'],
+ sembuh:['{p}, cepat sembuh ya. Rehat cukup-cukup, nanti kita jumpa dan gelak sama-sama lagi.',
+  'Get well soon {p}! Semoga bunga ni ceriakan bilik dan hati {p} sementara {p} berehat.',
+  'Doa saya untuk {p}: cepat pulih, cepat kuat dan kembali senyum macam biasa.'],
+ baby:['Tahniah {p} atas kelahiran cahaya mata! Semoga si kecil membesar sihat, ceria dan menjadi penyejuk mata.',
+  'Selamat datang ke dunia, si comel! {p}, semoga dipermudahkan urusan dan sentiasa sihat berdua.',
+  '{p}, tahniah jadi ibu bapa baru. Penat tu pasti terbayar setiap kali tengok dia senyum.'],
+ saja:['Tak ada sebab pun. Saja nak bagitahu {p}, saya hargai {p}.',
+  '{p}, hari ni saya teringat {p}. Jadi saya hantar sedikit senyuman.',
+  'Untuk {p}: terima kasih sebab jadi sebahagian hidup saya. Itu saja.']
+};
+// coverage: example postcode ranges (KL, Selangor, Putrajaya). To be replaced with the real list.
+// Zon ikut peta owner (Okt 2026). free = bulatan biru, plus20 = bulatan merah (Rawang/Kuang/Selayang/Sg Buloh). Lain = tak cover.
+// Semakan ikut poskod (sama dengan api/_lib.php zone_of). Fasa seterusnya: lat/lng + poligon zon.
+const ZONE_FREE=[[50000,60000],[62000,62988],[63000,63300],[64000,64300],[68000,68099],[40000,41999],[42000,42199],[42300,42399],[42500,42799],[43000,43949],[46000,46999],[47100,47999],[71800,71809]];
+const ZONE_20=[[47000,47099],[48000,48099],[68100,68199]];
+const inR=(pc,R)=>R.some(([a,b])=>pc>=a&&pc<=b);
+const zoneOf=p=>{if(!p||p.length<5)return null;const pc=+p;return inR(pc,ZONE_FREE)?'free':inR(pc,ZONE_20)?'plus20':'out'};
+const zoneFee=()=>zoneOf(S.rpost)==='plus20'?20:0;
+
+/* ---------- STATE ---------- */
+const blank=()=>({step:0,occ:null,rel:null,gender:null,call:'',callCustom:'',bq:null,bal:null,cake:null,extraCake:0,extraCakes:{},photos:[],
+  otherFl:[],wishPick:null,wish:'',rname:'',rphone:'',raddr:'',rpost:'',date:'',del:'free',time:'',bname:'',bphone:'',sender:''});
+let S=blank(), dir=1;
+/* server state: Malaysia time, closed dates, out-of-stock items (api/catalog.php) */
+let CAT={now:null,t0:Date.now(),blocked:[],off:{bq:[],bal:[],cake:[]}};
+const myNow=()=>CAT.now?new Date(new Date(CAT.now).getTime()+(Date.now()-CAT.t0)):new Date();
+const isOff=(t,id)=>(CAT.off[t]||[]).includes(id);
+const isBlocked=d=>CAT.blocked.includes(d);
+try{const r=new URLSearchParams(location.search).get('ref');if(r&&/^[A-Za-z0-9]{1,20}$/.test(r))localStorage.setItem('hb_ref',r);}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('hb_state')||'null'); if(s){S=Object.assign(blank(),s,{photos:[]});}}catch(e){}
+if(S.extraCake&&!Object.keys(S.extraCakes||{}).length){S.extraCakes={'Pilihan lain (ikut stok)':S.extraCake};}
+const save=()=>{try{const c=Object.assign({},S,{photos:[]});localStorage.setItem('hb_state',JSON.stringify(c))}catch(e){}};
+
+const $=s=>document.querySelector(s);
+const h=(s)=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const occ=()=>OCC.find(o=>o.id===S.occ);
+const rel=()=>REL.find(r=>r.id===S.rel);
+const callName=()=>S.call==='__custom'?S.callCustom.trim():S.call;
+const isUp=()=>CAKE_UP.includes(S.cake);
+const ALL_CAKES=()=>[...CAKE_FREE,...CAKE_UP].filter(c=>!isOff('cake',c));
+function extraList(){const e=S.extraCakes||{};return ALL_CAKES().filter(c=>e[c]>0).map(c=>c+' × '+e[c]).join(', ')}
+function extraTxt(){if(!S.extraCake)return'';const l=extraList();return ` + ${S.extraCake} tambahan`+(l?` (${l})`:'')}
+function delFee(){return S.del==='free'?0:S.del==='spec'?50:10}
+function lines(){
+  const L=[['Combo Jimat (bouquet '+(BQ.find(b=>b.id===S.bq)||{t:'-'}).t+')',BASE]];
+  if(isUp())L.push(['Upgrade kek: '+cakeName(),10]);
+  if(S.extraCake)L.push(['Kek tambahan × '+S.extraCake+(extraList()?' ('+extraList()+')':''),S.extraCake*20,'cake']);
+  if(S.photos.length>1)L.push(['Polaroid tambahan × '+(S.photos.length-1),(S.photos.length-1)*10,'pola']);
+  const dl={free:'Penghantaran percuma (10am–6pm)',A:'Slot A (9am–12pm)',B:'Slot B (1pm–4pm)',C:'Slot C (5pm–8pm)',spec:'Masa khusus '+(S.time||'')}[S.del];
+  L.push([dl,delFee()]);if(zoneFee())L.push(['Caj kawasan (Rawang / Kuang / Selayang / Sg Buloh)',zoneFee()]);return L;
+}
+const total=()=>lines().reduce((a,b)=>a+b[1],0);
+const rm=n=>'RM'+n;
+
+function setTheme(){
+  const o=occ(),r=document.documentElement.style;
+  r.setProperty('--bg',o?o.bg:'#fbeef0');r.setProperty('--bg2',o?o.bg2:'#f6dbe1');r.setProperty('--accent',o?o.ac:'#d94f74');
+}
+
+/* ---------- SCREENS ---------- */
+const STEPS=['intro','occ','who','call','hello','bq','bal','cake','photo','wish','recv','del','sum','pay','done'];
+const COUNTED=13;
+
+function render(){
+  setTheme();
+  // a saved selection may have gone out of stock since: send the customer back to choose again
+  if(S.step<STEPS.indexOf('pay'))for(const [k,ok] of [['bq',()=>S.bq&&!isOff('bq',S.bq)],['bal',()=>S.bal&&!isOff('bal',S.bal)],['cake',()=>S.cake&&!isOff('cake',S.cake)]])
+    if(S.step>STEPS.indexOf(k)&&!ok()){S.step=STEPS.indexOf(k);break;}
+  const k=STEPS[S.step];
+  $('#back').disabled=S.step===0||k==='done';
+  const pct=Math.min(S.step,COUNTED)/COUNTED*100;
+  $('#bar').style.width=pct+'%';
+  $('#stepn').textContent=k==='done'?'':(Math.min(S.step+1,COUNTED+1))+'/'+(COUNTED+1);
+  const m=$('#main');m.innerHTML='';
+  const sc=document.createElement('section');sc.className='screen'+(dir<0?' backward':'');
+  m.appendChild(sc);
+  SCR[k](sc);
+  window.scrollTo({top:0});
+  save();
+}
+function foot(label,ok,onClick,showTotal=true){
+  const f=$('#foot');
+  f.innerHTML=(showTotal?`<button class="total cartbtn" id="cartb" aria-label="Lihat isi cart">Jumlah <span class="cv">▴ Lihat</span><b>${rm(total())}</b></button>`:'')+`<button class="btn" id="next" ${ok?'':'disabled'}>${label}</button>`;
+  $('#next').onclick=onClick||next;
+  const cb=$('#cartb');if(cb)cb.onclick=showCart;
+}
+function next(){dir=1;S.step++;render()}
+function back(){if(S.step>0){dir=-1;S.step--;render()}}
+$('#back').onclick=back;
+
+const SCR={
+ intro(el){
+  $('#stepn').textContent='';$('#bar').style.width='0';
+  el.innerHTML=`<div class="hero">
+    <svg class="flr" viewBox="0 0 100 100" aria-hidden="true"><g fill="var(--accent)" opacity=".85"><ellipse cx="50" cy="26" rx="14" ry="22"/><ellipse cx="50" cy="74" rx="14" ry="22"/><ellipse cx="26" cy="50" rx="22" ry="14"/><ellipse cx="74" cy="50" rx="22" ry="14"/></g><circle cx="50" cy="50" r="12" fill="#ffd36e"/></svg>
+    <div class="eyebrow">Combo Jimat</div>
+    <div class="pr"><small>RM</small>128</div>
+    <h1 style="font-size:24px">Satu set hadiah lengkap, terus ke pintu dia.</h1>
+    <p class="sub">Tak perlu pening fikir nak bagi apa. Pilih bouquet, kami siapkan semuanya dan hantar pada orang tersayang.</p>
+    <div class="rate"><span class="st">★★★★★</span><b>5.0</b><span>· 680+ ulasan Google</span></div></div>
+   <h2>Dalam setiap set, ada 5 item</h2>
+   <ul class="items">
+    <li><span class="n">1</span><span><b>Bouquet pilihan awak</b><small>8 design: bunga segar atau bouquet coklat</small></span></li>
+    <li><span class="n">2</span><span><b>Sepotong kek Secret Recipe</b><small>4 perisa termasuk dalam harga</small></span></li>
+    <li><span class="n">3</span><span><b>Balloon</b><small>Ikut momen: birthday, anniversary, tahniah dan lain-lain</small></span></li>
+    <li><span class="n">4</span><span><b>Foto polaroid</b><small>Upload gambar kenangan korang</small></span></li>
+    <li><span class="n">5</span><span><b>Wishcard</b><small>Kami bantu karang ayat, awak boleh edit</small></span></li>
+   </ul>
+   <div class="perks">
+    <div class="perk"><b>Penghantaran PERCUMA</b>10 pagi – 6 petang, sekitar KL, Putrajaya &amp; Lembah Klang</div>
+    <div class="perk"><b>Gambar penerima</b>Runner ambil gambar reaksi dia untuk awak simpan</div>
+   </div>`;
+  foot('Mula pilih hadiah',true,next,false);
+ },
+ occ(el){
+  el.innerHTML=`<div class="eyebrow">Mula di sini</div>
+   <h1>Hadiah ni untuk apa ya?</h1>
+   <p class="sub">Pilih satu. Kami susun hadiah, ayat kad dan balloon ikut momen awak.</p>
+   <div class="occ">${OCC.map(o=>`<button class="opt" data-id="${o.id}" aria-pressed="${S.occ===o.id}">
+     <span class="ic" style="background:${o.bg2}"><svg viewBox="0 0 24 24" fill="none" stroke="${o.ac}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICON[o.ic]}</svg></span>
+     <span><b>${o.t}</b><small>${o.d}</small></span></button>`).join('')}</div>`;
+  el.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+    if(S.occ!==b.dataset.id){S.bal=null;S.wishPick=null;}
+    S.occ=b.dataset.id;el.querySelectorAll('.opt').forEach(x=>x.setAttribute('aria-pressed',x===b));setTheme();foot('Pilih ini',true,next,false);save();});
+  foot('Pilih ini',!!S.occ,next,false);
+ },
+ who(el){
+  const draw=()=>{
+   const r=rel();
+   el.innerHTML=`<div class="eyebrow">${h(occ().t)}</div><h1>Untuk siapa hadiah ni?</h1>
+    <p class="sub">Kami guna jawapan ni untuk sesuaikan ayat wishcard dan tema hadiah.</p>
+    <div class="chips">${REL.map(x=>`<button class="chip" data-id="${x.id}" aria-pressed="${S.rel===x.id}">${x.t}</button>`).join('')}</div>
+    ${r&&!r.g?`<div class="field" style="margin-top:6px"><label>Penerima ni lelaki atau perempuan?</label>
+      <div class="chips"><button class="chip" data-g="l" aria-pressed="${S.gender==='l'}">Lelaki</button><button class="chip" data-g="p" aria-pressed="${S.gender==='p'}">Perempuan</button></div>
+      <span class="hint">Supaya cadangan bouquet dan panggilan lebih kena.</span></div>`:''}`;
+   el.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{S.rel=b.dataset.id;S.call='';const rr=rel();S.gender=rr.g||null;draw();});
+   el.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{S.gender=b.dataset.g;draw();});
+   foot('Seterusnya',!!(S.rel&&S.gender),next,false);save();
+  };draw();
+ },
+ call(el){
+  let list=CALL[S.rel]||['Awak'];
+  if(S.rel==='tunang'||S.rel==='kekasih') list=list.filter(c=>!(S.gender==='l'&&c==='Bakal isteri')&&!(S.gender==='p'&&c==='Bakal suami'));
+  if(S.rel==='adik') list=S.gender==='l'?['Adik','Abang','Along','Angah','Bro']:['Adik','Kakak','Along','Angah','Sis'];
+  if(S.rel==='makcik') list=S.gender==='l'?['Pak Long','Pak Ngah','Pak Su','Pak Cik']:['Mak Long','Mak Ngah','Mak Su','Mak Cik'];
+  if(S.rel==='cikgu') list=S.gender==='l'?['Cikgu','Encik','Sir','Dr.']:['Cikgu','Puan','Cik','Teacher','Dr.'];
+  if(S.rel==='kerja') list=S.gender==='l'?['Boss','Encik','Abang','Tuan']:['Boss','Puan','Kak','Cik'];
+  const draw=()=>{
+   el.innerHTML=`<div class="eyebrow">${h(rel().t)}</div><h1>Awak panggil dia apa?</h1>
+    <p class="sub">Panggilan ni akan masuk dalam ayat kad ucapan.</p>
+    <div class="chips">${list.map(c=>`<button class="chip" data-c="${h(c)}" aria-pressed="${S.call===c}">${h(c)}</button>`).join('')}
+     <button class="chip" data-c="__custom" aria-pressed="${S.call==='__custom'}">Lain-lain…</button></div>
+    ${S.call==='__custom'?`<div class="field"><label for="cc">Tulis panggilan awak sendiri</label><input id="cc" type="text" maxlength="24" placeholder="Contoh: Ayang, Mok, Tok Wan" value="${h(S.callCustom)}"></div>`:''}`;
+   el.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{S.call=b.dataset.c;S.wishPick=null;draw();if(S.call==='__custom')$('#cc').focus();});
+   const cc=$('#cc');if(cc)cc.oninput=()=>{S.callCustom=cc.value;S.wishPick=null;foot('Seterusnya',!!callName(),next,false);save();};
+   foot('Seterusnya',!!callName(),next,false);save();
+  };draw();
+ },
+ hello(el){
+  const o=occ(),r=rel();
+  const warm={birthday:'Mesti dia suka.',anniv:'Sweet sangat.',pujuk:'Kita bantu awak pujuk dia ya.',convo:'Tahniah untuk dia!',rindu:'Mesti dia terharu nanti.',thanks:'Baiknya awak.',sembuh:'Semoga dia cepat sihat.',saja:'Comel.',baby:'Tahniah untuk keluarga baru!'}[S.occ];
+  const steps=['Bouquet','Balloon','Kek','Polaroid','Wishcard'];
+  el.innerHTML=`<div class="eyebrow">Ringkasan awak</div>
+   <div class="bubble"><p><b>Terima kasih!</b> Jadi awak nak hadiahkan sesuatu untuk <b>${h(r.t.toLowerCase())}</b> sempena <b>${h(o.t.toLowerCase())}</b>, dan awak panggil dia <b>"${h(callName())}"</b>. ${warm}</p>
+   <div class="pickrow"><span class="tagp">${h(o.t)}</span><span class="tagp">${h(r.t)}</span><span class="tagp">${S.gender==='l'?'Lelaki':'Perempuan'}</span><span class="tagp">${h(callName())}</span></div></div>
+   <div class="bubble" id="b2" style="animation-delay:.5s"><span class="typing" aria-label="sedang menaip"><i></i><i></i><i></i></span></div>
+   <div id="b3" hidden><div class="grouph" style="margin-bottom:12px">Perjalanan hadiah awak</div>
+    <div class="path" aria-hidden="true">${steps.map((s,i)=>`<span><i>${i+1}</i>${s}</span>`).join('')}</div></div>`;
+  foot('Jom pilih bouquet',true,next,false);
+  const who=/^(awak|kamu)$/i.test(callName())?'dia':h(callName());
+  setTimeout(()=>{const b=$('#b2');if(!b)return;
+    b.innerHTML=`<p>Ayat kad ucapan untuk ${who} sedang kami siapkan. Sementara tu, tekan butang di bawah untuk mula pilih bouquet.</p><p class="hint">Ayat tu akan tunggu awak di langkah wishcard nanti.</p>`;
+    $('#b3').hidden=false;const n=$('#next');if(n){n.classList.add('nudge');
+    n.insertAdjacentHTML('beforebegin','<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v14M6 12l6 6 6-6"/></svg>');}},1400);
+ },
+ bq(el){
+  if(S.bq&&isOff('bq',S.bq))S.bq=null;
+  const score=b=>(b.occ.includes(S.occ)?(4-b.occ.indexOf(S.occ))*2:0)+(b.rel.includes(S.rel)?3:0)+(S.gender==='l'&&b.choc?1:0)+(S.gender==='p'&&!b.choc?1:0);
+  const list=BQ.filter(b=>!isOff('bq',b.id)).sort((a,b)=>score(b)-score(a));
+  el.innerHTML=`<div class="eyebrow">Langkah 1 · Bouquet</div><h1>Pilih bouquet untuk ${h(callName())}</h1>
+   <p class="sub">Semua bouquet harga sama dalam set ${rm(BASE)}. Yang paling atas paling sesuai dengan jawapan awak.</p>
+   <div class="grid">${list.map((b,i)=>`<button class="card" data-id="${b.id}" aria-pressed="${S.bq===b.id}">
+    ${i<2?'<span class="badge">Sesuai</span>':''}${IMGS(b.id).cust.length?`<span class="peek">${IMGS(b.id).cust.length} foto penerima</span>`:''}<div class="art${IMGS(b.id).bq?' photo':''}" style="background:#fff">${IMGS(b.id).bq?`<img src="${IMGS(b.id).bq}" alt="Bouquet ${b.t}" loading="lazy">`:bqArt(b)}</div><b>${b.t}</b><small>${b.d}</small></button>`).join('')}</div>
+   <p class="hint">Tekan bouquet untuk tengok gambar penerima sebenar. Warna wrapping mungkin berbeza sedikit ikut stok.</p>`;
+  el.querySelectorAll('.card').forEach(c=>c.onclick=()=>openBq(c.dataset.id,el));
+  foot('Seterusnya',!!S.bq);
+ },
+ bal(el){
+  const sc=x=>{if(x.rel&&!x.rel.includes(S.rel))return -1;const i=x.occ.indexOf(S.occ);if(i<0)return -1;
+    return 10-i+(x.occ.length===1?3:0)+(x.rel?6:0)+(x.g&&x.g===S.gender?2:0)+(x.g&&x.g!==S.gender?-1:0)};
+  const AVB=BALLOON.filter(b=>!isOff('bal',b.id));
+  let fit=AVB.map(x=>[x,sc(x)]).filter(p=>p[1]>=0).sort((p,q)=>q[1]-p[1]).map(p=>p[0]).slice(0,5);
+  if(fit.length<4)fit=fit.concat(AVB.filter(x=>x.occ.includes('saja')&&!x.rel&&!fit.includes(x))).slice(0,4);
+  const chosen=AVB.find(b=>b.id===S.bal);if(!chosen)S.bal=null;
+  const shown=chosen&&!fit.includes(chosen)?[chosen,...fit.slice(0,4)]:fit;
+  el.innerHTML=`<div class="eyebrow">Langkah 2 · Balloon</div><h1>Balloon untuk ${h(occ().t.toLowerCase())}</h1>
+   <p class="sub">Kami pilih yang paling kena dengan momen awak.</p>
+   <div class="grid">${shown.map(b=>balCard(b)).join('')}</div>
+   <button class="link" id="allb">Tengok semua ${AVB.length} balloon</button>`;
+  bindBal(el);$('#allb').onclick=allBalloons;foot('Seterusnya',!!S.bal);
+ },
+ cake(el){
+  if(S.cake&&isOff('cake',S.cake))S.cake=null;
+  el.innerHTML=`<div class="eyebrow">Langkah 3 · Kek</div><h1>Sepotong kek Secret Recipe</h1>
+   <p class="sub">Pilih satu perisa.</p>
+   <div class="grouph">Termasuk dalam set</div>
+   <div class="grid">${CAKE_FREE.filter(c=>!isOff('cake',c)).map(c=>cakeCard(c,0)).join('')}</div>
+   <div class="grouph">Upgrade perisa</div>
+   <div class="grid">${CAKE_UP.filter(c=>!isOff('cake',c)).map(c=>cakeCard(c,10)).join('')}</div>
+   ${S.cake===OTHER?`<div class="sum" id="otherbox"><h2 style="font-size:16px">Tulis perisa pilihan awak</h2>
+    <p class="hint" style="margin:0">Susun ikut keutamaan, maksimum 5 perisa. Team kami akan beli ikut stok yang ada di Secret Recipe.</p>
+    ${[0,1,2,3,4].map(i=>`<div class="field"><label for="of${i}">Pilihan ${i+1}${i?' (tak wajib)':''}</label><input id="of${i}" type="text" maxlength="40" placeholder="${['Contoh: Cheese Cake','Contoh: Tiramisu','','',''][i]}" value="${h((S.otherFl||[])[i]||'')}"></div>`).join('')}
+    <p class="note" style="margin:0">Kalau semua perisa pilihan awak tiada, team kami akan pilihkan perisa premium lain yang ada pada hari tu.</p></div>`:''}
+   <p class="hint">Nak lebih dari satu kek? <button class="link" id="ext" style="padding:0;font-size:12px">Tambah kek</button> ${S.extraCake?`· <b>${S.extraCake} kek tambahan (${rm(S.extraCake*20)})</b><br><span>${h(extraList())}</span>`:''}</p>`;
+  el.querySelectorAll('.card').forEach(c=>c.onclick=()=>{S.cake=c.dataset.id;SCR.cake(el);});
+  $('#ext').onclick=extraCake;
+  const okc=()=>!!S.cake&&(S.cake!==OTHER||otherFl().length>0);
+  [0,1,2,3,4].forEach(i=>{const f=$('#of'+i);if(f)f.oninput=()=>{S.otherFl=S.otherFl||[];S.otherFl[i]=f.value;save();foot('Seterusnya',okc())}});
+  foot('Seterusnya',okc());
+ },
+ photo(el){
+  el.innerHTML=`<div class="eyebrow">Langkah 4 · Polaroid</div><h1>Satu gambar, satu kenangan</h1>
+   <p class="sub">Gambar korang berdua, gambar lama yang kelakar, atau momen yang dia rindu. Kami cetak sebagai polaroid untuk dia simpan.</p>
+   <label class="drop" id="dropz"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="12" cy="12" r="3.5"/><path d="M8 5l1.5-2h5L16 5"/></svg>
+    <b style="font-family:var(--display);font-size:17px">${S.photos.length?'Tambah gambar lagi':'Upload gambar'}</b><span class="hint">1 gambar percuma · tambahan RM10 sekeping</span>
+    <input id="file" type="file" accept="image/*" multiple aria-label="Pilih gambar"></label>
+   <p class="status warn" id="pmsg" hidden></p>
+   ${S.photos.length?`<div class="polas">${S.photos.map((p,i)=>`<div class="pola"><img src="${p}" alt="Gambar polaroid ${i+1}"><button class="x" data-i="${i}" aria-label="Buang gambar">×</button><span class="free">${i===0?'Percuma':'+RM10'}</span></div>`).join('')}</div>`:''}
+   <p class="note">Tip: gambar muka yang jelas dan terang paling cantik bila dicetak.</p>
+   <p class="hint" style="text-align:center">Tak boleh pilih gambar? Buka link ni dalam Chrome atau Safari, kemudian cuba semula.</p>`;
+  const M=1600;
+  const toJpeg=(src,w,h)=>{const k=Math.min(1,M/Math.max(w,h));const c=document.createElement('canvas');
+    c.width=Math.max(1,Math.round(w*k));c.height=Math.max(1,Math.round(h*k));c.getContext('2d').drawImage(src,0,0,c.width,c.height);
+    const u=c.toDataURL('image/jpeg',.85);return u&&u.length>100?u:null;};
+  const viaImg=f=>new Promise(ok=>{let url;try{url=URL.createObjectURL(f)}catch(e){return ok(null)}
+    const im=new Image();im.onload=()=>{let u=null;try{u=toJpeg(im,im.naturalWidth,im.naturalHeight)}catch(e){}URL.revokeObjectURL(url);ok(u)};
+    im.onerror=()=>{URL.revokeObjectURL(url);ok(null)};im.src=url;});
+  const viaReader=f=>new Promise(ok=>{try{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{try{ok(toJpeg(im,im.naturalWidth,im.naturalHeight))}catch(e){ok(r.result)}};im.onerror=()=>ok(null);im.src=r.result};r.onerror=()=>ok(null);r.readAsDataURL(f)}catch(e){ok(null)}});
+  const viaBitmap=async f=>{if(!window.createImageBitmap)return null;try{const bm=await createImageBitmap(f);const u=toJpeg(bm,bm.width,bm.height);bm.close&&bm.close();return u}catch(e){return null}};
+  const load=async f=>(await viaBitmap(f))||(await viaImg(f))||(await viaReader(f));
+  const inp=$('#file'),dz=$('#dropz');
+  
+  inp.onchange=async e=>{
+    const fs=[...(e.target.files||[])];if(!fs.length)return;
+    const m=$('#pmsg');m.hidden=false;m.className='status';m.textContent='Sedang muat naik '+fs.length+' gambar…';
+    let bad=0;
+    for(const f of fs){const u=await load(f);if(u)S.photos.push(u);else bad++;}
+    try{inp.value=''}catch(err){}
+    SCR.photo(el);
+    if(bad){const m2=$('#pmsg');m2.hidden=false;m2.className='status warn';m2.textContent=bad+' gambar tak dapat dibaca. Kalau gambar dari iPhone (HEIC), tukar ke JPG dulu atau screenshot gambar tu, kemudian upload semula.';}
+  };
+  el.querySelectorAll('.x').forEach(b=>b.onclick=()=>{S.photos.splice(+b.dataset.i,1);SCR.photo(el)});
+  foot(S.photos.length?'Seterusnya':'Skip dulu',true);
+ },
+ wish(el){
+  const p=callName(),ts=WISH[S.occ].map(t=>t.replaceAll('{p}',p));
+  const opened=el.dataset.opened;
+  el.innerHTML=`<div class="eyebrow">Langkah 5 · Wishcard</div><h1>Ayat kad untuk ${h(p)}</h1>
+   <div class="env" id="env" aria-hidden="true"><div class="bk"></div><div class="letter"><i style="width:60%"></i><i></i><i></i><i style="width:75%"></i></div><div class="front"></div><div class="flap"></div><div class="seal"></div></div>
+   <p class="sub">Kami dah sediakan 3 cadangan. Pilih satu dan edit, atau tulis sendiri dari kosong.</p>
+   <div class="sugg">${ts.map((t,i)=>`<button class="sug" data-i="${i}" aria-pressed="${S.wishPick===i}"><em>Cadangan ${i+1}</em>${h(t)}</button>`).join('')}
+    <button class="sug" data-i="blank" aria-pressed="${S.wishPick==='blank'}"><em>Tulis sendiri</em>Mula dari kosong</button></div>
+   <div class="field"><label for="wtext">Ayat kad (boleh edit)</label><textarea id="wtext" maxlength="320" placeholder="Tulis ucapan awak di sini…">${h(S.wish)}</textarea>
+    <span class="hint" id="wcount"></span></div>
+   <div class="field"><label for="sender">Daripada</label><input id="sender" type="text" maxlength="40" placeholder="Nama awak, atau 'Secret admirer'" value="${h(S.sender)}"></div>`;
+  const env=$('#env');requestAnimationFrame(()=>setTimeout(()=>env.classList.add('open'),opened?0:250));el.dataset.opened=1;
+  const ta=$('#wtext'),cnt=()=>{$('#wcount').textContent=ta.value.length+'/320 aksara';foot('Seterusnya',ta.value.trim().length>0)};
+  el.querySelectorAll('.sug').forEach(b=>b.onclick=()=>{const i=b.dataset.i;S.wishPick=i==='blank'?'blank':+i;S.wish=i==='blank'?'':ts[+i];
+    ta.value=S.wish;el.querySelectorAll('.sug').forEach(x=>x.setAttribute('aria-pressed',x===b));cnt();ta.focus();save();});
+  ta.oninput=()=>{S.wish=ta.value;cnt();save()};$('#sender').oninput=e=>{S.sender=e.target.value;save()};cnt();
+ },
+ recv(el){
+  el.innerHTML=`<div class="eyebrow">Langkah 6 · Penerima</div><h1>Hadiah ni nak dihantar ke mana?</h1>
+   <div class="field"><label for="rname">Nama penerima</label><input id="rname" type="text" value="${h(S.rname)}" placeholder="Nama penuh penerima"></div>
+   <div class="field"><label for="rphone">Nombor telefon penerima</label><input id="rphone" type="tel" inputmode="tel" value="${h(S.rphone)}" placeholder="01X-XXX XXXX"><span class="hint">Runner hanya hubungi bila sampai. Kejutan tetap terjaga.</span></div>
+   <div class="field"><label for="raddr">Alamat penuh</label><textarea id="raddr" style="min-height:90px" placeholder="No. rumah, jalan, taman, bandar">${h(S.raddr)}</textarea></div>
+   <div class="field"><label for="rpost">Poskod</label><input id="rpost" type="text" inputmode="numeric" maxlength="5" value="${h(S.rpost)}" placeholder="Contoh: 40150"></div>
+   <div id="cov"></div>`;
+  const chk=()=>{const pc=+S.rpost,c=$('#cov');
+    if(S.rpost.length<5){c.innerHTML='';}
+    else{const z=zoneOf(S.rpost);
+     c.innerHTML=z==='free'?'<div class="status ok">Kawasan ni dapat penghantaran PERCUMA.</div>'
+      :z==='plus20'?'<div class="status warn">Kawasan ni dalam liputan kami dengan caj tambahan RM20 (Rawang, Kuang, Selayang, Sg Buloh).</div>'
+      :'<div class="status bad">Maaf, poskod ni di luar kawasan penghantaran kami buat masa ni. Kalau rasa ini silap, <a href="https://wa.me/601165862584" target="_blank" rel="noopener" style="color:inherit;font-weight:700">WhatsApp kami</a> untuk semak.</div>';}
+    foot('Seterusnya',S.rname.trim()&&S.rphone.replace(/\D/g,'').length>=9&&S.raddr.trim().length>8&&S.rpost.length===5&&zoneOf(S.rpost)!=='out');};
+  ['rname','rphone','raddr','rpost'].forEach(k=>{$('#'+k).oninput=e=>{S[k]=k==='rpost'?e.target.value.replace(/\D/g,''):e.target.value;if(k==='rpost')e.target.value=S.rpost;chk();save();}});chk();
+ },
+ del(el){
+  const now=myNow(),today=ymd(now),isToday=S.date===today,hr=now.getHours()+now.getMinutes()/60;
+  const closed={free:isToday&&hr>=17,A:isToday&&hr>=9,B:isToday&&hr>=14,C:isToday&&hr>=18};
+  const opts=[['free','Percuma','Masa rawak antara 10 pagi – 6 petang',0],['A','Slot A','9 pagi – 12 tengah hari',10],['B','Slot B','1 petang – 4 petang',10],['C','Slot C','5 petang – 8 malam',10],['spec','Masa khusus','Pilih jam tepat. Tempah sekurang-kurangnya 5 jam awal, sehingga 10 malam',50]];
+  if(closed[S.del])S.del=closed.free?(['A','B','C','spec'].find(k=>!closed[k])||'spec'):'free';
+  const quick=[[0,'Hari ini'],[1,'Esok'],[2,'Lusa']],qset=quick.map(([k])=>ymd(new Date(now.getFullYear(),now.getMonth(),now.getDate()+k))),other=!!S.date&&!qset.includes(S.date);
+  el.innerHTML=`<div class="eyebrow">Langkah 7 · Penghantaran</div><h1>Bila nak sampai?</h1>
+   <div class="field"><label for="date">Tarikh penghantaran</label><span class="hint">Tekan hari ini, esok atau lusa untuk pilih cepat. Nak tarikh lain? Tekan ikon kalendar.</span>
+    <div class="qdate">${quick.map(([k,lb])=>{const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+k),v=ymd(d);return `<button class="qd" data-d="${v}" aria-pressed="${S.date===v}" ${isBlocked(v)?'disabled style="opacity:.4"':''}><small>${lb}</small><b>${d.getDate()}</b><small>${d.toLocaleDateString('ms-MY',{month:'short'})}</small></button>`}).join('')}
+    <label class="qd cal" aria-pressed="${other}" title="Pilih tarikh lain"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><small>${other?fmtShort(S.date):'Tarikh lain'}</small><input id="date" type="date" min="${today}" value="${S.date}" aria-label="Pilih tarikh lain"></label></div>
+    ${S.date&&isBlocked(S.date)?`<div class="status bad">${fmtDate(S.date)} dah penuh atau ditutup. Pilih tarikh lain.</div>`:S.date?`<span class="hint">Dipilih: <b style="color:var(--ink)">${fmtDate(S.date)}</b></span>`:''}</div>
+   ${S.date?`<div class="occ">${opts.map(([id,t,d,p])=>`<button class="dopt" data-id="${id}" aria-pressed="${S.del===id}" ${closed[id]?'disabled':''}><span class="r"></span><div><b>${t}</b><br><small class="hint">${closed[id]?'Ditutup untuk hari ini':d}</small></div><span class="p">${p?'+'+rm(p):'PERCUMA'}</span></button>`).join('')}</div>
+   ${S.del==='spec'?`<div class="field"><label for="time">Masa yang diminta</label><input id="time" type="time" min="09:00" max="22:00" value="${S.time}"><div id="terr"></div><span class="hint">Tertakluk kepada pengesahan team kami.</span></div>`:''}`:'<p class="note">Pilih tarikh dulu untuk tengok slot yang masih dibuka.</p>'}
+   <p class="note">Runner kami akan ambil gambar penerima semasa hadiah sampai, sebagai kenangan untuk awak.</p>`;
+  $('#date').onchange=e=>{S.date=e.target.value;SCR.del(el);save();};
+  el.querySelectorAll('.qd[data-d]').forEach(b=>b.onclick=()=>{S.date=b.dataset.d;SCR.del(el);save();});
+  {const di=$('#date'),box=el.querySelector('.qd.cal');let t=0;
+   const open=()=>{const n=Date.now();if(n-t<400)return;t=n;try{di.showPicker?di.showPicker():(di.focus(),di.click())}catch(_){try{di.focus()}catch(__){}}};
+   di.onclick=e=>{e.stopPropagation();open();};
+   box.onclick=e=>{e.preventDefault();open();};}
+  el.querySelectorAll('.dopt').forEach(b=>b.onclick=()=>{S.del=b.dataset.id;SCR.del(el);save();});
+  const t=$('#time');let ok=!!S.date&&!isBlocked(S.date)&&S.date>=today;
+  if(S.del==='spec'){const v=S.time,err=specErr(v,isToday,now);ok=ok&&v&&!err;$('#terr').innerHTML=err&&v?`<div class="status bad" style="margin-top:6px">${err}</div>`:'';
+    t.onchange=e=>{S.time=e.target.value;SCR.del(el);save();};}
+  foot('Seterusnya',ok);
+ },
+ sum(el){
+  const b=BQ.find(x=>x.id===S.bq),bl=BALLOON.find(x=>x.id===S.bal);
+  el.innerHTML=`<div class="eyebrow">Semak sebelum bayar</div><h1>Hadiah untuk ${h(callName())} dah siap disusun</h1>
+   <div class="sum"><h2>Item</h2>
+    <div class="row"><span>Momen</span><span>${h(occ().t)}</span></div>
+    <div class="row"><span>Bouquet</span><span>${b.t}</span></div>
+    <div class="row"><span>Balloon</span><span>${h(bl?bl.t:'-')}</span></div>
+    <div class="row"><span>Kek</span><span>${h(cakeName()+extraTxt())}</span></div>
+    <div class="row"><span>Polaroid</span><span>${S.photos.length} gambar</span></div>
+    <div class="row"><span>Wishcard</span><span>"${h(S.wish.slice(0,60))}${S.wish.length>60?'…':''}"</span></div></div>
+   <div class="sum"><h2>Penerima</h2>
+    <div class="row"><span>Nama</span><span>${h(S.rname)}</span></div>
+    <div class="row"><span>Telefon</span><span>${h(S.rphone)}</span></div>
+    <div class="row"><span>Alamat</span><span>${h(S.raddr)}, ${h(S.rpost)}</span></div>
+    <div class="row"><span>Tarikh</span><span>${fmtDate(S.date)}</span></div></div>
+   <div class="sum"><h2>Harga</h2>${lines().map(([l,p])=>`<div class="row"><span>${h(l)}</span><span>${p?rm(p):'Percuma'}</span></div>`).join('')}
+    <div class="row tot"><span>Jumlah</span><span>${rm(total())}</span></div></div>
+   <p class="note" style="margin:0"><b>Polisi tempahan:</b> order yang dah dibayar tak boleh dibatalkan atau di-refund. Kalau ada perubahan, awak boleh tukar tarikh delivery dengan WhatsApp kami.</p>
+   <div class="sum"><h2>Maklumat awak</h2>
+    <div class="field"><label for="bname">Nama awak</label><input id="bname" type="text" value="${h(S.bname)}"></div>
+    <div class="field"><label for="bphone">Nombor WhatsApp awak</label><input id="bphone" type="tel" inputmode="tel" value="${h(S.bphone)}"><span class="hint">Kami hantar resit dan gambar penerima ke nombor ni.</span></div></div>`;
+  const chk=()=>foot('Bayar '+rm(total()),S.bname.trim()&&S.bphone.replace(/\D/g,'').length>=9);
+  el.insertAdjacentHTML('beforeend','<p class="hint" style="text-align:center;margin:0">Bayar dengan DuitNow QR atau FPX (online banking) melalui ToyyibPay.</p>');
+  ['bname','bphone'].forEach(k=>$('#'+k).oninput=e=>{S[k]=e.target.value;chk();save()});chk();
+ },
+ pay(el){
+  $('#back').disabled=true;$('#foot').innerHTML='';
+  el.innerHTML=`<div class="done"><div class="tick" style="background:var(--bg2)"><span class="typing" aria-label="sedang memproses"><i></i><i></i><i></i></span></div>
+   <h1>Sedang simpan order awak…</h1><p class="sub" id="pst">Jangan tutup halaman ni. Awak akan dibawa ke halaman bayaran sekejap lagi.</p><div id="perr" style="width:100%"></div></div>`;
+  submitOrder();
+ },
+ done(el){
+  $('#foot').innerHTML='';$('#back').disabled=true;
+  const R=window.RESULT||{};
+  if(!R.paid){
+   el.innerHTML=`<div class="done"><div class="tick" style="background:var(--bg2)"><span class="typing"><i></i><i></i><i></i></span></div>
+    <h1>Menunggu pengesahan bayaran…</h1><p class="sub">Order <b>${h(R.code||'')}</b>. Kalau awak dah bayar, status akan dikemas kini dalam beberapa saat.</p>
+    ${R.payUrl?`<a class="btn" href="${h(R.payUrl)}" style="flex:none;width:100%;text-decoration:none;text-align:center">Belum bayar? Bayar sekarang</a>`:''}
+    <a class="link" href="https://wa.me/${CAT.wa||'601165862584'}?text=${encodeURIComponent('Hai 100 Blooms, saya nak semak order '+(R.code||''))}" target="_blank" rel="noopener">WhatsApp kami tentang order ni</a></div>`;
+   return;
+  }
+  el.innerHTML=`<div class="done"><div class="tick"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></div>
+   <h1>Terima kasih, ${h(R.buyer||'awak')}!</h1>
+   <p class="sub">Bayaran diterima untuk order <b>${h(R.code)}</b>. Hadiah untuk ${h(R.call||'dia')} akan dihantar pada ${fmtDate(R.date)}. Kami akan WhatsApp awak gambar penerima bila hadiah sampai.</p>
+   <p class="note">Simpan kod order ni. Untuk tukar tarikh delivery, WhatsApp kami dengan kod order.</p>
+   <button class="btn ghost" id="again" style="flex:none;width:100%">Hantar hadiah lain</button></div>`;
+  $('#again').onclick=()=>{history.replaceState(null,'',location.pathname);S=blank();dir=1;render();};
+ }
+};
+
+/* ---------- helpers ---------- */
+function showCart(){
+  const b=BQ.find(x=>x.id===S.bq),bl=BALLOON.find(x=>x.id===S.bal),im=b&&IMGS(b.id);
+  const it=[['Bouquet',b?b.t:null],['Balloon',bl?bl.t:null],['Kek',S.cake?cakeName()+extraTxt():null],
+    ['Polaroid',S.photos.length?S.photos.length+' gambar':null],['Wishcard',S.wish?'Siap':null]];
+  sheet(`<h2>Hadiah awak setakat ni</h2>
+   ${im&&im.bq?`<div style="display:flex;gap:12px;align-items:center"><img src="${im.bq}" alt="" style="width:64px;height:80px;object-fit:contain;background:#fff;border-radius:12px"><div><b style="font-family:var(--display);font-size:17px">Combo Jimat · ${b.t}</b><br><span class="hint">Untuk ${h(callName()||'-')} · ${h(occ()?occ().t:'')}</span></div></div>`:''}
+   <div class="sum" style="padding:0">${it.map(([k,v])=>`<div class="row"><span>${k}</span><span>${v?h(v):'<span class="hint">Belum pilih</span>'}</span></div>`).join('')}</div>
+   <div class="sum" style="padding:0;border-top:1.5px dashed var(--line);padding-top:12px">${lines().map(([l,p,k])=>`<div class="row" style="align-items:center"><span>${h(l)}${k?`<br><button class="cdel" data-k="${k}" aria-label="Kurangkan ${h(l)}">− Kurangkan</button>`:''}</span><span>${p?rm(p):'Percuma'}</span></div>`).join('')}
+    <div class="row tot"><span>Jumlah</span><span>${rm(total())}</span></div></div>
+   <button class="btn ghost" id="cc" style="flex:none">Teruskan</button>`);
+  $('#cc').onclick=closeSheet;
+  document.querySelectorAll('.cdel').forEach(b=>b.onclick=()=>{
+    if(b.dataset.k==='cake'){const e=S.extraCakes||{},k=ALL_CAKES().filter(c=>e[c]>0).pop();if(k){e[k]--;if(!e[k])delete e[k];}S.extraCakes=e;S.extraCake=Object.values(e).reduce((a,b)=>a+b,0);}
+    if(b.dataset.k==='pola'&&S.photos.length>1)S.photos.pop();
+    save();const y=window.scrollY;render();window.scrollTo({top:y});showCart();
+  });
+}
+function IMGS(id){return (window.IMG&&window.IMG[id])||{cust:[]}}
+const TICK='<svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>';
+function openBq(id,scr){
+  const b=BQ.find(x=>x.id===id),im=IMGS(id);
+  const slides=[im.bq?`<figure class="prod"><img src="${im.bq}" alt="Bouquet ${b.t}"><figcaption>Bouquet ${b.t}</figcaption></figure>`:'',
+    ...im.cust.map((u,i)=>`<figure><img src="${u}" alt="Penerima sebenar dengan bouquet ${b.t}" loading="lazy"><figcaption>Penerima sebenar</figcaption></figure>`)].filter(Boolean);
+  sheet(`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><h2 style="font-size:22px">${b.t}</h2><span class="tagp">Termasuk dalam ${rm(BASE)}</span></div>
+   <div class="gal" id="gal">${slides.join('')}</div>
+   <div class="dots" id="dots">${slides.map((_,i)=>`<i class="${i?'':'on'}"></i>`).join('')}</div>
+   <p style="margin:0"><b>Isi bouquet:</b> ${b.d}</p>
+   ${im.cust.length?`<p class="hint" style="margin:-6px 0 0">Swipe untuk tengok bouquet ${b.t} yang dah sampai ke tangan penerima kami.</p>`:''}
+   <div class="trust">
+    <div>${TICK}<span>Set lengkap: bouquet, kek Secret Recipe, balloon, polaroid dan wishcard</span></div>
+    <div>${TICK}<span>Runner ambil gambar penerima dan kami hantar kepada awak</span></div>
+    <div>${TICK}<span>Penghantaran PERCUMA 10 pagi – 6 petang</span></div>
+   </div>
+   ${(window.IMG&&IMG.testi&&IMG.testi.length)?`<div class="testi"><h3>Kata pelanggan <span>★ 5.0 · 680+ ulasan Google</span></h3><div class="trow">${IMG.testi.map(u=>`<img src="${u}" alt="Ulasan pelanggan 100 Blooms" loading="lazy">`).join('')}</div><p class="hint" style="margin:0">Ulasan sebenar, dikongsi dengan izin pelanggan. Ketik untuk besarkan.</p></div>`:''}
+   <button class="btn" id="pick" style="flex:none">Pilih ${b.t}</button>
+   <p class="wa">Ada soalan? WhatsApp kami: <a href="https://wa.me/601165862584" target="_blank" rel="noopener">Aliff 011-6586 2584</a> · <a href="https://wa.me/60143467099" target="_blank" rel="noopener">Hanie 014-346 7099</a></p>`);
+  const g=$('#gal');g.onscroll=()=>{const i=Math.round(g.scrollLeft/(g.firstElementChild.offsetWidth+10));[...$('#dots').children].forEach((d,j)=>d.classList.toggle('on',j===i))};
+  $('#pick').onclick=()=>{S.bq=id;save();closeSheet();SCR.bq(scr);};
+  document.querySelectorAll('.trow img').forEach(i=>i.onclick=()=>{const z=document.createElement('div');z.className='zoom';z.innerHTML=`<img src="${i.src}" alt="">`;z.onclick=()=>z.remove();document.body.appendChild(z);});
+}
+function bqArt(b){
+  let flowers='';
+  const pos=[[50,30],[34,38],[66,38],[42,22],[58,22]];
+  pos.forEach(([x,y],i)=>{
+    if(b.kind==='rose')flowers+=`<circle cx="${x}" cy="${y}" r="9" fill="${b.fl}"/><path d="M${x-4} ${y}a4 4 0 0 1 8 0" stroke="#7a1a2a" stroke-width="1.4" fill="none"/>`;
+    else if(b.kind==='gerbera')flowers+=`<circle cx="${x}" cy="${y}" r="10" fill="${b.fl}"/><circle cx="${x}" cy="${y}" r="3.5" fill="#6b3a1f"/>`;
+    else if(b.kind==='sun'&&i<3)flowers+=`<circle cx="${x}" cy="${y}" r="11" fill="${b.fl}"/><circle cx="${x}" cy="${y}" r="5" fill="#6b3a1f"/>`;
+    else if(b.kind==='baby')flowers+=[0,1,2,3].map(j=>`<circle cx="${x+(j%2?5:-5)}" cy="${y+(j>1?5:-4)}" r="3.2" fill="${b.fl}"/>`).join('');
+    else if(b.kind==='choc')flowers+=`<circle cx="${x}" cy="${y}" r="8" fill="${b.fl}"/><circle cx="${x-2}" cy="${y-2}" r="2.5" fill="#e8c88a"/>`;
+  });
+  if(b.kind==='sun')flowers+=[[40,24],[60,24],[50,16]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="2.5" fill="#fff"/>`).join('');
+  const bal=b.id==='walter'?`<line x1="50" y1="16" x2="50" y2="2" stroke="#999"/><circle cx="50" cy="-2" r="0" /><circle cx="50" cy="8" r="0"/>`:'';
+  return `<svg viewBox="0 0 100 100" aria-hidden="true">${b.id==='walter'?'<circle cx="74" cy="16" r="12" fill="#e6cfa3"/><line x1="74" y1="28" x2="60" y2="44" stroke="#a88" stroke-width="1"/>':''}
+    ${flowers}<path d="M24 40 L50 92 L76 40 Z" fill="${b.wr}" stroke="rgba(0,0,0,.12)"/><path d="M30 40 L50 80 L70 40" fill="none" stroke="rgba(255,255,255,.25)"/>
+    <path d="M42 72 q8 -6 16 0 q-8 6 -16 0z" fill="${b.rb}"/><path d="M48 74 l-5 12M52 74 l5 12" stroke="${b.rb}" stroke-width="2.4"/>${bal}</svg>`;
+}
+function balArt(c){return `<svg viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="40" rx="24" ry="28" fill="${c}"/><ellipse cx="42" cy="30" rx="6" ry="9" fill="rgba(255,255,255,.4)"/><path d="M47 68h6l-3 4z" fill="${c}"/><path d="M50 72 q-6 10 2 18" stroke="#999" fill="none"/></svg>`}
+function balCard(b){const u=(window.IMG&&IMG.bal&&IMG.bal[b.id]);return `<button class="card" data-id="${b.id}" aria-pressed="${S.bal===b.id}"><div class="art photo" style="background:#fff">${u?`<img src="${u}" alt="Balloon ${h(b.t)}" loading="lazy">`:balArt(b.c||'#ddd')}</div><b style="font-size:14px">${h(b.t)}</b></button>`}
+function bindBal(scope){scope.querySelectorAll('.card[data-id]').forEach(c=>c.onclick=()=>{S.bal=c.dataset.id;save();closeSheet();render();});}
+function sheet(html){const L=$('#layer');L.innerHTML=`<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div></div>`;
+  $('#scrim').onclick=e=>{if(e.target.id==='scrim')closeSheet()};return L;}
+function closeSheet(){$('#layer').innerHTML=''}
+function allBalloons(){
+  const L=sheet(`<h2>Semua balloon</h2><p class="sub">Disusun ikut tema. Tekan untuk pilih.</p>`+BAL_GRP.map(g=>{const items=BALLOON.filter(b=>b.grp===g&&!isOff('bal',b.id));if(!items.length)return '';
+    return `<div class="grouph">${g}</div><div class="grid">${items.map(balCard).join('')}</div>`}).join(''));
+  bindBal(L);
+}
+function cakeCard(c,up){const u=window.IMG&&IMG.cake&&IMG.cake[c];return `<button class="card" data-id="${h(c)}" aria-pressed="${S.cake===c}"><div class="art" style="background:${u?'#fff':up?'#f6e3e8':'#f3ebe4'};aspect-ratio:${u?'3/2':'2/1'}">${u?`<img src="${u}" alt="${h(c)}" loading="lazy" style="object-fit:cover;padding:0">`:`
+  <svg viewBox="0 0 100 50" aria-hidden="true"><path d="M20 38 L80 38 L80 22 L20 30Z" fill="${/Red/.test(c)?'#b8323f':/Carrot/.test(c)?'#d9894a':/lain/.test(c)?'#e8b04f':'#5b3424'}"/><path d="M20 30 L80 22 L68 14 L20 26Z" fill="#fff4ea"/><path d="M20 34 L80 30" stroke="#fff4ea" stroke-width="2"/></svg>`}</div>
+  <b style="font-size:14px">${h(c)}</b><span class="price">${up?'+RM10':'Percuma'}</span></button>`}
+function extraCake(){
+  const e=Object.assign({},S.extraCakes||{}),MAX=10,tot=()=>Object.values(e).reduce((a,b)=>a+b,0);
+  const row=(c,i)=>`<div class="row" style="align-items:center"><span><b style="font-weight:600;color:var(--ink)">${h(c)}</b></span>
+    <span class="stepper" style="gap:10px"><button data-i="${i}" data-d="-1" aria-label="Kurang ${h(c)}">−</button><output id="n${i}">${e[c]||0}</output><button data-i="${i}" data-d="1" aria-label="Tambah ${h(c)}">+</button></span></div>`;
+  const C=ALL_CAKES();
+  sheet(`<h2>Tambah kek</h2><p class="sub">Pilih perisa yang awak nak, boleh campur-campur. RM20 sepotong untuk semua perisa, maksimum ${MAX} kek tambahan. Team kami akan sahkan perisa ikut stok.</p>
+   <div class="sum" style="padding:0;gap:8px">${C.map(row).join('')}</div>
+   <div class="row tot"><span>Kek tambahan: <b id="nt0">0</b></span><span id="nt">RM0</span></div>
+   <button class="btn" id="okc">Simpan</button>`);
+  const up=()=>{C.forEach((c,i)=>$('#n'+i).textContent=e[c]||0);$('#nt0').textContent=tot();$('#nt').textContent=rm(tot()*20);
+    document.querySelectorAll('#scrim .stepper button').forEach(b=>{const c=C[b.dataset.i];b.disabled=b.dataset.d>0?tot()>=MAX:!(e[c]>0)});};
+  document.querySelectorAll('#scrim .stepper button').forEach(b=>b.onclick=()=>{const c=C[b.dataset.i],d=+b.dataset.d;
+    if(d>0&&tot()>=MAX)return;e[c]=Math.max(0,(e[c]||0)+d);if(!e[c])delete e[c];up()});
+  up();
+  $('#okc').onclick=()=>{S.extraCakes=e;S.extraCake=tot();save();closeSheet();render()};
+}
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function fmtShort(s){const d=new Date(s+'T00:00');return d.toLocaleDateString('ms-MY',{day:'numeric',month:'short'})}
+function fmtDate(s){if(!s)return'-';const d=new Date(s+'T00:00');return d.toLocaleDateString('ms-MY',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}
+function specErr(v,isToday,now){
+  if(!v)return'';const [H,M]=v.split(':').map(Number),t=H+M/60;
+  if(t<9||t>22)return'Masa khusus hanya antara 9 pagi hingga 10 malam.';
+  if(isToday&&t<now.getHours()+now.getMinutes()/60+5)return'Masa khusus perlu ditempah sekurang-kurangnya 5 jam awal. Pilih masa lebih lewat.';
+  return'';
+}
+function _unusedQR(cv){const x=cv.getContext('2d'),n=29;x.fillStyle='#fff';x.fillRect(0,0,n,n);x.fillStyle='#2b1d24';
+  let s=total()*7+13;const rnd=()=>(s=(s*9301+49297)%233280)/233280;
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++)if(rnd()>.52)x.fillRect(i,j,1,1);
+  [[0,0],[n-7,0],[0,n-7]].forEach(([a,b])=>{x.fillStyle='#2b1d24';x.fillRect(a,b,7,7);x.fillStyle='#fff';x.fillRect(a+1,b+1,5,5);x.fillStyle='#2b1d24';x.fillRect(a+2,b+2,3,3)});}
+
+/* ---------- order submission ---------- */
+function dataUrlToBlob(u){const [m,b]=u.split(',');const bin=atob(b),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:(m.match(/:(.*?);/)||[])[1]||'image/jpeg'})}
+let submitting=false;
+async function submitOrder(){
+  if(submitting)return;submitting=true;
+  const err=msg=>{submitting=false;$('#pst').textContent='';$('#perr').innerHTML=`<div class="status bad">${h(msg)}</div>
+    <button class="btn" id="retry" style="flex:none;width:100%;margin-top:12px">Cuba lagi</button><button class="btn ghost" id="bk2" style="flex:none;width:100%;margin-top:8px">Kembali ke ringkasan</button>`;
+    $('#retry').onclick=()=>{$('#perr').innerHTML='';$('#pst').textContent='Cuba sekali lagi…';submitOrder()};$('#bk2').onclick=()=>{dir=-1;S.step=STEPS.indexOf('sum');render()};};
+  const d=Object.assign({},S);delete d.photos;delete d.step;
+  try{d.ref=localStorage.getItem('hb_ref')||''}catch(e){}
+  d.call=callName();
+  const fd=new FormData();fd.append('data',JSON.stringify(d));
+  S.photos.forEach((u,i)=>fd.append('photo[]',dataUrlToBlob(u),'p'+(i+1)+'.jpg'));
+  let r,j;
+  try{r=await fetch('api/order.php',{method:'POST',body:fd});j=await r.json().catch(()=>({}));}
+  catch(e){return err('Tiada sambungan internet. Semak sambungan dan cuba lagi.');}
+  if(j.payUrl){try{localStorage.setItem('hb_last',JSON.stringify({code:j.code}))}catch(e){}$('#pst').textContent='Membuka halaman bayaran…';location.href=j.payUrl;return;}
+  if(j.code){submitting=false;$('#pst').textContent='';$('#perr').innerHTML=`<div class="status bad">${h(j.error||'Halaman bayaran tak dapat dibuka.')}</div><a class="btn" style="flex:none;width:100%;margin-top:12px;text-align:center;text-decoration:none" href="https://wa.me/${CAT.wa||'601165862584'}?text=${encodeURIComponent('Hai 100 Blooms, saya nak bayar order '+j.code)}" target="_blank" rel="noopener">WhatsApp kami</a>`;return;}
+  err(j.error||'Order tak dapat dihantar. Cuba lagi sebentar.');
+}
+async function checkReturn(code,k,tries){
+  try{const r=await fetch('api/status.php?code='+encodeURIComponent(code)+'&k='+encodeURIComponent(k));const j=await r.json();
+    if(r.ok){window.RESULT=j;if(j.paid){S=blank();save();}S.step=STEPS.indexOf('done');render();
+      if(!j.paid&&tries<8)setTimeout(()=>checkReturn(code,k,tries+1),tries<3?3000:6000);return;}}catch(e){}
+  window.RESULT={code};S.step=STEPS.indexOf('done');render();
+}
+
+/* ---------- boot ---------- */
+if(STEPS[S.step]==='done'||STEPS[S.step]==='pay')S.step=STEPS.indexOf('sum');
+(async()=>{
+  try{const r=await fetch('api/catalog.php',{cache:'no-store'});if(r.ok){const j=await r.json();CAT=Object.assign(CAT,j,{t0:Date.now()});}}catch(e){}
+  const P=new URLSearchParams(location.search);
+  if(P.get('r')&&P.get('k')){checkReturn(P.get('r'),P.get('k'),0);}
+  else render();
+  setTimeout(()=>$('#splash').classList.add('gone'),900);
+})();
+</script>
+</body>
+</html>

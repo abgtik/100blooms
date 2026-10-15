@@ -1,0 +1,6 @@
+Options -Indexes
+# Block direct access to config and internal include files
+<FilesMatch "^(config\.php|config\.sample\.php|_.*\.php)$">
+  Require all denied
+</FilesMatch>
+DirectoryIndex index.html index.php
