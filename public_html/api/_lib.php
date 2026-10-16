@@ -35,7 +35,7 @@ function catalog(): array {
       'hb-jungle'=>'Happy Birthday Jungle','anniv'=>'Happy Anniversary','ily-red'=>'I Love You Merah','ily-rw'=>'I Love You Putih-Merah','roses'=>'Heart Roses',
       'ly-gold'=>'Love You Gold','candy'=>'Sweet Heart','sorry-dots'=>"I'm Sorry Polka Dot",'sorry-stripe'=>"I'm Sorry Pelangi",'gws-sun'=>'Get Well Soon Matahari',
       'gws-wishes'=>'Get Well Soon Wishes','gws-plaster'=>'Get Well Soon Plaster','grad-gold'=>'Congrats Grad Gold','grad-black'=>'Congrats Graduate',
-      'grad-white'=>'Congrats Grad Putih','grad-pink'=>'Congrats Grad Pink','grad-key'=>'Congrats Grad Key','mom'=>'Love You Mom','dad'=>'Best Dad Ever',
+      'grad-white'=>'Congrats Grad Putih','grad-pink'=>'Congrats Grad Pink','grad-key'=>'Congrats Grad Key','grad-dots'=>'Congrats Grad Polkadot','mom'=>'Love You Mom','dad'=>'Best Dad Ever',
       'baby-boy'=>'New Baby Boy','baby-girl'=>'New Baby Girl'],
     'cake_free' => ['Chocolate Chip Walnut','Chocolate Moist','Carrot Cake','Chocolate Fudge'],
     'cake_up' => ['Chocolate Indulgence','Red Velvet', OTHER_CAKE],
@@ -77,7 +77,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 13) return;
+  if ($v >= 14) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -116,13 +116,16 @@ function migrate(PDO $pdo): void {
   $run('ALTER TABLE orders ADD COLUMN bill_to TEXT NULL');
   // v13: name a team member shows on invoices/receipts (e.g. "Hanie HQ (60143467099)")
   $run('ALTER TABLE admins ADD COLUMN doc_name VARCHAR(100) NULL');
+  // v14: new catalogue items (e.g. Congrats Grad Polkadot balloon) get a row in Stok
+  $ins = $my ? 'INSERT IGNORE' : 'INSERT OR IGNORE'; $C = catalog();
+  foreach (['bq' => $C['bq'], 'bal' => $C['bal']] as $t => $list) foreach ($list as $k => $n) { try { $pdo->prepare("$ins INTO products (type,item_id,name,active) VALUES (?,?,?,1)")->execute([$t, $k, $n]); } catch (Throwable $e) {} }
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','13')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','14')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
