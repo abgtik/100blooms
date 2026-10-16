@@ -343,7 +343,7 @@ function wfCards(o){
 async function openOrder(id,reload){
   let o;try{o=(await api('order',{params:{id}})).order}catch(e){toast(e.message);return}
   const ph=(n,dl)=>`photo.php?o=${encodeURIComponent(o.code)}&f=${encodeURIComponent(n)}${dl?'&dl=1':''}`;
-  const wa=(n,t)=>'https://wa.me/'+n.replace(/\D/g,'').replace(/^0/,'60')+(t?'?text='+encodeURIComponent(t):'');
+  const wa=(n,t)=>'https://api.whatsapp.com/send?phone='+n.replace(/\D/g,'').replace(/^0/,'60')+(t?'&text='+encodeURIComponent(t):'');
   const cakeTxt=o.cake+(o.cake_flavours&&o.cake_flavours.length?` → pilihan: ${o.cake_flavours.join(' / ')}`:'');
   const ext=o.extra_cakes&&Object.keys(o.extra_cakes).length?Object.entries(o.extra_cakes).map(([k,n])=>`${k} × ${n}`).join(', '):'Tiada';
   $('#layer').innerHTML=`<div class="scrim" id="sc"><div class="panel" role="dialog" aria-modal="true" aria-label="Order ${h(o.code)}">
@@ -573,7 +573,7 @@ function NewOrder(el){
     let j;try{j=await api('manual',{method:'POST',body:fd})}catch(x){toast(x.message);$('#go').disabled=false;quote();return}
     showInvoice(el,j,d.bphone,()=>NewOrder(el));};
 }
-function waLink(phone,text){return 'https://wa.me/'+String(phone).replace(/\D/g,'').replace(/^0/,'60')+'?text='+encodeURIComponent(text)}
+function waLink(phone,text){return 'https://api.whatsapp.com/send?phone='+String(phone).replace(/\D/g,'').replace(/^0/,'60')+'&text='+encodeURIComponent(text)}
 function showInvoice(el,j,phone,again){
   el.innerHTML=`<div class="card"><h2>✅ Order ${h(j.code)} dicipta</h2><p style="margin:0 0 6px">Jumlah <b>${rm(j.total)}</b> · ${j.paid?'ditanda <b>dah bayar</b>':j.mode==='invoice'?'menunggu pembeli bayar melalui QR bank':'menunggu bayaran online'}</p>
     ${j.warn?`<div class="msg bad">${h(j.warn)}</div>`:''}
@@ -805,7 +805,7 @@ const fuMsg=r=>{const first=(r.name||'').split(' ')[0]||'';const when=r.years>1?
 async function Customers(el){
   el.innerHTML='<div class="empty">Memuatkan…</div>';
   let j,ly;try{[j,ly]=await Promise.all([api('customers',{params:{sort:'last'}}),api('lastyear')])}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
-  const wa=(p,t)=>`https://wa.me/${p}${t?'?text='+encodeURIComponent(t):''}`;
+  const wa=(p,t)=>`https://api.whatsapp.com/send?phone=${p}${t?'&text='+encodeURIComponent(t):''}`;
   const dLong=s=>new Date(s.slice(0,10)+'T00:00').toLocaleDateString('ms-MY',{day:'numeric',month:'short',year:'numeric'});
   const olPill=r=>r.src.includes('orderla')?'<span class="pill" style="background:var(--infob);color:var(--info)">Orderla</span>':'';
   const internal=r=>/100\s*blooms|^pickup$|^pick\s*up$|^test/i.test((r.name||'').trim());

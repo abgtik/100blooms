@@ -272,7 +272,7 @@ function Home(el,fresh){
   el.innerHTML=`${fresh?`<div class="msg ok" style="margin:0 0 14px">Tahniah, awak dah jadi agent! Kongsi link di bawah untuk mula dapat komisen.</div>`:''}
    <h1>Hai, ${h(a.name.split(' ')[0])} 👋</h1><p class="sub">Agent no. <b>${a.id}</b> · komisen ${rm(j.rate)} setiap order dibayar</p>
    <section class="card"><h2>Link order awak</h2><div class="link"><span style="flex:1">${h(j.link.replace(/^https?:\/\//,''))}</span></div>
-    <div class="acts"><a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(share)}">Kongsi di WhatsApp</a><button class="btn ghost sm" id="cs">Salin ayat</button><button class="btn ghost sm" id="cp">Salin link</button></div>
+    <div class="acts"><a class="btn sm" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?text=${encodeURIComponent(share)}">Kongsi di WhatsApp</a><button class="btn ghost sm" id="cs">Salin ayat</button><button class="btn ghost sm" id="cp">Salin link</button></div>
     <p class="hint" style="margin:10px 0 0">Pelanggan yang order melalui link ni dalam 30 hari dikira sebagai order awak.</p></section>
    <section class="card"><div class="row2">
     <div class="stat hero"><small>Baki komisen</small><b>${rm(m.due)}</b></div>
@@ -332,7 +332,7 @@ async function Media(el){
    <div class="mchips" role="group" aria-label="Kategori">${[['all','Semua'],...cats].map(([k,t])=>`<button data-c="${k}" aria-pressed="${mcat===k}">${h(t)}</button>`).join('')}</div>
    <div class="mgrid">${rows.length?rows.map(r=>r.img?`<div class="mi"><img src="${src(r.id)}" alt="${h(r.title)}" loading="lazy" data-z="${r.id}"><div class="mb"><b>${h(r.title)}</b>
       <div class="ma"><button class="p" data-sh="${r.id}">Kongsi</button><a class="g" href="${src(r.id,1)}" download>Simpan</a></div>${r.caption?`<div class="ma"><button class="g" data-cp="${r.id}">Salin caption</button></div>`:''}</div></div>`
-     :`<div class="cap"><b style="font:600 15px var(--display)">✍️ ${h(r.title)}</b><pre>${h(fill(r.caption))}</pre><div class="ma"><a class="btn sm" style="margin:0" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(fill(r.caption))}">Kongsi di WhatsApp</a><button class="btn ghost sm" style="margin:0" data-cp="${r.id}">Salin</button></div></div>`).join('')
+     :`<div class="cap"><b style="font:600 15px var(--display)">✍️ ${h(r.title)}</b><pre>${h(fill(r.caption))}</pre><div class="ma"><a class="btn sm" style="margin:0" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?text=${encodeURIComponent(fill(r.caption))}">Kongsi di WhatsApp</a><button class="btn ghost sm" style="margin:0" data-cp="${r.id}">Salin</button></div></div>`).join('')
      :'<div class="empty" style="grid-column:1/-1">Belum ada bahan dalam kategori ni.</div>'}</div>
    <p class="hint" style="margin-top:14px">Kongsi terus dari telefon: gambar dan caption dihantar sekali ke WhatsApp, Instagram atau TikTok. Kalau app tak terima caption, tekan "Salin caption" dan tampal sendiri.</p>`;
   const byId=id=>j.rows.find(r=>r.id===+id);
