@@ -43,7 +43,7 @@ json_out([
   'photos' => json_decode((string)$o['photos'], true) ?: [], 'recipient_photo' => in_array($o['status'], ['sampai', 'selesai'], true) ? $o['recipient_photo'] : null,
   'sender' => $o['sender'], 'wish' => $o['wish'] === WISH_NONE ? '' : $o['wish'], 'photo_count' => (int)$o['photo_count'], 'edit' => buyer_edit($o), 'total' => (float)$o['total'], 'b_name' => explode(' ', $o['b_name'])[0],
   'payUrl' => ($o['pay_status'] !== 'paid' && $o['bill_code'] && $o['status'] !== 'batal') ? pay_url($o['bill_code']) : null,
-  'wa' => WA_MAIN, 'manual' => $o['created_by'] !== null,
+  'wa' => WA_MAIN, 'manual' => $o['created_by'] !== null, 'bill_to' => (string)($o['bill_to'] ?? ''),
   'bank' => ($o['pay_status'] !== 'paid' && $o['status'] !== 'batal' && !$o['bill_code'])
     ? ['text' => setting('bank_text', ''), 'qr' => bank_qr_path() !== null] : null,
 ]);

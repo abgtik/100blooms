@@ -103,6 +103,7 @@ case 'order':
   need_login();
   $o = q('SELECT * FROM orders WHERE id=?', [(int)($_GET['id'] ?? 0)])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404);
   $o['track_url'] = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
+  $o['doc_invoice'] = doc_url($o, 'invoice'); $o['doc_receipt'] = doc_url($o, 'receipt');
   unset($o['token']);
   $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS; $o['invoice'] = invoice_text($o);
   $o['agent'] = $o['agent_ref'] ? (q('SELECT a.id,a.name,c.amount,c.payout_id FROM agents a LEFT JOIN commissions c ON c.order_id=? AND c.agent_id=a.id WHERE a.id=?', [$o['id'], (int)$o['agent_ref']])->fetch() ?: null) : null;
@@ -119,6 +120,7 @@ case 'update':
     else fail('Status tidak sah.');
   }
   if (array_key_exists('notes', $body)) { $set[] = 'notes=?'; $P[] = str_in($body['notes'], 2000); }
+  if (array_key_exists('bill_to', $body)) { $b = str_in($body['bill_to'], 400); $set[] = 'bill_to=?'; $P[] = $b !== '' ? $b : null; }
   if (isset($body['del_date'])) { // customer may change the delivery date (no refunds policy)
     $d = DateTimeImmutable::createFromFormat('!Y-m-d', (string)$body['del_date']);
     if (!$d || $d->format('Y-m-d') !== $body['del_date']) fail('Tarikh tidak sah.');
@@ -705,6 +707,11 @@ case 'manual': // sales team keys in an order taken on WhatsApp
   catch (Throwable $e) { error_log('100blooms manual bill: ' . $e->getMessage()); json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'payUrl' => null, 'track_url' => $track, 'warn' => 'Order disimpan tapi link bayaran gagal dicipta: ' . mb_substr($e->getMessage(), 0, 150)]); }
   json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'paid' => false, 'payUrl' => $url, 'track_url' => $track, 'invoice' => $inv . "\n\n[ Pay online (DuitNow / FPX): $url ]"]);
 
+case 'biz': // business details printed on invoices and receipts
+  need_login();
+  if ($post) { need_owner(); foreach (['name' => 120, 'reg' => 40, 'phone' => 30, 'addr' => 300, 'email' => 120] as $k => $n) set_setting('biz_' . $k, str_in($body[$k] ?? '', $n)); }
+  json_out(['biz' => biz_info()]);
+
 case 'hqorder': // Sales HQ page (/sales/): customer order flow, saved under this team member, payment link + WhatsApp invoice for the buyer
   $m = need_login(); if (!$post) fail('POST sahaja.', 405);
   $d = json_decode((string)($_POST['data'] ?? ''), true); if (!is_array($d)) fail('Data order tidak lengkap.');
@@ -725,8 +732,8 @@ case 'hqorder': // Sales HQ page (/sales/): customer order flow, saved under thi
   $url = null; $warn = null;
   try { [$bill, $url] = pay_create($o); q('UPDATE orders SET bill_code=? WHERE id=?', [$bill, $o['id']]); }
   catch (Throwable $e) { error_log('100blooms hqorder bill: ' . $e->getMessage()); $warn = 'Link bayaran online gagal dicipta. Pembeli masih boleh bayar melalui QR bank di Invoice Link.'; }
-  $inv = invoice_text($o) . ($url ? "\n\n[ Pay online (DuitNow / FPX / Card): $url ]" : '');
-  json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'b_phone' => wa_num((string)$o['b_phone']), 'b_name' => $o['b_name'], 'track_url' => $track, 'payUrl' => $url, 'invoice' => $inv, 'warn' => $warn]);
+  $inv = invoice_text($o) . ($url ? "\n\n[ Pay online (DuitNow / FPX / Card): $url ]" : '') . "\n\n[ Invoice PDF: " . doc_url($o, 'invoice') . " ]";
+  json_out(['id' => $o['id'], 'code' => $o['code'], 'total' => $o['total'], 'b_phone' => wa_num((string)$o['b_phone']), 'b_name' => $o['b_name'], 'track_url' => $track, 'payUrl' => $url, 'invoice' => $inv, 'doc' => doc_url($o, 'invoice'), 'warn' => $warn]);
 
 case 'vouchers':
   need_login();

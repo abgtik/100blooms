@@ -922,6 +922,7 @@ function hqDone(j){
     ${j.warn?`<div class="status warn" style="width:100%">${h(j.warn)}</div>`:''}
     <a class="btn hqwa" href="${h(wa)}" target="_blank" rel="noopener" style="display:block;flex:none;width:100%;text-decoration:none;text-align:center">📲 Hantar invoice ke WhatsApp pembeli</a>
     <button class="btn ghost" id="hqcp" style="flex:none;width:100%">Salin invoice</button>
+    ${j.doc?`<a class="btn ghost" href="${h(j.doc)}" target="_blank" rel="noopener" style="display:block;flex:none;width:100%;text-decoration:none;text-align:center">🧾 Invoice PDF</a>`:''}
     <details class="hqinv" style="width:100%;text-align:left"><summary>Lihat invoice</summary><pre>${h(j.invoice)}</pre></details>
     <button class="btn ghost" id="hqnew" style="flex:none;width:100%">＋ Order baru</button>
     <p class="hint" style="margin:0">Status bayaran dikemas kini sendiri bila pembeli bayar online. Bayaran QR bank: sahkan di <a href="admin/" target="_blank" rel="noopener">admin</a>.</p></div>`;

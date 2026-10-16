@@ -77,6 +77,7 @@ textarea{width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(
 .zoom{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px}.zoom img{max-width:100%;max-height:100%;border-radius:12px}
 .foot{text-align:center;font-size:13px;color:var(--soft);margin-top:18px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+.docs{display:flex;gap:8px}.docs .btn{flex:1;text-align:center;text-decoration:none}.bill{margin-top:12px}.bill summary{cursor:pointer;font-weight:600;color:var(--accent)}.bill textarea{width:100%}.bill .btn{margin-top:8px}
 </style>
 </head>
 <body>
@@ -124,6 +125,7 @@ function show(o){
   const ext=Object.entries(o.extra_cakes||{}).map(([k,n])=>`${k} × ${n}`).join(', ');
   const wa='https://wa.me/'+(o.wa||'601165862584')+'?text='+encodeURIComponent(`Hai 100 Blooms, saya nak tukar tarikh delivery untuk order ${o.code}.`);
   const ed=o.edit||{};
+  const doc=t=>`/api/doc.php?c=${encodeURIComponent(o.code)}&k=${encodeURIComponent(o.k)}&t=${t}`;
   const delTxt=o.del_type==='spec'&&o.del_time?`Masa khusus ${o.del_time}`:o.del_label;
   $('#main').innerHTML=`<p class="code">ORDER ${h(o.code)}</p><h1>Hadiah untuk ${h(o.call)}</h1><p class="sub">${o.manual?'Dihantar kepada ':h(o.occasion)+' · dihantar kepada '}${h(o.r_name)}</p>
    ${o.status==='batal'?`<div class="msg bad" style="margin:0 0 14px">Order ini telah dibatalkan. WhatsApp kami jika ada pertanyaan.</div>`:''}
@@ -154,8 +156,16 @@ function show(o){
      <div id="wm"></div><button class="btn" id="wsv">Simpan wishcard</button><button class="btn ghost" type="button" id="wcx" style="margin-top:8px">Batal</button>
      ${!ed.wish_first?`<p class="hint" style="text-align:center;margin:8px 0 0">Simpan akan guna 1 daripada ${ed.wish_left} baki edit.</p>`:''}</form></section>
    ${!['batal','selesai','sampai','dalam_penghantaran'].includes(o.status)?`<a class="btn ghost" href="${wa}" target="_blank" rel="noopener">Minta tukar tarikh delivery</a><p class="hint" style="text-align:center;margin:8px 0 0">Order yang dah dibayar tak boleh di-refund, tapi tarikh boleh ditukar.</p>`:''}
+   ${o.status!=='batal'?`<section class="card" aria-labelledby="t9"><h2 id="t9">🧾 Invoice &amp; resit</h2>
+    <p class="hint" style="margin:0 0 10px">Muat turun sebagai PDF untuk rekod atau tuntutan syarikat.${o.paid?'':' Resit tersedia selepas bayaran diterima.'}</p>
+    <div class="docs"><a class="btn ghost" href="${doc('invoice')}" target="_blank" rel="noopener">Invoice</a>${o.paid?`<a class="btn ghost" href="${doc('receipt')}" target="_blank" rel="noopener">Resit</a>`:''}</div>
+    <details class="bill"${o.bill_to?' open':''}><summary>${o.bill_to?'Invoice atas nama syarikat':'Perlu invoice atas nama syarikat?'}</summary>
+     <label for="bt" class="hint" style="display:block;margin:8px 0 4px">Nama syarikat, no. pendaftaran &amp; alamat (dipapar sebagai "Bill To")</label>
+     <textarea id="bt" rows="3" maxlength="400" placeholder="Contoh: ABC Sdn Bhd (201901012345)&#10;No 1, Jalan Industri, 47000 Sungai Buloh">${h(o.bill_to||'')}</textarea>
+     <div id="bm"></div><button class="btn" id="bsv" type="button">Simpan</button></details></section>`:''}
    <p class="foot"><a href="/semak/">Semak order lain</a> · <a href="https://wa.me/601165862584" target="_blank" rel="noopener">WhatsApp kami</a></p>`;
   const post=async(body,isForm)=>{const r=await fetch('/api/edit.php',isForm?{method:'POST',body}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Tak dapat simpan. Cuba lagi.');return j};
+  if($('#bsv'))$('#bsv').onclick=async()=>{$('#bsv').disabled=true;try{await post({c:o.code,k:o.k,a:'bill',bill_to:$('#bt').value});$('#bm').innerHTML='<div class="msg ok">Disimpan. Buka semula invoice/resit untuk lihat.</div>'}catch(x){$('#bm').innerHTML=`<div class="msg bad">${h(x.message)}</div>`}$('#bsv').disabled=false};
   const reload=async()=>{const r=await fetch('/api/track.php?c='+encodeURIComponent(o.code)+'&k='+encodeURIComponent(o.k));if(r.ok)show(await r.json())};
   if($('#we')){$('#we').onclick=()=>{$('#wv').hidden=true;$('#wf').hidden=false;$('#wt').focus();$('#wn').textContent=$('#wt').value.length};
     $('#wt').oninput=()=>{$('#wn').textContent=$('#wt').value.length};$('#wcx').onclick=()=>{$('#wf').hidden=true;$('#wv').hidden=false};

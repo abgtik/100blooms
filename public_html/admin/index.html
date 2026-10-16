@@ -370,6 +370,11 @@ async function openOrder(id,reload){
     <div class="rowx"><span>WhatsApp</span><span><a href="${wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}, ini 100 Blooms tentang order ${o.code}. Semak status hadiah di sini: ${o.track_url}`)}" target="_blank" rel="noopener">${h(o.b_phone)}</a></span></div>
     <div class="rowx"><span>Link semak order</span><span><a href="${h(o.track_url)}" target="_blank" rel="noopener">Buka</a> · <a href="#" id="ct">Salin</a></span></div>
     ${o.agent_ref?`<div class="rowx"><span>Agent</span><span>${o.agent?`<b>${h(o.agent.name)}</b> (#${o.agent.id})${o.agent.amount!==null&&o.agent.amount!==undefined?` · komisen ${rm(o.agent.amount)}${o.agent.payout_id?' (dah dibayar)':''}`:''}`:'#'+h(o.agent_ref)}</span></div>`:''}</div>
+   <div class="card"><h2>🧾 Invoice &amp; resit</h2>
+    <div class="bar" style="margin:0"><a class="btn ghost sm" href="${h(o.doc_invoice)}" target="_blank" rel="noopener">Invoice PDF</a>${o.pay_status==='paid'?`<a class="btn ghost sm" href="${h(o.doc_receipt)}" target="_blank" rel="noopener">Resit PDF</a>`:''}
+     <a class="btn ghost sm" href="${wa(o.b_phone,o.pay_status==='paid'?`Hai ${o.b_name.split(' ')[0]}, ini resit untuk order ${o.code} (PDF):\n${o.doc_receipt}\n\nInvoice:\n${o.doc_invoice}\n\nTerima kasih! — 100 Blooms`:`Hai ${o.b_name.split(' ')[0]}, ini invoice untuk order ${o.code} (PDF):\n${o.doc_invoice}\n\nResit akan tersedia selepas bayaran diterima. — 100 Blooms`)}" target="_blank" rel="noopener">WhatsApp ke pembeli</a></div>
+    <label class="mini" for="bto" style="display:block;margin:10px 0 4px">Bill To (nama syarikat, no. SSM, alamat) — tak wajib</label><textarea id="bto" rows="2" maxlength="400" style="width:100%" placeholder="Contoh: ABC Sdn Bhd (201901012345)">${h(o.bill_to||'')}</textarea>
+    <button class="btn ghost sm" id="bts" style="margin-top:6px">Simpan Bill To</button></div>
    <div class="card"><h2>Harga</h2>${o.price_lines.map(([l,p])=>`<div class="rowx"><span>${h(l)}</span><span>${p?rm(p):'Percuma'}</span></div>`).join('')}
     <div class="rowx" style="font-weight:700"><span style="color:var(--ink)">Jumlah</span><span>${rm(o.total)}</span></div></div>
    <div class="card"><h2>Nota dalaman</h2><textarea id="nn" rows="3" style="width:100%" placeholder="Contoh: perisa kek ditukar, customer minta call dulu">${h(o.notes||'')}</textarea>
@@ -380,6 +385,7 @@ async function openOrder(id,reload){
   const close=()=>{$('#layer').innerHTML=''};
   const done=async(p,msg)=>{try{await p;toast(msg);reload&&reload();openOrder(id,reload)}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}};
   $('#cx').onclick=close;$('#sc').onclick=e=>{if(e.target.id==='sc')close()};
+  $('#bts').onclick=()=>done(api('update',{method:'POST',body:{id,bill_to:$('#bto').value}}),'Bill To disimpan');
   if($('#odel'))$('#odel').onclick=async()=>{if(prompt(`Padam terus order ${o.code}? Taip PADAM untuk sahkan.`)!=='PADAM')return;
     try{await api('delorder',{method:'POST',body:{id}});toast('Order '+o.code+' dipadam');close();reload&&reload()}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}};
   document.addEventListener('keydown',function k(e){if(e.key==='Escape'){close();document.removeEventListener('keydown',k)}});
@@ -820,6 +826,9 @@ async function Acc(el){
     <button class="btn sm" id="wasv" style="margin-top:10px">Simpan tetapan</button>
     <div class="bar" style="margin:14px 0 0"><input id="wtn" placeholder="No. untuk ujian, cth 0123456789" aria-label="Nombor ujian"><button class="btn ghost sm" id="wts">Hantar mesej ujian</button></div>
     <p class="mini" id="wal" style="margin:8px 0 0">${w.last?`Mesej terakhir ${fmtDT(w.last.at)} ke ${h(w.last.to)}: ${w.last.ok?'<b style="color:var(--ok)">berjaya</b>':`<b style="color:var(--bad)">gagal</b> (${h(w.last.error||'')})`}`:'Belum ada mesej dihantar.'}</p></div>`;}
+  if(ME.role==='owner'){const bz=(await api('biz')).biz;users+=`<div class="card" id="bzc"><h2>🧾 Maklumat syarikat (invoice &amp; resit)</h2><p class="mini" style="margin-top:0">Dipapar di bahagian atas setiap invoice dan resit PDF.</p>
+    <div class="grid2">${[['name','Nama syarikat'],['reg','No. pendaftaran (SSM)'],['phone','Telefon'],['email','Email (tak wajib)']].map(([k,t])=>`<label class="fl">${t}<input id="bz_${k}" value="${h(bz[k]||'')}"></label>`).join('')}</div>
+    <label class="fl">Alamat (tak wajib)<textarea id="bz_addr" rows="2" style="width:100%">${h(bz.addr||'')}</textarea></label><button class="btn sm" id="bzs" style="margin-top:8px">Simpan</button></div>`}
   if(ME.role==='owner'){const o=await api('olset');users+=`<div class="card" id="olc"><h2>Import data dari Orderla</h2>
     <p class="mini" style="margin-top:0">Tarik semua order lama dari Orderla (2021 hingga sekarang) ke sistem ni. Data lama disimpan berasingan: tiada WhatsApp dihantar, tiada komisen, dan order semasa tak terusik. Order yang sama tak akan masuk dua kali.</p>
     ${o.count?`<div class="msg ok" style="margin:0 0 10px">${o.count.toLocaleString()} order Orderla dalam sistem (${o.first.slice(0,7)} – ${o.last.slice(0,7)}), jualan dibayar ${rm(o.sales)}.${o.synced?` Sync terakhir ${fmtDT(o.synced)}.`:''}</div>`:''}
@@ -845,6 +854,7 @@ async function Acc(el){
       const w=await api('waset');if(w.last)$('#wal').innerHTML=`Mesej terakhir ${fmtDT(w.last.at)} ke ${h(w.last.to)}: ${w.last.ok?'<b style="color:var(--ok)">berjaya</b>':`<b style="color:var(--bad)">gagal</b> (${h(w.last.error||'')})`}`};
     if(/^sess_|^official:/.test($('#wan').value))sess();
   }
+  if($('#bzs'))$('#bzs').onclick=async()=>{const b={};['name','reg','phone','email','addr'].forEach(k=>b[k]=$('#bz_'+k).value);try{await api('biz',{method:'POST',body:b});toast('Maklumat syarikat disimpan')}catch(e){toast(e.message)}};
   if($('#olc')){
     const out=t=>$('#olo').innerHTML=t;
     $('#ols').onclick=async()=>{try{await api('olset',{method:'POST',body:{email:$('#ole').value,token:$('#olt').value}});$('#olt').value='';toast('Disimpan');Acc(el)}catch(e){toast(e.message)}};

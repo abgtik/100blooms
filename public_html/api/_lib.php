@@ -71,7 +71,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 11) return;
+  if ($v >= 12) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -106,13 +106,15 @@ function migrate(PDO $pdo): void {
   if ($v < 10) media_ads($pdo);
   // v11: orders imported from Orderla (2021 onwards), kept apart from live orders
   $run(legacy_schema($my));
+  // v12: invoice/receipt addressed to a company ("Bill to")
+  $run('ALTER TABLE orders ADD COLUMN bill_to TEXT NULL');
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','11')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','12')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
@@ -595,7 +597,7 @@ function wa_order(array $o, string $event): void {
       $add('buyer_paid', 'buyer_paid', $o['b_phone'], "Hai $first 🌸\n\nTerima kasih! Bayaran untuk order *{$o['code']}* (RM" . number_format((float)$o['total'], 2) . ") dah kami terima.\n\n"
         . "💐 Hadiah untuk *{$o['r_name']}*\n🚚 $day · $slot\n\n"
         . ($need ? '📝 Jangan lupa ' . implode(' dan ', $need) . " di link bawah ya, supaya kami boleh siapkan hadiah.\n\n" : '')
-        . "Semak status order:\n$track\n\n— 100 Blooms");
+        . "Semak status order:\n$track\n\n🧾 Resit (PDF):\n" . doc_url($o, 'receipt') . "\n\n— 100 Blooms");
       if ($ag) {
         $c = q('SELECT amount FROM commissions WHERE order_id=?', [$o['id']])->fetchColumn();
         if ($c !== false) { $due = agent_money((int)$ag['id'])['due'];
@@ -690,40 +692,54 @@ function product_meta(): array {
 }
 const SLOT_EN = ['free' => '10:00 AM – 6:00 PM', 'A' => '9:00 AM – 12:00 PM', 'B' => '1:00 PM – 4:00 PM', 'C' => '5:00 PM – 8:00 PM'];
 /** WhatsApp invoice in the shop's usual layout, priced the same way as the website (Combo Jimat set + add-ons). */
-function invoice_text(array $o): string {
-  $C = catalog(); $M = product_meta(); $f = fn($n) => number_format((float)$n, 2, '.', '');
+/** Invoice lines in our set pricing (Combo Jimat + add-ons), shared by the WhatsApp invoice and the PDF invoice/receipt. */
+function invoice_rows(array $o): array {
+  $C = catalog(); $M = product_meta();
   $lines = json_decode((string)$o['price_lines'], true) ?: [];
   $bqName = $C['bq'][$o['bouquet']] ?? $o['bouquet']; $balName = $C['bal'][$o['balloon']] ?? $o['balloon'];
   $balCode = $M['bal'][$o['balloon']]['code'] ?? ''; $bqCode = $M['bq'][$o['bouquet']]['code'] ?? '';
   $cakeTxt = $o['cake'] === OTHER_CAKE ? implode(' / ', json_decode((string)$o['cake_flavours'], true) ?: []) . ' (ikut stok)' : $o['cake'];
-  $items = []; $sub = 0;
-  $add = function (string $t, float $p, int $n = 1, string $sublines = '') use (&$items, &$sub, $f) { $items[] = "↳ $n x $t (" . $f($p) . " x $n = " . $f($p * $n) . ")" . ($sublines !== '' ? "\n        $sublines" : ''); $sub += $p * $n; };
-  $set = ['1 x ' . ($bqCode ? "$bqCode - " : '') . "$bqName Bouquet" . ($o['bq_note'] ? " - {$o['bq_note']}" : ''),
-    "1 x Balloon Foil ( " . ($balCode ? "$balCode - " : '') . "$balName )",
-    "1 x Secret Recipe Slice Cake ( $cakeTxt )", '1 x Polaroid photo', '1 x Wishcard'];
-  $add('Combo Jimat', (float)($lines[0][1] ?? BASE_PRICE), 1, implode("\n        ", $set));
-  $fees = 0; $delLabel = ''; $extra = [];
+  $items = []; $sub = 0.0;
+  $add = function (string $t, float $p, int $n = 1, array $subs = []) use (&$items, &$sub) { $items[] = ['name' => $t, 'subs' => $subs, 'qty' => $n, 'price' => $p, 'amount' => $p * $n]; $sub += $p * $n; };
+  $add('Combo Jimat', (float)($lines[0][1] ?? BASE_PRICE), 1, ['1 x ' . ($bqCode ? "$bqCode - " : '') . "$bqName Bouquet" . (!empty($o['bq_note']) ? " - {$o['bq_note']}" : ''),
+    '1 x Balloon Foil ( ' . ($balCode ? "$balCode - " : '') . "$balName )", "1 x Secret Recipe Slice Cake ( $cakeTxt )", '1 x Polaroid photo', '1 x Wishcard']);
+  $fees = 0.0; $delLabel = ''; $extra = [];
   foreach (array_slice($lines, 1) as [$label, $amt]) { // everything after the set line
     $amt = (float)$amt;
-    if (str_starts_with($label, 'Upgrade kek')) $add($label, $amt);
-    elseif (str_starts_with($label, 'Kek tambahan')) $add($label, $amt);
+    if (str_starts_with($label, 'Upgrade kek') || str_starts_with($label, 'Kek tambahan')) $add($label, $amt);
     elseif (str_starts_with($label, 'Polaroid tambahan')) { $n = (int)preg_replace('/\D/', '', $label) ?: 1; $add('Polaroid tambahan', EXTRA_PHOTO, $n); }
-    elseif (str_starts_with($label, '🎁')) $items[] = '↳ 1 x ' . $label . ' (FREE)';
+    elseif (str_starts_with($label, '🎁')) $items[] = ['name' => $label, 'subs' => [], 'qty' => 1, 'price' => 0.0, 'amount' => 0.0, 'free' => true];
     elseif (isset(DELIVERY[$o['del_type']]) && str_starts_with($label, DELIVERY[$o['del_type']]['label'])) { $delLabel = $label; $fees += $amt; }
-    elseif (str_starts_with($label, 'Caj kawasan')) { $fees += $amt; $extra[] = "$label: RM" . $f($amt); }
+    elseif (str_starts_with($label, 'Caj kawasan')) { $fees += $amt; $extra[] = [$label, $amt]; }
     elseif ($amt > 0) $add($label, $amt);
   }
-  $disc = round($sub + $fees - (float)$o['total'], 2);
+  $areaFee = array_sum(array_column($extra, 1));
   $delName = ['free' => 'Free Delivery (10am-6pm)', 'A' => 'Slot A (9am-12pm)', 'B' => 'Slot B (1pm-4pm)', 'C' => 'Slot C (5pm-8pm)', 'spec' => 'Masa khusus ' . $o['del_time']][$o['del_type']] ?? $delLabel;
   $date = date('l, j F Y', strtotime($o['del_date'])) . ' (' . ($o['del_type'] === 'spec' ? $o['del_time'] : (SLOT_EN[$o['del_type']] ?? '')) . ')';
+  return ['items' => $items, 'sub' => round($sub, 2), 'fees' => round($fees, 2), 'del_fee' => round($fees - $areaFee, 2), 'extra' => $extra, 'del_name' => $delName,
+    'disc' => round($sub + $fees - (float)$o['total'], 2), 'date' => $date];
+}
+function invoice_text(array $o): string {
+  $f = fn($n) => number_format((float)$n, 2, '.', '');
+  $R = invoice_rows($o); $items = [];
+  foreach ($R['items'] as $it) $items[] = !empty($it['free']) ? '↳ 1 x ' . $it['name'] . ' (FREE)'
+    : "↳ {$it['qty']} x {$it['name']} (" . $f($it['price']) . " x {$it['qty']} = " . $f($it['amount']) . ")" . ($it['subs'] ? "\n        " . implode("\n        ", $it['subs']) : '');
+  $extra = array_map(fn($x) => "{$x[0]}: RM" . $f($x[1]), $R['extra']); $disc = $R['disc'];
   $wish = $o['wish'] === WISH_NONE ? 'not receive yet (boleh isi sendiri di Invoice Link bersama gambar polaroid)' : $o['wish'] . ($o['sender'] ? "\n— " . $o['sender'] : '');
   $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
-  return "[ Invoice No: {$o['code']} ]\n\nHi, I want to order:\n\n" . implode("\n \n", $items) . " \n \nSubtotal: RM" . $f($sub)
-    . "\n\nDelivery: $delName \nDelivery Fee: RM" . $f($fees) . ($extra ? "\n" . implode("\n", $extra) : '')
+  return "[ Invoice No: {$o['code']} ]\n\nHi, I want to order:\n\n" . implode("\n \n", $items) . " \n \nSubtotal: RM" . $f($R['sub'])
+    . "\n\nDelivery: {$R['del_name']} \nDelivery Fee: RM" . $f($R['fees']) . ($extra ? "\n" . implode("\n", $extra) : '')
     . ($disc > 0 ? "\n\nDiscount" . ($o['voucher'] ? " ({$o['voucher']})" : '') . ": RM" . $f(-$disc) : '') . "\n\nTotal:\nRM" . $f($o['total'])
     . "\n \nName:\n{$o['b_name']}\n\nPhone Number:\n" . '60' . norm_phone($o['b_phone']) . "\n\nAddress:\n\n{$o['r_addr']}\n\nPostcode:\n{$o['r_post']}"
-    . "\n\nReceiver Name:\n{$o['r_name']}\n\nReceiver Phone Number:\n{$o['r_phone']}\n\nWishcard (FREE):\n$wish\n\nDate & Time Slot:\n$date"
+    . "\n\nReceiver Name:\n{$o['r_name']}\n\nReceiver Phone Number:\n{$o['r_phone']}\n\nWishcard (FREE):\n$wish\n\nDate & Time Slot:\n{$R['date']}"
     . "\n\n[ Invoice Link: $track ]";
+}
+/** Printable invoice (before payment) / receipt (after payment) for this order. */
+function doc_url(array $o, string $type): string { return SITE_URL . '/api/doc.php?c=' . rawurlencode($o['code']) . '&k=' . $o['token'] . '&t=' . $type; }
+/** Business details printed on invoices and receipts (owner edits them in admin → Pengguna). */
+function biz_info(): array {
+  return ['name' => (string)setting('biz_name', '100 Blooms Enterprise'), 'reg' => (string)setting('biz_reg', '202103358950'),
+    'phone' => (string)setting('biz_phone', '60182547099'), 'addr' => (string)setting('biz_addr', ''), 'email' => (string)setting('biz_email', '')];
 }
 
 // ---------- vouchers ----------
