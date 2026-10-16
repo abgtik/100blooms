@@ -14,6 +14,12 @@ const EXTRA_PHOTO = 10;
 const MAX_EXTRA_CAKE = 10;
 const MAX_PHOTOS = 10;
 const OTHER_CAKE = 'Pilihan lain (ikut stok)';
+// Add-ons the sales team can add to a manual order (+ Order in admin only): id => [name, price RM, unit, group]
+const ADDONS = [
+  'rose' => ['Red Roses', 10, 'stalk', 'Bunga'], 'gerbera' => ['Gerbera Daisy', 8, 'stalk', 'Bunga'], 'sunflower' => ['Sunflower', 15, 'stalk', 'Bunga'],
+  'kisses' => ['Hershey\'s Kisses', 8, 'pcs', 'Coklat'], 'ferrero' => ['Ferrero Rocher Egg Cup', 10, 'pcs', 'Coklat'], 'cadbury' => ['Cadbury Dairy Milk', 3, 'pcs', 'Coklat'],
+  'kitkat' => ['Kit Kat', 3, 'pcs', 'Coklat'], 'bueno' => ['Kinder Bueno', 8, 'pcs', 'Coklat'],
+];
 // Customer photos must not be reachable by URL. On Plesk, nginx can serve static files directly and skip
 // .htaccess, so prefer the webspace "private" folder (outside httpdocs) when it exists.
 if (!defined('UPLOAD_DIR')) {
@@ -173,7 +179,10 @@ function prep_items(array $o): array {
     'cake' => 'Kek dibeli (' . $o['cake'] . ')'];
   if ((int)$o['photo_count'] > 0) $it['polaroid'] = 'Polaroid dicetak (' . (int)$o['photo_count'] . ' keping)';
   $it['wishcard'] = 'Wishcard ditulis';
-  foreach (json_decode((string)$o['price_lines'], true) ?: [] as $l) if (str_starts_with((string)$l[0], '🎁 ')) $it['gift'] = 'Hadiah voucher: ' . preg_replace('/^🎁 | \(voucher .*\)$/u', '', $l[0]);
+  foreach (json_decode((string)$o['price_lines'], true) ?: [] as $i => $l) {
+    if (str_starts_with((string)$l[0], '🎁 ')) $it['gift'] = 'Hadiah voucher: ' . preg_replace('/^🎁 | \(voucher .*\)$/u', '', $l[0]);
+    if (str_starts_with((string)$l[0], 'Add-on: ')) $it['addon' . $i] = $l[0];
+  }
   return $it;
 }
 function jdec($v): array { return is_array($v) ? $v : (json_decode((string)$v, true) ?: []); }
@@ -713,6 +722,7 @@ function invoice_rows(array $o): array {
     elseif (str_starts_with($label, '🎁')) $items[] = ['name' => $label, 'subs' => [], 'qty' => 1, 'price' => 0.0, 'amount' => 0.0, 'free' => true];
     elseif (isset(DELIVERY[$o['del_type']]) && str_starts_with($label, DELIVERY[$o['del_type']]['label'])) { $delLabel = $label; $fees += $amt; }
     elseif (str_starts_with($label, 'Caj kawasan')) { $fees += $amt; $extra[] = [$label, $amt]; }
+    elseif (preg_match('/^Add-on: (.+) × (\d+)$/u', $label, $m)) $add($m[1], $amt / max(1, (int)$m[2]), (int)$m[2]);
     elseif ($amt > 0) $add($label, $amt);
   }
   $areaFee = array_sum(array_column($extra, 1));
@@ -907,6 +917,9 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
     $r = voucher_apply($L, $v, $photoCount, $setSub);
     if (is_string($r)) return ['errors' => [$r]];
     [$L, $discount] = $r; $vcode = $v['code'];
+  }
+  if (!empty($opts['manual']) && is_array($in['addons'] ?? null)) foreach (ADDONS as $id => [$an, $ap, $au]) { // admin-only add-ons
+    $n = max(0, min(99, (int)($in['addons'][$id] ?? 0))); if ($n) $L[] = ["Add-on: $an × $n", $ap * $n];
   }
   if (!empty($opts['adjust']) && (float)$opts['adjust'][0] != 0) $L[] = [str_in($opts['adjust'][1] ?: 'Pelarasan harga', 80), round((float)$opts['adjust'][0], 2)];
   $total = round(array_sum(array_column($L, 1)), 2);

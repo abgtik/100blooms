@@ -124,6 +124,10 @@ a{color:var(--accent)}
 .ddm a,.ddm .dis{display:block;padding:9px 12px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:14px}.ddm a:hover{background:var(--bg)}.ddm .dis{color:var(--soft);font-size:13px}.ddm hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 .src{display:inline-block;font:600 11.5px var(--body);border-radius:99px;padding:2px 8px;vertical-align:1px}.src.hq{background:#efe6fb;color:#6b3fb5}.src.agent{background:var(--hl);color:var(--warn)}.src.web{background:var(--infob);color:var(--info)}
 .filled{outline:2px solid var(--ok)!important;outline-offset:1px;transition:outline-color .4s}.card.paste{border:1.5px dashed var(--line)}
+.addons{border:1.5px solid var(--line);border-radius:14px;padding:10px 12px}.adg{margin-top:4px}.adg>.mini{display:block;margin:4px 0}
+.adl{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}.adi{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;background:var(--bg);cursor:default}
+.adi.on{background:var(--okb);outline:1.5px solid var(--ok)}.adi small{display:block;color:var(--soft);font-size:11.5px}.stp{display:flex;align-items:center;gap:2px}
+.stp button{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font:700 16px/1 var(--body);cursor:pointer}.stp input{width:44px!important;min-width:0;flex:none;text-align:center;padding:4px 2px}.adi>span:first-child{flex:1;min-width:0}
 .btn.danger{color:var(--bad);border-color:var(--bad)}.btn.danger:hover{background:var(--badb)}
 @media (max-width:560px){.cal button{min-height:56px;padding:4px}.cal .d{font-size:12px}.cal .lbl{display:none}}
 
@@ -219,7 +223,7 @@ html:not([data-nomascot]) .ranks{row-gap:26px}
 const $=s=>document.querySelector(s);
 const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rm=n=>{const d=+n%1?2:0;return (+n<0?'−':'')+'RM'+Math.abs(+n).toLocaleString('en-MY',{minimumFractionDigits:d,maximumFractionDigits:d})};
-let PM={bq:{},bal:{},cake:{}},GW='gateway bayaran',ME=null,CSRF='',CAT=null,TODAY='',tab='dash',f='today',qs='',dfrom='',dto='';
+let ADDONS={},PM={bq:{},bal:{},cake:{}},GW='gateway bayaran',ME=null,CSRF='',CAT=null,TODAY='',tab='dash',f='today',qs='',dfrom='',dto='';
 const ST={menunggu_bayaran:'Menunggu bayaran',baru:'Baru (dibayar)',disiapkan:'Sedang disiapkan',dalam_penghantaran:'Dalam penghantaran',selesai:'Selesai',batal:'Batal'};
 const DEL={free:'Percuma 10am–6pm',A:'Slot A 9am–12pm',B:'Slot B 1pm–4pm',C:'Slot C 5pm–8pm',spec:'Masa khusus'};
 const OCC_T=()=>CAT.occ,REL_T=()=>CAT.rel;
@@ -248,7 +252,7 @@ function login(err){
   $('#le').focus();
 }
 async function boot(){
-  try{const j=await api('me');ME=j.user;ME.site=j.site;CSRF=j.csrf;if(j.pmeta)PM=j.pmeta;if(j.status_label)Object.assign(ST,j.status_label);GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
+  try{const j=await api('me');ME=j.user;ME.site=j.site;ADDONS=j.addons||{};CSRF=j.csrf;if(j.pmeta)PM=j.pmeta;if(j.status_label)Object.assign(ST,j.status_label);GW=j.gateway||GW;CAT=j.catalog;TODAY=j.today;render()}catch(e){login()}
 }
 function render(){
   const T=[['dash','Dashboard'],['orders','Order'],['new','＋ Order'],['cal','Kalendar'],['report','Report'],['vouch','Voucher'],['agent','Agent'],['cust','Pelanggan'],['stock','Stok'],['dates','Tutup tarikh'],['acc',ME.role==='owner'?'Pengguna':'Akaun']];
@@ -484,6 +488,9 @@ function NewOrder(el){
     <label class="fl" id="w_ofl" hidden>Perisa pilihan (pisah dengan koma, maks 5)<input id="f_ofl" placeholder="Cheese Cake, Tiramisu"></label>
     <label class="fl">Bilangan polaroid<input id="f_pc" type="number" min="1" max="10" value="1"></label>
     <label class="fl">Gambar polaroid (jika dah terima)<input id="f_photos" type="file" accept="image/*" multiple></label>
+    <div class="fl full addons"><b style="display:block;margin-bottom:6px">🌹🍫 Add-on <span class="mini" style="font-weight:400">(team sahaja, tak keluar di page customer)</span></b>
+     ${['Bunga','Coklat'].map(g=>`<div class="adg"><span class="mini">${g}</span><div class="adl">${Object.entries(ADDONS).filter(([,a])=>a[3]===g).map(([id,[n,p,u]])=>`<label class="adi"><span>${h(n)}<small>RM${p}/${u}</small></span>
+       <span class="stp"><button type="button" data-ad="-1" aria-label="Kurang ${h(n)}">−</button><input type="number" min="0" max="99" value="0" data-ao="${id}" aria-label="Bilangan ${h(n)}"><button type="button" data-ad="1" aria-label="Tambah ${h(n)}">+</button></span></label>`).join('')}</div></div>`).join('')}</div>
     <details class="fl full"><summary style="cursor:pointer">Kek tambahan (RM20 sepotong)</summary><div class="bar" style="margin:6px 0 0">${cakes.filter(c=>!/lain/.test(c)).map(c=>`<span class="mini" style="display:flex;align-items:center;gap:4px">${h(c)} <input type="number" min="0" max="10" value="0" data-xc="${h(c)}" style="width:62px" aria-label="Bilangan ${h(c)}"></span>`).join('')}</div></details>
     <label class="fl full">Ayat wishcard (kosongkan jika belum terima)<textarea id="f_wish" rows="3" maxlength="320"></textarea></label>
     <label class="fl">Daripada<input id="f_sender"></label></div></div>
@@ -514,9 +521,9 @@ function NewOrder(el){
    <div class="qbox" aria-live="polite"><div id="qv" class="mini">Isi borang untuk tengok harga.</div>
     <button class="btn" id="go" type="submit" style="width:100%;margin-top:10px" disabled>Cipta order</button></div></form>`;
   const V=id=>$('#'+id).value,photos=()=>$('#f_photos').files.length;
-  const data=()=>{const xc={};el.querySelectorAll('[data-xc]').forEach(i=>{if(+i.value>0)xc[i.dataset.xc]=+i.value});
+  const data=()=>{const xc={},ao={};el.querySelectorAll('[data-xc]').forEach(i=>{if(+i.value>0)xc[i.dataset.xc]=+i.value});el.querySelectorAll('[data-ao]').forEach(i=>{if(+i.value>0)ao[i.dataset.ao]=+i.value});
     return{occ:V('f_occ'),bq:V('f_bq'),bq_note:V('f_bqn'),bal:V('f_bal'),cake:V('f_cake'),otherFl:V('f_ofl').split(',').map(x=>x.trim()).filter(Boolean).slice(0,5),photo_count:+V('f_pc')||1,
-      extraCakes:xc,wish:V('f_wish'),sender:V('f_sender'),rname:V('f_rname'),rphone:V('f_rphone'),raddr:V('f_raddr'),rpost:V('f_rpost').replace(/\D/g,''),date:V('f_date'),del:V('f_del'),time:V('f_time'),
+      extraCakes:xc,addons:ao,wish:V('f_wish'),sender:V('f_sender'),rname:V('f_rname'),rphone:V('f_rphone'),raddr:V('f_raddr'),rpost:V('f_rpost').replace(/\D/g,''),date:V('f_date'),del:V('f_del'),time:V('f_time'),
       bname:V('f_bname'),bphone:V('f_bphone'),ref:V('f_ref').trim(),voucher:V('f_voucher').trim(),adj_amt:V('f_adj'),adj_label:V('f_adjl'),override:$('#f_ov').checked,notes:V('f_notes'),
       pay_mode:el.querySelector('[name=pm]:checked').value,pay_ref:V('f_pref')}};
   /* paste the customer's WhatsApp form → fill the fields */
@@ -542,6 +549,8 @@ function NewOrder(el){
       ${chk.length?`<br>🔎 Semak pilihan ni: ${chk.map(h).join('; ')}.`:''}${miss.length?`<br>⚠️ Tak jumpa dalam senarai, pilih sendiri: ${miss.map(h).join('; ')}.`:''}${empty.length&&got.length?`<br>ℹ️ Customer belum isi: ${empty.map(h).join(', ')}.`:''}</div>`;
     $('#nf').scrollIntoView({behavior:'smooth',block:'start'});
   };
+  el.querySelectorAll('[data-ad]').forEach(b=>b.onclick=()=>{const i=b.parentNode.querySelector('input');i.value=Math.max(0,Math.min(99,(+i.value||0)+ +b.dataset.ad));i.closest('.adi').classList.toggle('on',+i.value>0);i.dispatchEvent(new Event('input',{bubbles:true}))});
+  el.querySelectorAll('[data-ao]').forEach(i=>i.addEventListener('input',()=>i.closest('.adi').classList.toggle('on',+i.value>0)));
   let tm,ok=false;
   const quote=async()=>{const d=data();$('#w_ofl').hidden=!/lain/.test(d.cake);$('#w_time').hidden=d.del!=='spec';$('#w_pref').hidden=d.pay_mode!=='paid';
     try{const j=await api('quote',{method:'POST',body:{data:d,photos:photos()}});

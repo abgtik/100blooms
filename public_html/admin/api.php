@@ -41,7 +41,7 @@ switch ($a) {
 case 'me':
   if (!$me) fail('Sila log masuk.', 401);
   if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(16));
-  json_out(['user' => $me, 'csrf' => $_SESSION['csrf'], 'catalog' => catalog(), 'status_label' => STATUS_LABEL, 'pmeta' => product_meta(), 'today' => date('Y-m-d'), 'site' => SITE_URL, 'gateway' => gateway_name()]);
+  json_out(['user' => $me, 'csrf' => $_SESSION['csrf'], 'catalog' => catalog(), 'status_label' => STATUS_LABEL, 'pmeta' => product_meta(), 'today' => date('Y-m-d'), 'site' => SITE_URL, 'addons' => ADDONS, 'gateway' => gateway_name()]);
 
 case 'login':
   if (!$post) fail('POST sahaja.', 405);
