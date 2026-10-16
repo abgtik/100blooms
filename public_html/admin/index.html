@@ -123,6 +123,7 @@ a{color:var(--accent)}
 .dd{position:relative}.ddm{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:220px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 16px 40px -14px rgba(0,0,0,.3)}
 .ddm a,.ddm .dis{display:block;padding:9px 12px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:14px}.ddm a:hover{background:var(--bg)}.ddm .dis{color:var(--soft);font-size:13px}.ddm hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 .src{display:inline-block;font:600 11.5px var(--body);border-radius:99px;padding:2px 8px;vertical-align:1px}.src.hq{background:#efe6fb;color:#6b3fb5}.src.agent{background:var(--hl);color:var(--warn)}.src.web{background:var(--infob);color:var(--info)}
+.filled{outline:2px solid var(--ok)!important;outline-offset:1px;transition:outline-color .4s}.card.paste{border:1.5px dashed var(--line)}
 .btn.danger{color:var(--bad);border-color:var(--bad)}.btn.danger:hover{background:var(--badb)}
 @media (max-width:560px){.cal button{min-height:56px;padding:4px}.cal .d{font-size:12px}.cal .lbl{display:none}}
 
@@ -427,12 +428,53 @@ async function openOrder(id,reload){
   if($('#rpu'))$('#rpu').onclick=()=>{const f=$('#rpf').files[0];if(!f)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fd.append('file',f);done(api('rphoto',{method:'POST',body:fd}),'Gambar dimuat naik')};
 }
 
+/* ---------- WhatsApp form paste helpers (+ Order) ---------- */
+const PASTE_KEYS=[[/^(occasion|momen|majlis|sempena)/,'occ'],[/^(bouquet|bunga|jambak)/,'bq'],[/^(wrap|balut)/,'bqn'],[/^(balloon|belon)/,'bal'],[/^(cake|kek)/,'cake'],
+  [/^(nama\s*)?(pemberi|pembeli|pengirim)|^sender\s*name|^your\s*name/,'bname'],[/^(no\.?\s*)?(tel|telefon|phone|hp|whatsapp|wa)\.?\s*(no\.?\s*)?(pemberi|pembeli|pengirim)/,'bphone'],
+  [/^(nama\s*)?penerima|^receiver\s*name|^recipient/,'rname'],[/^(no\.?\s*)?(tel|telefon|phone|hp)\.?\s*(no\.?\s*)?penerima|^receiver\s*phone/,'rphone'],
+  [/^alamat|^address/,'raddr'],[/^pos\s*kod|^poskod|^postcode/,'rpost'],[/^tarikh|^date|^hari/,'date'],[/^(masa|slot|time|waktu)/,'slot'],
+  [/^(kad|ucapan|wish|card)/,'wish'],[/^(daripada|dari|from)/,'sender']];
+function pasteParse(t){const F={};let cur=null;
+  for(const raw of String(t).replace(/\r/g,'').split('\n')){const line=raw.replace(/[*_~]/g,'').trim();
+    const m=line.match(/^([A-Za-z][A-Za-z0-9 ./()&-]{1,45}?)\s*[:：=]\s*(.*)$/);let key=null;
+    if(m){const lab=m[1].toLowerCase().replace(/\s+/g,' ').trim();for(const [re,k] of PASTE_KEYS)if(re.test(lab)){key=k;break}}
+    if(key){cur=key;F[key]=(m[2]||'').trim();continue}
+    if(m&&!key){cur=null;continue}
+    if(cur&&line){F[cur]=(F[cur]?F[cur]+'\n':'')+line}else if(!line&&cur&&cur!=='wish')cur=null;}
+  for(const k in F)F[k]=F[k].trim();return F}
+const pasteNorm=x=>String(x).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,' ').trim();
+function pasteMatch(sel,val){const v=pasteNorm(val);if(!v)return null;const code=(String(val).match(/\b([A-Za-z]{1,3}\d{2,3})\b/)||[])[1];let best=null,score=0;
+  for(const o of sel.options){if(!o.value)continue;const t=pasteNorm(o.text),name=pasteNorm(o.text.replace(/^[A-Za-z]{1,3}\d{2,3}\s*-\s*/,''));let sc=0;
+    if(code&&new RegExp('^'+code.toLowerCase()+'\\b').test(t))sc=100;else if(name===v||t===v)sc=90;else if(name&&v.includes(name))sc=50+name.length;else if(name.includes(v)&&v.length>=3)sc=40+v.length;
+    if(!sc){const vw=v.split(' ').filter(w=>w.length>=3&&!/^\d+$/.test(w)),nw=new Set(name.split(' '));const hit=vw.filter(w=>nw.has(w)).length;if(hit)sc=hit*10-(nw.size-hit)}
+    if(sc>score){score=sc;best=o.value}}pasteMatch.sure=score>=40;return score>0?best:null}
+function pasteOcc(v){const t=v.toLowerCase();const R=[[/jadi|birth|b'?day|besday|lahir\s*hari|ulang\s*tahun\s*kelahiran/,'birthday'],[/anniv|ulang\s*tahun\s*perkahwinan|wedding/,'anniv'],[/konvo|grad|graduat/,'convo'],
+  [/sembuh|get\s*well|sakit/,'sembuh'],[/baby|bayi|bersalin|newborn/,'baby'],[/terima\s*kasih|thank|appreciat/,'thanks'],[/rindu|miss/,'rindu'],[/pujuk|sorry|maaf|merajuk/,'pujuk'],[/saja|just/,'saja']];
+  for(const [re,k] of R)if(re.test(t)&&(CAT.occ||{})[k])return k;return null}
+function pasteDate(v){const M={jan:1,feb:2,mac:3,mar:3,apr:4,mei:5,may:5,jun:6,jul:7,ogo:8,aug:8,sep:9,okt:10,oct:10,nov:11,dis:12,dec:12};const t=v.toLowerCase(),now=new Date(TODAY+'T00:00');let d,m,y;
+  let x=t.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);if(x){y=+x[1];m=+x[2];d=+x[3]}
+  else if((x=t.match(/\b(\d{1,2})\s*[\/.-]\s*(\d{1,2})(?:\s*[\/.-]\s*(\d{2,4}))?\b/))){d=+x[1];m=+x[2];y=x[3]?+(x[3].length===2?'20'+x[3]:x[3]):0}
+  else if((x=t.match(/\b(\d{1,2})\s*(?:hb\s*)?([a-z]{3})[a-z]*\.?\s*(\d{4})?/))&&M[x[2]]){d=+x[1];m=M[x[2]];y=x[3]?+x[3]:0}
+  else if(/esok|tomorrow/.test(t)){const n=new Date(now.getTime()+864e5);return ymd(n)}else if(/hari\s*ni|today/.test(t))return TODAY;else return null;
+  if(!y){y=now.getFullYear();if(new Date(y,m-1,d)<now)y++}const r=new Date(y,m-1,d);return r.getMonth()===m-1?ymd(r):null}
+function pasteSlot(v){const t=v.toLowerCase().replace(/\s+/g,' ');let x;
+  if((x=t.match(/slot\s*([abc])\b/)))return [x[1].toUpperCase()];
+  if(/percuma|free|bila[- ]?bila|any\s*time|10\s*(am|pg|pagi)?\s*[-–to]+\s*6/.test(t))return ['free'];
+  if(/9\s*(am|pg|pagi)?\s*[-–to]+\s*12/.test(t))return ['A'];if(/\b1\s*(pm|ptg|tgh|tengah\s*hari)?\s*[-–to]+\s*4/.test(t))return ['B'];if(/\b5\s*(pm|ptg|petang)?\s*[-–to]+\s*8/.test(t))return ['C'];
+  if(/^pagi$/.test(t))return ['A'];if(/tengah\s*hari/.test(t))return ['B'];if(/petang|malam/.test(t))return ['C'];
+  if((x=t.match(/\b(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm|pg|ptg|pagi|petang|malam|tgh)?\b/))){let hh=+x[1];const mm=x[2]||'00',ap=x[3]||'';if(/pm|ptg|petang|malam/.test(ap)&&hh<12)hh+=12;if(/tgh/.test(ap)&&hh<7)hh+=12;if(!ap&&hh<8)hh+=12;
+    if(hh>=8&&hh<=21)return ['spec',String(hh).padStart(2,'0')+':'+mm]}
+  return [null]}
 /* ---------- manual order (sales team, WhatsApp orders) ---------- */
 function NewOrder(el){
   const C=CAT,lab=(t,k,n)=>{const c=(PM[t]||{})[k];return (c&&c.code?c.code+' - ':'')+n};
   const optc=(t,o)=>Object.entries(o).map(([k,n])=>[k,lab(t,k,n)]).sort((a,b)=>{const ca=(PM[t]||{})[a[0]]?.code||'',cb=(PM[t]||{})[b[0]]?.code||'';return (!ca-!cb)||(ca||a[1]).localeCompare(cb||b[1],undefined,{numeric:true})}).map(([k,n])=>`<option value="${h(k)}">${h(n)}</option>`).join('');
   const cakes=[...C.cake_free,...C.cake_up],tom=new Date(Date.now()+864e5);
   el.innerHTML=`<div class="msg ok" style="margin:0 0 12px">🧑‍💼 <b>Page order Sales HQ</b>: sama macam page customer, order disimpan atas nama awak dan diakhiri invoice WhatsApp ke pembeli. <a href="../sales/" target="_blank" rel="noopener">Buka page Sales HQ ↗</a> <span class="mini">(link: ${h((ME.site||location.origin)+"/sales/")})</span></div><form id="nf" novalidate>
+   <div class="card paste"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">📋 Tampal borang WhatsApp</h2><button type="button" class="btn ghost sm" id="ptpl">Salin template untuk customer</button></div>
+    <p class="mini" style="margin:6px 0 8px">Tampal jawapan customer (Bouquet : … Nama Pemberi : … ) di bawah, kemudian tekan <b>Isi borang</b>. Semak semula sebelum cipta order.</p>
+    <textarea id="f_paste" rows="5" style="width:100%" placeholder="Bouquet : Glam&#10;Balloon : FB02&#10;Cake : Carrot Cake&#10;&#10;Nama Pemberi : Ahmad&#10;No Tel Pemberi : 012-345 6789&#10;…"></textarea>
+    <div class="bar" style="margin:8px 0 0"><button type="button" class="btn sm" id="pfill">Isi borang</button><button type="button" class="btn ghost sm" id="pclr">Kosongkan</button></div><div id="pres"></div></div>
    <div class="card"><h2>Item</h2><div class="fgrid">
     <label class="fl">Occasion / momen<select id="f_occ"><option value="">— Pilih —</option>${Object.entries(C.occ||{}).map(([k,n])=>`<option value="${k}">${h(n)}</option>`).join('')}</select></label>
     <label class="fl">Bouquet<select id="f_bq">${optc('bq',C.bq)}</select></label>
@@ -477,6 +519,29 @@ function NewOrder(el){
       extraCakes:xc,wish:V('f_wish'),sender:V('f_sender'),rname:V('f_rname'),rphone:V('f_rphone'),raddr:V('f_raddr'),rpost:V('f_rpost').replace(/\D/g,''),date:V('f_date'),del:V('f_del'),time:V('f_time'),
       bname:V('f_bname'),bphone:V('f_bphone'),ref:V('f_ref').trim(),voucher:V('f_voucher').trim(),adj_amt:V('f_adj'),adj_label:V('f_adjl'),override:$('#f_ov').checked,notes:V('f_notes'),
       pay_mode:el.querySelector('[name=pm]:checked').value,pay_ref:V('f_pref')}};
+  /* paste the customer's WhatsApp form → fill the fields */
+  const TPL=`*Borang Order 100 Blooms* 🌸\n\nOccasion : \nBouquet : \nBalloon : \nCake : \n\nNama Pemberi : \nNo Tel Pemberi : \n\nNama Penerima : \nNo Tel Penerima : \nAlamat Penerima : \nPoskod : \n\nTarikh Hantar : \nMasa / Slot : \n\nKad Ucapan : \nDaripada (nama pada kad) : `;
+  $('#ptpl').onclick=async()=>{try{await navigator.clipboard.writeText(TPL);toast('Template disalin. Tampal di WhatsApp customer.')}catch(e){$('#f_paste').value=TPL;toast('Template diletak dalam kotak, salin dari situ.')}};
+  $('#pclr').onclick=()=>{$('#f_paste').value='';$('#pres').innerHTML=''};
+  $('#pfill').onclick=()=>{
+    const F=pasteParse($('#f_paste').value),got=[],miss=[],chk=[];
+    const set=(id,v,label)=>{if(v==null||v==='')return;const e=$('#'+id);e.value=v;e.dispatchEvent(new Event(e.tagName==='SELECT'?'change':'input',{bubbles:true}));e.classList.add('filled');setTimeout(()=>e.classList.remove('filled'),2500);got.push(label)};
+    const pickSel=(id,val,label,onMiss)=>{if(!val)return;const k=pasteMatch($('#'+id),val);if(k!=null){set(id,k,label);if(!pasteMatch.sure)chk.push(`${label} → ${$('#'+id).selectedOptions[0].text} (customer tulis "${val}")`)}else if(onMiss)onMiss();else miss.push(`${label}: "${val}"`)};
+    if(F.occ){const k=pasteOcc(F.occ);if(k)set('f_occ',k,'Occasion');else pickSel('f_occ',F.occ,'Occasion')}
+    if(F.bq){const m=F.bq.match(/\(([^)]+)\)/);pickSel('f_bq',F.bq.replace(/\([^)]*\)/g,''),'Bouquet');if(m&&!$('#f_bqn').value)set('f_bqn',m[1].trim(),'Wrapping')}
+    pickSel('f_bal',F.bal,'Balloon');
+    pickSel('f_cake',F.cake,'Kek',()=>{const lain=[...$('#f_cake').options].find(o=>/lain/i.test(o.text));if(lain){set('f_cake',lain.value,'Kek (pilihan lain)');set('f_ofl',F.cake,'Perisa')}else miss.push(`Kek: "${F.cake}"`)});
+    set('f_bname',F.bname,'Nama pembeli');set('f_bphone',F.bphone,'No. pembeli');set('f_rname',F.rname,'Nama penerima');set('f_rphone',F.rphone,'Telefon penerima');
+    if(F.raddr){set('f_raddr',F.raddr.replace(/,?\s*\n\s*/g,', '),'Alamat');if(!F.rpost){const pc=F.raddr.match(/\b\d{5}\b(?!.*\b\d{5}\b)/s);if(pc)F.rpost=pc[0]}}
+    set('f_rpost',(F.rpost||'').replace(/\D/g,'').slice(0,5),'Poskod');
+    if(F.date){const d=pasteDate(F.date);if(d)set('f_date',d,'Tarikh');else miss.push(`Tarikh: "${F.date}"`)}
+    if(F.slot){const [k,t]=pasteSlot(F.slot);if(k){set('f_del',k,'Slot');if(t)set('f_time',t,'Masa')}else miss.push(`Slot: "${F.slot}"`)}
+    set('f_wish',F.wish,'Wishcard');set('f_sender',F.sender,'Daripada');
+    const empty=[['bq','Bouquet'],['bname','Nama pemberi'],['bphone','No. pemberi'],['rname','Nama penerima'],['rphone','No. penerima'],['raddr','Alamat'],['date','Tarikh hantar']].filter(([k])=>!F[k]).map(([,t])=>t);
+    $('#pres').innerHTML=`<div class="msg ${miss.length||empty.length||chk.length?'warn':'ok'}" style="margin:8px 0 0">${got.length?`✅ Diisi: ${got.map(h).join(', ')}.`:'Tiada medan dikenal pasti. Pastikan format "Label : jawapan".'}
+      ${chk.length?`<br>🔎 Semak pilihan ni: ${chk.map(h).join('; ')}.`:''}${miss.length?`<br>⚠️ Tak jumpa dalam senarai, pilih sendiri: ${miss.map(h).join('; ')}.`:''}${empty.length&&got.length?`<br>ℹ️ Customer belum isi: ${empty.map(h).join(', ')}.`:''}</div>`;
+    $('#nf').scrollIntoView({behavior:'smooth',block:'start'});
+  };
   let tm,ok=false;
   const quote=async()=>{const d=data();$('#w_ofl').hidden=!/lain/.test(d.cake);$('#w_time').hidden=d.del!=='spec';$('#w_pref').hidden=d.pay_mode!=='paid';
     try{const j=await api('quote',{method:'POST',body:{data:d,photos:photos()}});
