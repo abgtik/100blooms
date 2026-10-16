@@ -36,7 +36,7 @@ json_out([
   'paid' => $o['pay_status'] === 'paid', 'pay_status' => $o['pay_status'], 'status' => $o['status'],
   'created_at' => $o['created_at'], 'paid_at' => $o['paid_at'],
   'del_date' => $o['del_date'], 'del_type' => $o['del_type'], 'del_time' => $o['del_time'], 'del_label' => DELIVERY[$o['del_type']]['label'] ?? '',
-  'occasion' => $C['occ'][$o['occasion']] ?? $o['occasion'], 'call' => $o['call_name'], 'r_name' => $o['r_name'], 'r_post' => $o['r_post'],
+  'occasion' => $C['occ'][$o['occasion']] ?? $o['occasion'], 'occ_id' => $o['occasion'], 'call' => $o['call_name'], 'r_name' => $o['r_name'], 'r_post' => $o['r_post'],
   'bouquet' => ['id' => $o['bouquet'], 'name' => $C['bq'][$o['bouquet']] ?? $o['bouquet']],
   'balloon' => ['id' => $o['balloon'], 'name' => $C['bal'][$o['balloon']] ?? $o['balloon']],
   'cake' => $o['cake'], 'cake_flavours' => json_decode((string)$o['cake_flavours'], true) ?: [], 'extra_cakes' => $extra,

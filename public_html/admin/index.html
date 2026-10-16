@@ -434,6 +434,7 @@ function NewOrder(el){
   const cakes=[...C.cake_free,...C.cake_up],tom=new Date(Date.now()+864e5);
   el.innerHTML=`<div class="msg ok" style="margin:0 0 12px">🧑‍💼 <b>Page order Sales HQ</b>: sama macam page customer, order disimpan atas nama awak dan diakhiri invoice WhatsApp ke pembeli. <a href="../sales/" target="_blank" rel="noopener">Buka page Sales HQ ↗</a> <span class="mini">(link: ${h((ME.site||location.origin)+"/sales/")})</span></div><form id="nf" novalidate>
    <div class="card"><h2>Item</h2><div class="fgrid">
+    <label class="fl">Occasion / momen<select id="f_occ"><option value="">— Pilih —</option>${Object.entries(C.occ||{}).map(([k,n])=>`<option value="${k}">${h(n)}</option>`).join('')}</select></label>
     <label class="fl">Bouquet<select id="f_bq">${optc('bq',C.bq)}</select></label>
     <label class="fl">Wrapping / nota bouquet<input id="f_bqn" placeholder="Contoh: Red + Black (Normal)"></label>
     <label class="fl">Balloon<select id="f_bal">${optc('bal',C.bal)}</select></label>
@@ -472,7 +473,7 @@ function NewOrder(el){
     <button class="btn" id="go" type="submit" style="width:100%;margin-top:10px" disabled>Cipta order</button></div></form>`;
   const V=id=>$('#'+id).value,photos=()=>$('#f_photos').files.length;
   const data=()=>{const xc={};el.querySelectorAll('[data-xc]').forEach(i=>{if(+i.value>0)xc[i.dataset.xc]=+i.value});
-    return{bq:V('f_bq'),bq_note:V('f_bqn'),bal:V('f_bal'),cake:V('f_cake'),otherFl:V('f_ofl').split(',').map(x=>x.trim()).filter(Boolean).slice(0,5),photo_count:+V('f_pc')||1,
+    return{occ:V('f_occ'),bq:V('f_bq'),bq_note:V('f_bqn'),bal:V('f_bal'),cake:V('f_cake'),otherFl:V('f_ofl').split(',').map(x=>x.trim()).filter(Boolean).slice(0,5),photo_count:+V('f_pc')||1,
       extraCakes:xc,wish:V('f_wish'),sender:V('f_sender'),rname:V('f_rname'),rphone:V('f_rphone'),raddr:V('f_raddr'),rpost:V('f_rpost').replace(/\D/g,''),date:V('f_date'),del:V('f_del'),time:V('f_time'),
       bname:V('f_bname'),bphone:V('f_bphone'),ref:V('f_ref').trim(),voucher:V('f_voucher').trim(),adj_amt:V('f_adj'),adj_label:V('f_adjl'),override:$('#f_ov').checked,notes:V('f_notes'),
       pay_mode:el.querySelector('[name=pm]:checked').value,pay_ref:V('f_pref')}};

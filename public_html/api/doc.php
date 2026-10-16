@@ -70,7 +70,7 @@ table.it tr{break-inside:avoid;page-break-inside:avoid}
   <b style="margin-top:4px">Salesperson:</b><?= $e($sales) ?></div>
 </div>
 <div class="row">
- <div><span class="lbl">Order</span>Combo Jimat 100 Blooms<span class="lbl">Received At</span><?= $e($dt($o['created_at'])) ?></div>
+ <div><span class="lbl">Order</span>Combo Jimat 100 Blooms<?php if (($o['occasion'] ?? '') !== '' && $o['occasion'] !== 'saja'): ?><span class="lbl">Occasion</span><?= $e(catalog()['occ'][$o['occasion']] ?? $o['occasion']) ?><?php endif ?><span class="lbl">Received At</span><?= $e($dt($o['created_at'])) ?></div>
  <table class="st"><tr><td>Status</td><td><?= $status ?></td></tr><tr><td>Payment</td><td class="<?= $paid ? 'paid' : 'pend' ?>"><?= $paid ? 'PAID' : 'UNPAID' ?></td></tr></table>
 </div>
 <div class="row" style="display:block"><span class="lbl">Date &amp; Time Slot</span><?= $e($R['date']) ?></div>
