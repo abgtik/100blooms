@@ -157,6 +157,42 @@ case 'oldel': // Owner: hide an Orderla order for good (auto-sync won't bring it
   set_setting('olx_' . substr(md5((string)$r['code_id']), 0, 20), '1'); q('DELETE FROM legacy_orders WHERE id=?', [$r['id']]);
   json_out(['ok' => true]);
 
+case 'items': // change bouquet / balloon / cake / occasion on an existing order (before the runner collects it)
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0)); $C = catalog();
+  if ($o['status'] === 'batal') fail('Order dah dibatalkan.');
+  if (isset(jdec($o['del_steps'])['otw_pickup'])) fail('Runner dah ambil barang. Item tak boleh ditukar lagi.');
+  $bq = (string)($body['bouquet'] ?? $o['bouquet']); $bal = (string)($body['balloon'] ?? $o['balloon']); $cake = (string)($body['cake'] ?? $o['cake']);
+  $occ = (string)($body['occasion'] ?? $o['occasion']);
+  if (!isset($C['bq'][$bq])) fail('Bouquet tidak sah.'); if (!isset($C['bal'][$bal])) fail('Balloon tidak sah.');
+  if (!in_array($cake, array_merge($C['cake_free'], $C['cake_up']), true)) fail('Kek tidak sah.');
+  if ($occ !== '' && !isset($C['occ'][$occ])) fail('Occasion tidak sah.');
+  $fl = $cake === OTHER_CAKE ? array_slice(array_values(array_filter(array_map(fn($x) => str_in($x, 40), (array)($body['flavours'] ?? [])))), 0, 5) : [];
+  if ($cake === OTHER_CAKE && !$fl) fail('Isi perisa pilihan untuk "' . OTHER_CAKE . '".');
+  $note = str_in($body['bq_note'] ?? ($o['bq_note'] ?? ''), 100);
+  $chg = []; $p = jdec($o['prep']);
+  if ($bq !== $o['bouquet']) { $chg[] = 'Bouquet ' . ($C['bq'][$o['bouquet']] ?? $o['bouquet']) . ' → ' . $C['bq'][$bq]; unset($p['bouquet']); }
+  if ($bal !== $o['balloon']) { $chg[] = 'Balloon ' . ($C['bal'][$o['balloon']] ?? $o['balloon']) . ' → ' . $C['bal'][$bal]; unset($p['balloon']); }
+  $oldFl = jdec($o['cake_flavours']);
+  if ($cake !== $o['cake'] || $fl != $oldFl) { $chg[] = 'Kek ' . $o['cake'] . ' → ' . $cake . ($fl ? ' (' . implode(' / ', $fl) . ')' : ''); unset($p['cake']); }
+  if ($note !== (string)($o['bq_note'] ?? '')) $chg[] = 'Nota bouquet: ' . ($note !== '' ? $note : '(kosong)');
+  if ($occ !== (string)$o['occasion']) $chg[] = 'Occasion → ' . ($C['occ'][$occ] ?? '-');
+  if (!$chg) fail('Tiada perubahan.');
+  // price: only the cake upgrade can change it
+  $wasUp = in_array($o['cake'], $C['cake_up'], true); $isUp = in_array($cake, $C['cake_up'], true); $diff = ($isUp ? CAKE_UPGRADE : 0) - ($wasUp ? CAKE_UPGRADE : 0);
+  $L = jdec($o['price_lines']); $total = (float)$o['total']; $warn = null;
+  if (isset($L[0][0]) && str_starts_with((string)$L[0][0], 'Combo Jimat')) $L[0][0] = preg_replace('/\(bouquet [^)]*\)/u', '(bouquet ' . $C['bq'][$bq] . ')', (string)$L[0][0]);
+  if ($diff != 0 && $o['pay_status'] !== 'paid' && empty($o['bill_code'])) { // invoice not paid yet: reprice
+    $L = array_values(array_filter($L, fn($l) => !str_starts_with((string)$l[0], 'Upgrade kek')));
+    if ($isUp) array_splice($L, 1, 0, [['Upgrade kek: ' . $cake, CAKE_UPGRADE]]);
+    $total = round($total + $diff, 2); $chg[] = 'Jumlah dikemas kini ke RM' . number_format($total, 2);
+  } elseif ($diff != 0) $warn = ($diff > 0 ? 'Beza harga RM' . $diff . ' perlu dikutip daripada pembeli' : 'Lebihan bayaran RM' . (-$diff) . ' untuk pembeli') . ' (jumlah order tak berubah sebab dah dibayar / link bayaran dah dihantar).';
+  $log = '[' . date('j/n H:i') . ' ' . $m['name'] . '] Tukar item: ' . implode('; ', $chg) . ($warn ? '. ' . $warn : '');
+  q('UPDATE orders SET bouquet=?, balloon=?, cake=?, cake_flavours=?, bq_note=?, occasion=?, prep=?, price_lines=?, total=?, notes=?, updated_by=? WHERE id=?',
+    [$bq, $bal, $cake, json_encode($fl, JSON_UNESCAPED_UNICODE), $note !== '' ? $note : null, $occ !== '' ? $occ : $o['occasion'], json_encode($p ?: new stdClass, JSON_UNESCAPED_UNICODE),
+     json_encode($L, JSON_UNESCAPED_UNICODE), $total, trim(($o['notes'] ? $o['notes'] . "\n" : '') . $log), $m['name'], $o['id']]);
+  refresh_status($o['id']);
+  json_out(['ok' => true, 'warn' => $warn]);
+
 case 'prep': // tick / untick a production checklist item
   $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
   if ($o['pay_status'] !== 'paid' || $o['status'] === 'batal') fail('Order belum dibayar atau dibatalkan.');

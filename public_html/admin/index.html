@@ -131,6 +131,7 @@ a{color:var(--accent)}
 .disc{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:10px;margin:4px 0 10px}.dsr{display:flex;gap:6px}.dsr select{width:76px;flex:none}.dsr input{flex:1;min-width:0}
 .qtot{font-weight:800;font-size:16px;border-top:2px solid var(--ink)!important;margin-top:4px;padding-top:8px!important}.qtot span{color:var(--ink)!important}
 @media (max-width:560px){.disc{grid-template-columns:1fr}}
+.tiw{margin:10px 0 6px;padding:10px 12px;border:1.5px dashed var(--accent);border-radius:12px;background:var(--tint)}
 .btn.danger{color:var(--bad);border-color:var(--bad)}.btn.danger:hover{background:var(--badb)}
 @media (max-width:560px){.cal button{min-height:56px;padding:4px}.cal .d{font-size:12px}.cal .lbl{display:none}}
 
@@ -366,7 +367,16 @@ async function openOrder(id,reload){
      <p class="mini" style="margin:0">Caj tidak dikira semula. Kutip beza harga (jika ada) secara manual.</p></details></div>
    <div class="card" style="background:var(--warnb)"><h2>📝 Nota dalaman <span class="mini" style="font-weight:400">(team sahaja, customer tak nampak)</span></h2><textarea id="nn" rows="3" style="width:100%" placeholder="Contoh: perisa kek ditukar, customer minta call dulu">${h(o.notes||'')}</textarea>
     <button class="btn ghost sm" id="sn" style="margin-top:8px">Simpan nota</button></div>
-   <div class="card"><h2>Isi hadiah</h2>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">Isi hadiah</h2>${o.status!=='batal'&&!(o.del_steps||{}).otw_pickup?'<button class="btn ghost sm" id="tie">✏️ Tukar item</button>':''}</div>
+    <div id="tiw" hidden class="tiw"><div class="fgrid">
+     <label class="fl">Occasion<select id="ti_occ">${Object.entries(CAT.occ||{}).map(([k,n])=>`<option value="${k}"${k===o.occasion?' selected':''}>${h(n)}</option>`).join('')}</select></label>
+     <label class="fl">Bouquet<select id="ti_bq">${Object.entries(CAT.bq).map(([k,n])=>`<option value="${k}"${k===o.bouquet?' selected':''}>${h(((PM.bq||{})[k]?.code?PM.bq[k].code+' - ':'')+n)}</option>`).join('')}</select></label>
+     <label class="fl">Wrapping / nota bouquet<input id="ti_bqn" value="${h(o.bq_note||'')}" maxlength="100"></label>
+     <label class="fl">Balloon<select id="ti_bal">${Object.entries(CAT.bal).map(([k,n])=>[k,((PM.bal||{})[k]?.code?PM.bal[k].code+' - ':'')+n]).sort((a,b)=>a[1].localeCompare(b[1],undefined,{numeric:true})).map(([k,n])=>`<option value="${k}"${k===o.balloon?' selected':''}>${h(n)}</option>`).join('')}</select></label>
+     <label class="fl">Kek<select id="ti_cake">${[...CAT.cake_free,...CAT.cake_up].map(c=>`<option${c===o.cake?' selected':''}>${h(c)}</option>`).join('')}</select></label>
+     <label class="fl" id="ti_flw">Perisa pilihan (pisah dengan koma)<input id="ti_fl" value="${h((o.cake_flavours||[]).join(', '))}"></label></div>
+     <p class="mini" style="margin:6px 0 0">Kek upgrade (Chocolate Indulgence / Red Velvet / pilihan lain) +RM10. Kalau order dah dibayar, jumlah tak berubah dan beza harga dicatat dalam nota. Tick penyediaan untuk item yang ditukar akan dibuang.</p>
+     <div class="bar" style="margin:8px 0 0"><button class="btn sm" id="tis">Simpan perubahan</button><button class="btn ghost sm" id="tic">Batal</button></div></div>
     ${o.created_by?'':`<div class="rowx"><span>Momen</span><span>${h(OCC_T()[o.occasion]||o.occasion)} · ${h(REL_T()[o.relation]||o.relation)} (${o.gender==='l'?'L':'P'}) · panggil "${h(o.call_name)}"</span></div>`}
     <div class="rowx"><span>Bouquet</span><span><b>${h(CAT.bq[o.bouquet]||o.bouquet)}</b></span></div>
     <div class="rowx"><span>Balloon</span><span>${(PM.bal||{})[o.balloon]?.code?`<b>${h(PM.bal[o.balloon].code)}</b> - `:''}${h(CAT.bal[o.balloon]||o.balloon)}</span></div>
@@ -404,6 +414,10 @@ async function openOrder(id,reload){
   $('#ddb').onclick=e=>{e.stopPropagation();const m=$('#ddm'),open=m.hidden;m.hidden=!open;$('#ddb').setAttribute('aria-expanded',open)};
   $('#sc').addEventListener('click',e=>{if(!e.target.closest('.dd')&&$('#ddm'))$('#ddm').hidden=true});
   $('#ddbill').onclick=e=>{e.preventDefault();$('#ddm').hidden=true;$('#bto').scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>$('#bto').focus(),400)};
+  if($('#tie')){const fw=()=>{$('#ti_flw').style.display=/lain/i.test($('#ti_cake').value)?'':'none'};fw();$('#ti_cake').onchange=fw;
+    $('#tie').onclick=()=>{$('#tiw').hidden=!$('#tiw').hidden};$('#tic').onclick=()=>{$('#tiw').hidden=true};
+    $('#tis').onclick=async()=>{try{const r=await api('items',{method:'POST',body:{id,occasion:$('#ti_occ').value,bouquet:$('#ti_bq').value,balloon:$('#ti_bal').value,bq_note:$('#ti_bqn').value,cake:$('#ti_cake').value,flavours:$('#ti_fl').value.split(',').map(x=>x.trim()).filter(Boolean)}});
+      toast(r.warn?'Item ditukar. '+r.warn:'Item ditukar');reload&&reload();openOrder(id,reload)}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`;$('#om').scrollIntoView({block:'nearest'})}}}
   $('#bts').onclick=()=>done(api('update',{method:'POST',body:{id,bill_to:$('#bto').value}}),'Bill To disimpan');
   if($('#odel'))$('#odel').onclick=async()=>{if(prompt(`Padam terus order ${o.code}? Taip PADAM untuk sahkan.`)!=='PADAM')return;
     try{await api('delorder',{method:'POST',body:{id}});toast('Order '+o.code+' dipadam');close();reload&&reload()}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}};
