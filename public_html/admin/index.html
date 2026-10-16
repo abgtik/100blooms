@@ -128,6 +128,9 @@ a{color:var(--accent)}
 .adl{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}.adi{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;background:var(--bg);cursor:default}
 .adi.on{background:var(--okb);outline:1.5px solid var(--ok)}.adi small{display:block;color:var(--soft);font-size:11.5px}.stp{display:flex;align-items:center;gap:2px}
 .stp button{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font:700 16px/1 var(--body);cursor:pointer}.stp input{width:44px!important;min-width:0;flex:none;text-align:center;padding:4px 2px}.adi>span:first-child{flex:1;min-width:0}
+.disc{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:10px;margin:4px 0 10px}.dsr{display:flex;gap:6px}.dsr select{width:76px;flex:none}.dsr input{flex:1;min-width:0}
+.qtot{font-weight:800;font-size:16px;border-top:2px solid var(--ink)!important;margin-top:4px;padding-top:8px!important}.qtot span{color:var(--ink)!important}
+@media (max-width:560px){.disc{grid-template-columns:1fr}}
 .btn.danger{color:var(--bad);border-color:var(--bad)}.btn.danger:hover{background:var(--badb)}
 @media (max-width:560px){.cal button{min-height:56px;padding:4px}.cal .d{font-size:12px}.cal .lbl{display:none}}
 
@@ -506,6 +509,8 @@ function NewOrder(el){
     <label class="fl">Slot<select id="f_del">${Object.entries(DEL).map(([k,t])=>`<option value="${k}">${t}</option>`).join('')}</select></label>
     <label class="fl" id="w_time" hidden>Masa khusus<input id="f_time" type="time" min="09:00" max="22:00"></label></div></div>
    <div class="card"><h2>Harga & bayaran</h2>
+    <div class="disc"><label class="fl">Diskaun<span class="dsr"><select id="f_dt" aria-label="Jenis diskaun"><option value="rm">RM</option><option value="pct">%</option></select><input id="f_dv" type="number" min="0" step="0.01" placeholder="0" aria-label="Nilai diskaun"></span></label>
+     <label class="fl">Sebab diskaun (tak wajib, keluar dalam invoice)<input id="f_dl" maxlength="60" placeholder="Contoh: pelanggan tetap, order korporat"></label></div>
     <details><summary class="mini" style="cursor:pointer">Voucher, pelarasan harga, kes khas</summary><div class="fgrid" style="margin-top:8px">
      <label class="fl">Kod voucher<input id="f_voucher"></label>
      <label class="fl">No. agent (contoh 101)<input id="f_ref" inputmode="numeric"></label>
@@ -523,7 +528,7 @@ function NewOrder(el){
   const V=id=>$('#'+id).value,photos=()=>$('#f_photos').files.length;
   const data=()=>{const xc={},ao={};el.querySelectorAll('[data-xc]').forEach(i=>{if(+i.value>0)xc[i.dataset.xc]=+i.value});el.querySelectorAll('[data-ao]').forEach(i=>{if(+i.value>0)ao[i.dataset.ao]=+i.value});
     return{occ:V('f_occ'),bq:V('f_bq'),bq_note:V('f_bqn'),bal:V('f_bal'),cake:V('f_cake'),otherFl:V('f_ofl').split(',').map(x=>x.trim()).filter(Boolean).slice(0,5),photo_count:+V('f_pc')||1,
-      extraCakes:xc,addons:ao,wish:V('f_wish'),sender:V('f_sender'),rname:V('f_rname'),rphone:V('f_rphone'),raddr:V('f_raddr'),rpost:V('f_rpost').replace(/\D/g,''),date:V('f_date'),del:V('f_del'),time:V('f_time'),
+      extraCakes:xc,addons:ao,disc_type:V('f_dt'),disc_val:V('f_dv'),disc_label:V('f_dl'),wish:V('f_wish'),sender:V('f_sender'),rname:V('f_rname'),rphone:V('f_rphone'),raddr:V('f_raddr'),rpost:V('f_rpost').replace(/\D/g,''),date:V('f_date'),del:V('f_del'),time:V('f_time'),
       bname:V('f_bname'),bphone:V('f_bphone'),ref:V('f_ref').trim(),voucher:V('f_voucher').trim(),adj_amt:V('f_adj'),adj_label:V('f_adjl'),override:$('#f_ov').checked,notes:V('f_notes'),
       pay_mode:el.querySelector('[name=pm]:checked').value,pay_ref:V('f_pref')}};
   /* paste the customer's WhatsApp form → fill the fields */
@@ -554,8 +559,12 @@ function NewOrder(el){
   let tm,ok=false;
   const quote=async()=>{const d=data();$('#w_ofl').hidden=!/lain/.test(d.cake);$('#w_time').hidden=d.del!=='spec';$('#w_pref').hidden=d.pay_mode!=='paid';
     try{const j=await api('quote',{method:'POST',body:{data:d,photos:photos()}});
-      if(j.errors){ok=false;$('#qv').innerHTML=`<div class="msg warn" style="margin:0">${j.errors.map(h).join('<br>')}</div>`}
-      else{ok=true;$('#qv').innerHTML=j.lines.map(([l,p])=>`<div class="rowx"><span>${h(l)}</span><span>${p?rm(p):'Percuma'}</span></div>`).join('')+`<div class="rowx" style="font-weight:700"><span style="color:var(--ink)">Jumlah</span><span>${rm(j.total)}</span></div>${j.zone==='out'?'<div class="msg warn" style="margin:6px 0 0">Poskod di luar kawasan. Tambah caj melalui pelarasan harga jika perlu.</div>':''}`}
+      const lines=L=>{const sub=L.filter(([,p])=>p>0).reduce((a,[,p])=>a+ +p,0),off=-L.filter(([,p])=>p<0).reduce((a,[,p])=>a+ +p,0);
+        return L.map(([l,p])=>`<div class="rowx"><span>${h(l)}</span><span${p<0?' style="color:var(--ok);font-weight:600"':''}>${p<0?'−'+rm(-p):p?rm(p):'Percuma'}</span></div>`).join('')
+        +(off?`<div class="rowx"><span>Subtotal</span><span>${rm(sub)}</span></div><div class="rowx" style="color:var(--ok)"><span>Jumlah diskaun</span><span>−${rm(off)}</span></div>`:'')
+        +`<div class="rowx qtot"><span>Jumlah perlu dibayar</span><span>${rm(j.total)}</span></div>`};
+      if(j.errors){ok=false;$('#qv').innerHTML=(j.lines?lines(j.lines):'')+`<div class="msg warn" style="margin:8px 0 0"><b>Belum lengkap:</b><br>${j.errors.map(h).join('<br>')}</div>`}
+      else{ok=true;$('#qv').innerHTML=lines(j.lines)+`${j.zone==='out'?'<div class="msg warn" style="margin:6px 0 0">Poskod di luar kawasan. Tambah caj melalui pelarasan harga jika perlu.</div>':''}`}
       $('#go').disabled=!ok;$('#go').textContent={paid:'Cipta order (dah bayar)',link:'Cipta order & link bayaran',invoice:'Cipta order & invoice'}[d.pay_mode];}catch(e){}};
   el.querySelectorAll('input,select,textarea').forEach(i=>i.addEventListener(i.type==='file'||i.tagName==='SELECT'||i.type==='radio'||i.type==='checkbox'?'change':'input',()=>{clearTimeout(tm);tm=setTimeout(quote,350)}));
   quote();

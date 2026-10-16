@@ -714,9 +714,10 @@ function invoice_rows(array $o): array {
   $add = function (string $t, float $p, int $n = 1, array $subs = []) use (&$items, &$sub) { $items[] = ['name' => $t, 'subs' => $subs, 'qty' => $n, 'price' => $p, 'amount' => $p * $n]; $sub += $p * $n; };
   $add('Combo Jimat', (float)($lines[0][1] ?? BASE_PRICE), 1, ['1 x ' . ($bqCode ? "$bqCode - " : '') . "$bqName Bouquet" . (!empty($o['bq_note']) ? " - {$o['bq_note']}" : ''),
     '1 x Balloon Foil ( ' . ($balCode ? "$balCode - " : '') . "$balName )", "1 x Secret Recipe Slice Cake ( $cakeTxt )", '1 x Polaroid photo', '1 x Wishcard']);
-  $fees = 0.0; $delLabel = ''; $extra = [];
+  $fees = 0.0; $delLabel = ''; $extra = []; $discNames = [];
   foreach (array_slice($lines, 1) as [$label, $amt]) { // everything after the set line
     $amt = (float)$amt;
+    if ($amt < 0 && str_starts_with($label, 'Diskaun')) $discNames[] = trim(str_replace(['(', ')'], '', preg_replace('/^Diskaun\s*/u', '', $label)));
     if (str_starts_with($label, 'Upgrade kek') || str_starts_with($label, 'Kek tambahan')) $add($label, $amt);
     elseif (str_starts_with($label, 'Polaroid tambahan')) { $n = (int)preg_replace('/\D/', '', $label) ?: 1; $add('Polaroid tambahan', EXTRA_PHOTO, $n); }
     elseif (str_starts_with($label, '🎁')) $items[] = ['name' => $label, 'subs' => [], 'qty' => 1, 'price' => 0.0, 'amount' => 0.0, 'free' => true];
@@ -729,7 +730,7 @@ function invoice_rows(array $o): array {
   $delName = ['free' => 'Free Delivery (10am-6pm)', 'A' => 'Slot A (9am-12pm)', 'B' => 'Slot B (1pm-4pm)', 'C' => 'Slot C (5pm-8pm)', 'spec' => 'Masa khusus ' . $o['del_time']][$o['del_type']] ?? $delLabel;
   $date = date('l, j F Y', strtotime($o['del_date'])) . ' (' . ($o['del_type'] === 'spec' ? $o['del_time'] : (SLOT_EN[$o['del_type']] ?? '')) . ')';
   return ['items' => $items, 'sub' => round($sub, 2), 'fees' => round($fees, 2), 'del_fee' => round($fees - $areaFee, 2), 'extra' => $extra, 'del_name' => $delName,
-    'disc' => round($sub + $fees - (float)$o['total'], 2), 'date' => $date];
+    'disc' => round($sub + $fees - (float)$o['total'], 2), 'disc_label' => implode(', ', array_filter($discNames)), 'date' => $date];
 }
 function invoice_text(array $o): string {
   $f = fn($n) => number_format((float)$n, 2, '.', '');
@@ -920,6 +921,11 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
   }
   if (!empty($opts['manual']) && is_array($in['addons'] ?? null)) foreach (ADDONS as $id => [$an, $ap, $au]) { // admin-only add-ons
     $n = max(0, min(99, (int)($in['addons'][$id] ?? 0))); if ($n) $L[] = ["Add-on: $an × $n", $ap * $n];
+  }
+  if (!empty($opts['disc']) && (float)$opts['disc'][1] > 0) { // team discount (RM or %), on everything except delivery charges
+    $base = 0.0; foreach ($L as [$lab, $amt]) if (!str_starts_with($lab, DELIVERY[$del]['label']) && !str_starts_with($lab, 'Caj kawasan')) $base += (float)$amt;
+    [$dt, $dv, $dl] = $opts['disc']; $off = round(min(max(0, $base), $dt === 'pct' ? $base * min(100, $dv) / 100 : $dv), 2);
+    if ($off > 0) { $L[] = ['Diskaun' . ($dt === 'pct' ? ' ' . rtrim(rtrim(number_format($dv, 2, '.', ''), '0'), '.') . '%' : '') . (trim($dl) !== '' ? ' (' . str_in($dl, 60) . ')' : ''), -$off]; $discount += $off; }
   }
   if (!empty($opts['adjust']) && (float)$opts['adjust'][0] != 0) $L[] = [str_in($opts['adjust'][1] ?: 'Pelarasan harga', 80), round((float)$opts['adjust'][0], 2)];
   $total = round(array_sum(array_column($L, 1)), 2);

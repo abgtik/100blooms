@@ -31,7 +31,8 @@ function refresh_status(int $id): array {
   return $o;
 }
 function manual_opts(array $d): array {
-  return ['manual' => true, 'override' => !empty($d['override']), 'photo_count' => (int)($d['photo_count'] ?? 0), 'adjust' => [(float)($d['adj_amt'] ?? 0), (string)($d['adj_label'] ?? '')]];
+  return ['manual' => true, 'override' => !empty($d['override']), 'photo_count' => (int)($d['photo_count'] ?? 0), 'adjust' => [(float)($d['adj_amt'] ?? 0), (string)($d['adj_label'] ?? '')],
+    'disc' => [($d['disc_type'] ?? '') === 'pct' ? 'pct' : 'rm', max(0, (float)($d['disc_val'] ?? 0)), (string)($d['disc_label'] ?? '')]];
 }
 function load_order(int $id): array { $o = q('SELECT * FROM orders WHERE id=?', [$id])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404); return $o; }
 
@@ -678,7 +679,12 @@ case 'quote': // live price preview for the manual order form
   need_login();
   $d = is_array($body['data'] ?? null) ? $body['data'] : [];
   $r = build_order($d, max(0, (int)($body['photos'] ?? 0)), null, manual_opts($d));
-  if (isset($r['errors'])) json_out(['errors' => $r['errors']]);
+  if (isset($r['errors'])) { // still show the running total: fill missing customer details with placeholders, price only
+    $tmp = $d; $ph = ['bname' => 'X', 'bphone' => '0123456789', 'rname' => 'X', 'rphone' => '0123456789', 'raddr' => 'Alamat sementara untuk kira harga', 'rpost' => '43800'];
+    foreach ($ph as $k => $v) if (trim((string)($tmp[$k] ?? '')) === '' || ($k === 'rpost' && !preg_match('/^\d{5}$/', (string)$tmp[$k])) || (str_ends_with($k, 'phone') && strlen(preg_replace('/\D/', '', (string)$tmp[$k])) < 9)) $tmp[$k] = $v;
+    $p = build_order($tmp, max(0, (int)($body['photos'] ?? 0)), null, ['override' => true] + manual_opts($tmp));
+    json_out(['errors' => $r['errors']] + (isset($p['errors']) ? [] : ['lines' => json_decode($p['order']['price_lines'], true), 'total' => $p['order']['total']]));
+  }
   json_out(['lines' => json_decode($r['order']['price_lines'], true), 'total' => $r['order']['total'], 'zone' => $r['order']['zone']]);
 
 case 'manual': // sales team keys in an order taken on WhatsApp

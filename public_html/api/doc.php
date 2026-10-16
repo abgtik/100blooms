@@ -90,7 +90,7 @@ table.it tr{break-inside:avoid;page-break-inside:avoid}
 <tr><td colspan="4">Delivery Fee : <?= $e($R['del_name']) ?></td><td class="n"><?= $f($R['del_fee']) ?></td></tr>
 <?php foreach ($R['extra'] as [$l, $a]): ?><tr><td colspan="4"><?= $e($l) ?></td><td class="n"><?= $f($a) ?></td></tr><?php endforeach ?>
 <?php if ($R['disc'] < -0.009): ?><tr><td colspan="4">Adjustment</td><td class="n"><?= $f(-$R['disc']) ?></td></tr><?php endif ?>
-<?php if ($R['disc'] > 0): ?><tr><td colspan="4">Discount<?= $o['voucher'] ? ' (Voucher: ' . $e($o['voucher']) . ')' : '' ?></td><td class="n">-<?= $f($R['disc']) ?></td></tr><?php endif ?>
+<?php if ($R['disc'] > 0): ?><tr><td colspan="4">Discount<?= $e(implode(' · ', array_filter([$o['voucher'] ? 'Voucher: ' . $o['voucher'] : '', $R['disc_label']]))) !== '' ? ' (' . $e(implode(' · ', array_filter([$o['voucher'] ? 'Voucher: ' . $o['voucher'] : '', $R['disc_label']]))) . ')' : '' ?></td><td class="n">-<?= $f($R['disc']) ?></td></tr><?php endif ?>
 <tr class="tot"><td colspan="4">Total</td><td class="n">RM <?= $f($o['total']) ?></td></tr>
 <?php if ($type === 'receipt'): ?><tr class="tot"><td colspan="4">Amount Paid</td><td class="n">RM <?= $f($o['total']) ?></td></tr><tr><td colspan="4">Balance Due</td><td class="n">0.00</td></tr><?php endif ?>
 </tfoot></table>
