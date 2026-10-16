@@ -283,7 +283,7 @@ textarea{min-height:150px;resize:vertical;line-height:1.6}
 <div class="footer"><div class="in" id="foot"></div></div>
 <div id="layer"></div>
 
-<script src="assets/img.js"></script>
+<script src="assets/img.js?v=20261016b"></script>
 <script>
 /* ---------- DATA ---------- */
 const BASE=128;
@@ -834,7 +834,7 @@ function bqArt(b){
     <path d="M42 72 q8 -6 16 0 q-8 6 -16 0z" fill="${b.rb}"/><path d="M48 74 l-5 12M52 74 l5 12" stroke="${b.rb}" stroke-width="2.4"/>${bal}</svg>`;
 }
 function balArt(c){return `<svg viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="40" rx="24" ry="28" fill="${c}"/><ellipse cx="42" cy="30" rx="6" ry="9" fill="rgba(255,255,255,.4)"/><path d="M47 68h6l-3 4z" fill="${c}"/><path d="M50 72 q-6 10 2 18" stroke="#999" fill="none"/></svg>`}
-function balCard(b){const u=(window.IMG&&IMG.bal&&IMG.bal[b.id]);return `<button class="card" data-id="${b.id}" aria-pressed="${S.bal===b.id}"><div class="art photo" style="background:#fff">${u?`<img src="${u}" alt="Balloon ${h(b.t)}" loading="lazy">`:balArt(b.c||'#ddd')}</div><b style="font-size:14px">${h(b.t)}</b></button>`}
+function balCard(b){const u=(window.IMG&&IMG.bal&&IMG.bal[b.id])||'assets/img/balloon/'+b.id+'.webp';return `<button class="card" data-id="${b.id}" aria-pressed="${S.bal===b.id}"><div class="art photo" style="background:#fff">${u?`<img src="${u}" alt="Balloon ${h(b.t)}" loading="lazy">`:balArt(b.c||'#ddd')}</div><b style="font-size:14px">${h(b.t)}</b></button>`}
 function bindBal(scope){scope.querySelectorAll('.card[data-id]').forEach(c=>c.onclick=()=>{S.bal=c.dataset.id;save();closeSheet();render();});}
 function sheet(html){const L=$('#layer');L.innerHTML=`<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div></div>`;
   $('#scrim').onclick=e=>{if(e.target.id==='scrim')closeSheet()};return L;}
