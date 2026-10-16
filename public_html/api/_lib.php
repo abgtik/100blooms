@@ -37,8 +37,8 @@ function catalog(): array {
       'gws-wishes'=>'Get Well Soon Wishes','gws-plaster'=>'Get Well Soon Plaster','grad-gold'=>'Congrats Grad Gold','grad-black'=>'Congrats Graduate',
       'grad-white'=>'Congrats Grad Putih','grad-pink'=>'Congrats Grad Pink','grad-key'=>'Congrats Grad Key','grad-dots'=>'Congrats Grad Polkadot','hb-confetti'=>'Happy Birthday Confetti Biru','mothers-day'=>'Happy Mother\'s Day','fathers-day'=>'Happy Father\'s Day','mom'=>'Love You Mom','dad'=>'Best Dad Ever',
       'baby-boy'=>'New Baby Boy','baby-girl'=>'New Baby Girl'],
-    'cake_free' => ['Chocolate Chip Walnut','Chocolate Moist','Carrot Cake','Chocolate Fudge'],
-    'cake_up' => ['Chocolate Indulgence','Red Velvet', OTHER_CAKE],
+    'cake_free' => ['Chocolate Fudge','Chocolate Moist','New York Cheese','Carrot Cake'],
+    'cake_up' => ['Chocolate Indulgence','Chocolate Chip Walnut','Red Velvet', OTHER_CAKE],
     'occ' => ['birthday'=>'Birthday','anniv'=>'Anniversary','pujuk'=>'Pujuk orang merajuk','convo'=>'Konvokesyen','rindu'=>'Rindu','thanks'=>'Terima kasih','sembuh'=>'Cepat sembuh','baby'=>'Kelahiran bayi','saja'=>'Saja-saja'],
     'rel' => ['isteri'=>'Isteri','suami'=>'Suami','tunang'=>'Tunang','kekasih'=>'Kekasih','ibu'=>'Ibu','ayah'=>'Ayah','adik'=>'Adik / Kakak / Abang','makcik'=>'Mak saudara / Pak saudara','cikgu'=>'Cikgu / Pensyarah','kawan'=>'Kawan baik','kerja'=>'Rakan sekerja / Bos','kenal'=>'Baru nak berkenalan'],
   ];
@@ -77,7 +77,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 15) return;
+  if ($v >= 16) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -117,15 +117,17 @@ function migrate(PDO $pdo): void {
   // v13: name a team member shows on invoices/receipts (e.g. "Hanie HQ (60143467099)")
   $run('ALTER TABLE admins ADD COLUMN doc_name VARCHAR(100) NULL');
   // v14/v15: new catalogue items (e.g. Congrats Grad Polkadot balloon) get a row in Stok
+  // v16: cake menu change (New York Cheese added) - cakes get their Stok rows too
   $ins = $my ? 'INSERT IGNORE' : 'INSERT OR IGNORE'; $C = catalog();
-  foreach (['bq' => $C['bq'], 'bal' => $C['bal']] as $t => $list) foreach ($list as $k => $n) { try { $pdo->prepare("$ins INTO products (type,item_id,name,active) VALUES (?,?,?,1)")->execute([$t, $k, $n]); } catch (Throwable $e) {} }
+  $cakeList = []; foreach (array_merge($C['cake_free'], $C['cake_up']) as $c) $cakeList[$c] = $c;
+  foreach (['bq' => $C['bq'], 'bal' => $C['bal'], 'cake' => $cakeList] as $t => $list) foreach ($list as $k => $n) { try { $pdo->prepare("$ins INTO products (type,item_id,name,active) VALUES (?,?,?,1)")->execute([$t, $k, $n]); } catch (Throwable $e) {} }
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','15')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','16')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';

@@ -375,7 +375,7 @@ async function openOrder(id,reload){
      <label class="fl">Balloon<select id="ti_bal">${Object.entries(CAT.bal).map(([k,n])=>[k,((PM.bal||{})[k]?.code?PM.bal[k].code+' - ':'')+n]).sort((a,b)=>a[1].localeCompare(b[1],undefined,{numeric:true})).map(([k,n])=>`<option value="${k}"${k===o.balloon?' selected':''}>${h(n)}</option>`).join('')}</select></label>
      <label class="fl">Kek<select id="ti_cake">${[...CAT.cake_free,...CAT.cake_up].map(c=>`<option${c===o.cake?' selected':''}>${h(c)}</option>`).join('')}</select></label>
      <label class="fl" id="ti_flw">Perisa pilihan (pisah dengan koma)<input id="ti_fl" value="${h((o.cake_flavours||[]).join(', '))}"></label></div>
-     <p class="mini" style="margin:6px 0 0">Kek upgrade (Chocolate Indulgence / Red Velvet / pilihan lain) +RM10. Kalau order dah dibayar, jumlah tak berubah dan beza harga dicatat dalam nota. Tick penyediaan untuk item yang ditukar akan dibuang.</p>
+     <p class="mini" style="margin:6px 0 0">Kek upgrade (Chocolate Indulgence / Chocolate Chip Walnut / Red Velvet / pilihan lain) +RM10. Kalau order dah dibayar, jumlah tak berubah dan beza harga dicatat dalam nota. Tick penyediaan untuk item yang ditukar akan dibuang.</p>
      <div class="bar" style="margin:8px 0 0"><button class="btn sm" id="tis">Simpan perubahan</button><button class="btn ghost sm" id="tic">Batal</button></div></div>
     ${o.created_by?'':`<div class="rowx"><span>Momen</span><span>${h(OCC_T()[o.occasion]||o.occasion)} · ${h(REL_T()[o.relation]||o.relation)} (${o.gender==='l'?'L':'P'}) · panggil "${h(o.call_name)}"</span></div>`}
     <div class="rowx"><span>Bouquet</span><span><b>${h(CAT.bq[o.bouquet]||o.bouquet)}</b></span></div>
