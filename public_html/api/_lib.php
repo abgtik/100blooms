@@ -734,6 +734,16 @@ function invoice_text(array $o): string {
     . "\n\nReceiver Name:\n{$o['r_name']}\n\nReceiver Phone Number:\n{$o['r_phone']}\n\nWishcard (FREE):\n$wish\n\nDate & Time Slot:\n{$R['date']}"
     . "\n\n[ Invoice Link: $track ]";
 }
+/** Who brought the order in: Sales HQ member, agent, or the website. Returns [kind, label]. */
+function order_source(array $o): array {
+  static $ag = null;
+  if (!empty($o['created_by'])) return ['hq', (string)$o['created_by']];
+  if (!empty($o['agent_ref'])) {
+    if ($ag === null) { $ag = []; try { foreach (q('SELECT id, name FROM agents')->fetchAll() as $r) $ag[(int)$r['id']] = $r['name']; } catch (Throwable $e) {} }
+    return ['agent', ($ag[(int)$o['agent_ref']] ?? 'Agent') . ' #' . (int)$o['agent_ref']];
+  }
+  return ['web', 'Website'];
+}
 /** Printable invoice (before payment) / receipt (after payment) for this order. */
 function doc_url(array $o, string $type): string { return SITE_URL . '/api/doc.php?c=' . rawurlencode($o['code']) . '&k=' . $o['token'] . '&t=' . $type; }
 /** Business details printed on invoices and receipts (owner edits them in admin → Pengguna). */

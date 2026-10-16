@@ -120,6 +120,9 @@ a{color:var(--accent)}
 .cal button.out{background:var(--bg);cursor:default}.cal button.today{outline:2px solid var(--accent);outline-offset:-3px;border-radius:6px}.cal button:not(.out):hover{background:var(--bg)}.cal button[aria-pressed=true]{background:var(--ink);color:var(--card)}
 .cal .d{font-weight:700;font-size:13px}.cal .c{font:600 12px var(--body);background:var(--accent);color:var(--on);border-radius:99px;padding:1px 7px;align-self:flex-start}
 .cal .c.pend{background:var(--warnb);color:var(--warn)}
+.dd{position:relative}.ddm{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:220px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 16px 40px -14px rgba(0,0,0,.3)}
+.ddm a,.ddm .dis{display:block;padding:9px 12px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:14px}.ddm a:hover{background:var(--bg)}.ddm .dis{color:var(--soft);font-size:13px}.ddm hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.src{display:inline-block;font:600 11.5px var(--body);border-radius:99px;padding:2px 8px;vertical-align:1px}.src.hq{background:#efe6fb;color:#6b3fb5}.src.agent{background:var(--hl);color:var(--warn)}.src.web{background:var(--infob);color:var(--info)}
 .btn.danger{color:var(--bad);border-color:var(--bad)}.btn.danger:hover{background:var(--badb)}
 @media (max-width:560px){.cal button{min-height:56px;padding:4px}.cal .d{font-size:12px}.cal .lbl{display:none}}
 
@@ -257,6 +260,7 @@ function render(){
   ({dash:Dash,new:NewOrder,cal:Cal,report:Report,orders:Orders,vouch:Vouchers,agent:Agents,cust:Customers,stock:Stock,dates:Dates,acc:Acc})[tab]($('#main'));
 }
 
+const srcChip=s=>s?`<span class="src ${s[0]}" title="Sumber order">${s[0]==='hq'?'🧑‍💼 '+h(s[1]):s[0]==='agent'?'🤝 '+h(s[1]):'🌐 Website'}</span>`:'';
 /* ---------- Orderla rows (calendar and today's list) ---------- */
 function olRow(o,note){return `<div><button class="ord" data-lid="${o.lid}"><div><span class="c">${h(o.code)}</span> <span class="pill" style="background:var(--infob);color:var(--info)">Orderla</span> <span class="pill ${o.pay_status==='paid'?'p-selesai':'p-menunggu_bayaran'}">${o.pay_status==='paid'?h(o.ol_status||'dibayar'):'belum bayar'}</span>
   <div class="m">untuk ${h(o.r_name)} · daripada ${h(o.b_name||'-')}${note||''}</div><div class="m">${h((o.items||'').slice(0,110))}</div></div><div class="r"><div class="t">${rm(o.total)}</div></div></button><div class="lx" id="lx${o.lid}" hidden></div></div>`}
@@ -291,7 +295,7 @@ async function Orders(el){
     const LG=j.legacy||[];
     $('#ol').innerHTML=(j.rows.length||LG.length)?j.rows.map(o=>`<button class="ord" data-id="${o.id}">
       <div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">Hantar <b style="color:var(--ink)">${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</div>
-       ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}${(o.need||[]).map(t=>`<span class="pg" style="background:var(--warnb);color:var(--warn)">${h(t)}</span>`).join(' ')}<div class="m">Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
+       ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}${(o.need||[]).map(t=>`<span class="pg" style="background:var(--warnb);color:var(--warn)">${h(t)}</span>`).join(' ')}<div class="m">${srcChip(o.src)} Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
       <div class="r"><div class="t">${rm(o.total)}</div><div class="m">Order ${fmtDT(o.created_at)}</div></div></button>`).join('')+LG.map(o=>olRow(o)).join('')
       :`<div class="empty">Tiada order${f==='today'?' untuk dihantar hari ini':''}.</div>`;
     $('#ol').querySelectorAll('.ord[data-id]').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,load));bindOl($('#ol'),load);
@@ -335,7 +339,11 @@ async function openOrder(id,reload){
   const cakeTxt=o.cake+(o.cake_flavours&&o.cake_flavours.length?` → pilihan: ${o.cake_flavours.join(' / ')}`:'');
   const ext=o.extra_cakes&&Object.keys(o.extra_cakes).length?Object.entries(o.extra_cakes).map(([k,n])=>`${k} × ${n}`).join(', '):'Tiada';
   $('#layer').innerHTML=`<div class="scrim" id="sc"><div class="panel" role="dialog" aria-modal="true" aria-label="Order ${h(o.code)}">
-   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 style="font:600 20px var(--display);margin:0">${h(o.code)} ${pill(o)}</h2><button class="btn ghost sm" id="cx">Tutup</button></div>
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 style="font:600 20px var(--display);margin:0">${h(o.code)} ${pill(o)} ${srcChip(o.src)}</h2>
+    <div style="display:flex;gap:6px;align-items:center"><div class="dd"><button class="btn sm" id="ddb" aria-haspopup="true" aria-expanded="false">🧾 Invoice (PDF) ▾</button>
+     <div class="ddm" id="ddm" hidden role="menu"><a role="menuitem" href="${h(o.doc_invoice)}" target="_blank" rel="noopener">Invoice (PDF)</a>${o.pay_status==='paid'?`<a role="menuitem" href="${h(o.doc_receipt)}" target="_blank" rel="noopener">Resit / Receipt (PDF)</a>`:'<span class="dis">Resit (selepas bayar)</span>'}
+      <a role="menuitem" href="${h(o.doc_invoice)}&print=1" target="_blank" rel="noopener">Cetak invoice</a>${o.pay_status==='paid'?`<a role="menuitem" href="${h(o.doc_receipt)}&print=1" target="_blank" rel="noopener">Cetak resit</a>`:''}
+      <hr><a role="menuitem" href="#" id="ddbill">Bill To (nama syarikat)…</a></div></div><button class="btn ghost sm" id="cx">Tutup</button></div></div>
    <div id="om"></div>
    ${wfCards(o)}
    <div class="card"><h2>Butiran penghantaran</h2>
@@ -385,6 +393,9 @@ async function openOrder(id,reload){
   const close=()=>{$('#layer').innerHTML=''};
   const done=async(p,msg)=>{try{await p;toast(msg);reload&&reload();openOrder(id,reload)}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}};
   $('#cx').onclick=close;$('#sc').onclick=e=>{if(e.target.id==='sc')close()};
+  $('#ddb').onclick=e=>{e.stopPropagation();const m=$('#ddm'),open=m.hidden;m.hidden=!open;$('#ddb').setAttribute('aria-expanded',open)};
+  $('#sc').addEventListener('click',e=>{if(!e.target.closest('.dd')&&$('#ddm'))$('#ddm').hidden=true});
+  $('#ddbill').onclick=e=>{e.preventDefault();$('#ddm').hidden=true;$('#bto').scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>$('#bto').focus(),400)};
   $('#bts').onclick=()=>done(api('update',{method:'POST',body:{id,bill_to:$('#bto').value}}),'Bill To disimpan');
   if($('#odel'))$('#odel').onclick=async()=>{if(prompt(`Padam terus order ${o.code}? Taip PADAM untuk sahkan.`)!=='PADAM')return;
     try{await api('delorder',{method:'POST',body:{id}});toast('Order '+o.code+' dipadam');close();reload&&reload()}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}};

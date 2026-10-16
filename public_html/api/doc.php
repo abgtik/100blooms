@@ -14,9 +14,8 @@ $f = fn($n) => number_format((float)$n, 2, '.', ',');
 $dt = fn($s) => $s ? date('j M Y, g:i A', strtotime($s)) : '-';
 if ($type === 'receipt' && !$paid) { http_response_code(409); echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Resit belum tersedia</title><body style="font-family:system-ui;padding:40px 20px;text-align:center;color:#3b2732"><h2>Resit belum tersedia</h2><p>Resit dikeluarkan selepas bayaran diterima. Invoice boleh dimuat turun di <a href="?c=' . $e($o['code']) . '&k=' . $e($o['token']) . '&t=invoice">sini</a>.</p>'; exit; }
 $R = invoice_rows($o); $B = biz_info();
-$sales = 'Online (100blooms.my)';
-if (!empty($o['created_by'])) $sales = $o['created_by'] . ' (Sales HQ)';
-elseif (!empty($o['agent_ref'])) { $ag = q('SELECT name FROM agents WHERE id=?', [(int)$o['agent_ref']])->fetchColumn(); $sales = ($ag ?: 'Agent') . ' (Agent #' . (int)$o['agent_ref'] . ')'; }
+[$sk, $sl] = order_source($o);
+$sales = $sk === 'hq' ? "$sl (Sales HQ)" : ($sk === 'agent' ? "$sl (Agent)" : 'Website (100blooms.my)');
 $status = $o['status'] === 'batal' ? 'CANCELLED' : ($paid ? 'CONFIRMED' : 'PENDING PAYMENT');
 $title = $type === 'receipt' ? 'Receipt' : 'Invoice';
 $docNo = $type === 'receipt' ? 'R-' . $o['code'] : $o['code'];
@@ -31,7 +30,7 @@ $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'
 .page{background:#fff;width:210mm;min-height:297mm;margin:16px auto;padding:16mm 15mm 14mm;box-shadow:0 10px 40px -14px rgba(0,0,0,.25);position:relative}
 h1{font-size:24px;margin:0 0 14px;letter-spacing:-.01em}
 .top{display:flex;justify-content:space-between;gap:20px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.biz{display:flex;gap:12px;align-items:flex-start}.biz svg{width:58px;height:58px;flex:none;border-radius:50%;background:#2b1d24;padding:6px}
+.biz{display:flex;gap:12px;align-items:flex-start}.biz img{width:88px;height:88px;flex:none;border-radius:50%}
 .biz b,.meta b{display:block}.meta{text-align:left;min-width:200px}
 .row{display:flex;justify-content:space-between;gap:20px;padding:14px 0;border-bottom:1px solid var(--line)}
 .lbl{font-weight:700;display:block;margin-top:6px}.lbl:first-child{margin-top:0}
@@ -54,7 +53,7 @@ table.it tfoot td{font-weight:500}table.it tfoot tr.tot td{font-weight:800;font-
 table.it tr{break-inside:avoid;page-break-inside:avoid}
 @page{size:A4;margin:10mm 12mm}
 @media print{html,body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:12px}.bar{display:none}.page{margin:0;box-shadow:none;width:auto;min-height:0;padding:0}
- h1{margin-bottom:10px}.row{padding:9px 0}h2{margin:10px 0 6px}.top{padding-bottom:10px}.stamp{top:-2mm;right:0}table.it th,table.it td{padding:4px 7px}.lbl{margin-top:2px}.foot{margin-top:8px}.pay{margin-top:8px;padding:7px 10px}.biz svg{width:48px;height:48px}.cols{gap:0 24px}}
+ h1{margin-bottom:10px}.row{padding:9px 0}h2{margin:10px 0 6px}.top{padding-bottom:10px}.stamp{top:-2mm;right:0}table.it th,table.it td{padding:4px 7px}.lbl{margin-top:2px}.foot{margin-top:8px}.pay{margin-top:8px;padding:7px 10px}.biz img{width:76px;height:76px}.cols{gap:0 24px}}
 </style></head><body>
 <div class="bar"><button class="pri" onclick="print()">⬇️ Simpan PDF / Cetak</button>
 <?php if ($paid && $type === 'invoice'): ?><a href="?c=<?= $e($o['code']) ?>&k=<?= $e($o['token']) ?>&t=receipt">Lihat resit</a><?php endif ?>
@@ -64,7 +63,7 @@ table.it tr{break-inside:avoid;page-break-inside:avoid}
 <?php if ($type === 'receipt'): ?><div class="stamp">PAID</div><?php endif ?>
 <h1><?= $title ?></h1>
 <div class="top">
- <div class="biz"><svg viewBox="0 0 100 100" aria-hidden="true"><g fill="#d94f74"><ellipse cx="50" cy="26" rx="14" ry="22"/><ellipse cx="50" cy="74" rx="14" ry="22"/><ellipse cx="26" cy="50" rx="22" ry="14"/><ellipse cx="74" cy="50" rx="22" ry="14"/></g><g fill="#f19bb2" transform="rotate(45 50 50)"><ellipse cx="50" cy="28" rx="11" ry="18"/><ellipse cx="50" cy="72" rx="11" ry="18"/><ellipse cx="28" cy="50" rx="18" ry="11"/><ellipse cx="72" cy="50" rx="18" ry="11"/></g><circle cx="50" cy="50" r="12" fill="#ffd36e"/></svg>
+ <div class="biz"><img src="../assets/logo.png" alt="100 Blooms" width="88" height="88">
   <div><b>100 Blooms</b><?= $e($B['name']) ?><br><?= $B['reg'] !== '' ? '(' . $e($B['reg']) . ')<br>' : '' ?><?= $B['addr'] !== '' ? nl2br($e($B['addr'])) . '<br>' : '' ?><?= $e($B['phone']) ?><?= $B['email'] !== '' ? '<br>' . $e($B['email']) : '' ?></div></div>
  <div class="meta"><b><?= $type === 'receipt' ? 'Receipt No:' : 'Invoice No:' ?></b><?= $e($docNo) ?><?php if ($type === 'receipt'): ?><b style="margin-top:4px">Invoice No:</b><?= $e($o['code']) ?><?php endif ?>
   <b style="margin-top:4px">Date:</b><?= $e(date('j M Y', strtotime($type === 'receipt' ? ($o['paid_at'] ?: $o['created_at']) : $o['created_at']))) ?>

@@ -75,8 +75,8 @@ case 'orders':
   $where = $W ? 'WHERE ' . implode(' AND ', $W) : '';
   $order = $f === 'pending' || $by === 'created_at' ? 'created_at DESC' : "del_date ASC, CASE del_type WHEN 'A' THEN 1 WHEN 'spec' THEN 2 WHEN 'free' THEN 3 WHEN 'B' THEN 4 ELSE 5 END, created_at";
   if ($f === 'all' || $f === 'delivered') $order = 'created_at DESC';
-  $rows = q("SELECT id,code,created_at,pay_status,status,bouquet,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher,wish,photos FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
-  foreach ($rows as &$r) { $r['progress'] = progress_text($r); $r['need'] = array_values(array_filter([$r['wish'] === WISH_NONE ? 'Wishcard belum' : null, count(jdec($r['photos'])) < (int)$r['photo_count'] ? 'Polaroid ' . count(jdec($r['photos'])) . '/' . (int)$r['photo_count'] : null])); unset($r['price_lines'], $r['prep'], $r['del_steps'], $r['wish'], $r['photos']); } unset($r);
+  $rows = q("SELECT id,code,created_at,pay_status,status,bouquet,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher,wish,photos,created_by,agent_ref FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
+  foreach ($rows as &$r) { $r['src'] = order_source($r); unset($r['created_by'], $r['agent_ref']); $r['progress'] = progress_text($r); $r['need'] = array_values(array_filter([$r['wish'] === WISH_NONE ? 'Wishcard belum' : null, count(jdec($r['photos'])) < (int)$r['photo_count'] ? 'Polaroid ' . count(jdec($r['photos'])) . '/' . (int)$r['photo_count'] : null])); unset($r['price_lines'], $r['prep'], $r['del_steps'], $r['wish'], $r['photos']); } unset($r);
   $t = date('Y-m-d');
   $legacy = []; $olToday = 0; $olLeft = 0;
   try { // Orderla orders for today's deliveries sit beside the new ones
@@ -103,7 +103,7 @@ case 'order':
   need_login();
   $o = q('SELECT * FROM orders WHERE id=?', [(int)($_GET['id'] ?? 0)])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404);
   $o['track_url'] = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
-  $o['doc_invoice'] = doc_url($o, 'invoice'); $o['doc_receipt'] = doc_url($o, 'receipt');
+  $o['src'] = order_source($o); $o['doc_invoice'] = doc_url($o, 'invoice'); $o['doc_receipt'] = doc_url($o, 'receipt');
   unset($o['token']);
   $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS; $o['invoice'] = invoice_text($o);
   $o['agent'] = $o['agent_ref'] ? (q('SELECT a.id,a.name,c.amount,c.payout_id FROM agents a LEFT JOIN commissions c ON c.order_id=? AND c.agent_id=a.id WHERE a.id=?', [$o['id'], (int)$o['agent_ref']])->fetch() ?: null) : null;
