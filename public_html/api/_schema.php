@@ -27,7 +27,7 @@ function schema_sql(string $driver): array {
 "CREATE INDEX idx_orders_created ON orders (created_at)",
 "CREATE TABLE IF NOT EXISTS admins (
   id $id, email VARCHAR(150) NOT NULL UNIQUE, pass_hash VARCHAR(255) NOT NULL, name VARCHAR(100) NOT NULL,
-  role VARCHAR(10) NOT NULL DEFAULT 'staff', created_at DATETIME NOT NULL
+  role VARCHAR(10) NOT NULL DEFAULT 'staff', doc_name VARCHAR(100) NULL, created_at DATETIME NOT NULL
 )$tail",
 "CREATE TABLE IF NOT EXISTS products (
   type VARCHAR(6) NOT NULL, item_id VARCHAR(60) NOT NULL, name VARCHAR(100) NOT NULL, active TINYINT NOT NULL DEFAULT 1, code VARCHAR(12) NULL, price DECIMAL(8,2) NULL,

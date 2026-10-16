@@ -501,7 +501,12 @@ case 'unblock':
   need_login(); q('DELETE FROM blocked_dates WHERE d=?', [(string)($body['d'] ?? '')]); json_out(['ok' => true]);
 
 case 'users':
-  need_owner(); json_out(['rows' => q('SELECT id,email,name,role,created_at FROM admins ORDER BY id')->fetchAll()]);
+  need_owner(); json_out(['rows' => q('SELECT id,email,name,role,doc_name,created_at FROM admins ORDER BY id')->fetchAll()]);
+
+case 'userdoc': // name printed as "Salesperson" on this member's invoices/receipts
+  need_owner();
+  $n = str_in($body['doc_name'] ?? '', 100);
+  q('UPDATE admins SET doc_name=? WHERE id=?', [$n !== '' ? $n : null, (int)($body['id'] ?? 0)]); json_out(['ok' => true]);
 
 case 'adduser':
   need_owner();

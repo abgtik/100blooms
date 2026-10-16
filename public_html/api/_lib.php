@@ -71,7 +71,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 12) return;
+  if ($v >= 13) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -108,13 +108,15 @@ function migrate(PDO $pdo): void {
   $run(legacy_schema($my));
   // v12: invoice/receipt addressed to a company ("Bill to")
   $run('ALTER TABLE orders ADD COLUMN bill_to TEXT NULL');
+  // v13: name a team member shows on invoices/receipts (e.g. "Hanie HQ (60143467099)")
+  $run('ALTER TABLE admins ADD COLUMN doc_name VARCHAR(100) NULL');
   if ($v < 3) { // carry over orders already marked done with the old single status
     $all = json_encode(array_fill_keys(array_keys(DEL_STEPS), ['by' => 'sistem', 'at' => date('Y-m-d H:i:s')]));
     $pdo->prepare("UPDATE orders SET del_steps=? WHERE status='selesai' AND del_steps IS NULL")->execute([$all]);
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','12')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','13')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';

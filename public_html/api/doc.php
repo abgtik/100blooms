@@ -15,7 +15,8 @@ $dt = fn($s) => $s ? date('j M Y, g:i A', strtotime($s)) : '-';
 if ($type === 'receipt' && !$paid) { http_response_code(409); echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Resit belum tersedia</title><body style="font-family:system-ui;padding:40px 20px;text-align:center;color:#3b2732"><h2>Resit belum tersedia</h2><p>Resit dikeluarkan selepas bayaran diterima. Invoice boleh dimuat turun di <a href="?c=' . $e($o['code']) . '&k=' . $e($o['token']) . '&t=invoice">sini</a>.</p>'; exit; }
 $R = invoice_rows($o); $B = biz_info();
 [$sk, $sl] = order_source($o);
-$sales = $sk === 'hq' ? "$sl (Sales HQ)" : ($sk === 'agent' ? "$sl (Agent)" : 'Website (100blooms.my)');
+$dn = $sk === 'hq' ? (string)(q('SELECT doc_name FROM admins WHERE name=? AND doc_name IS NOT NULL AND doc_name<>\'\' ORDER BY id LIMIT 1', [$sl])->fetchColumn() ?: '') : '';
+$sales = $sk === 'hq' ? ($dn !== '' ? $dn : "$sl (Sales HQ)") : ($sk === 'agent' ? "$sl (Agent)" : 'Website (100blooms.my)');
 $status = $o['status'] === 'batal' ? 'CANCELLED' : ($paid ? 'CONFIRMED' : 'PENDING PAYMENT');
 $title = $type === 'receipt' ? 'Receipt' : 'Invoice';
 $docNo = $type === 'receipt' ? 'R-' . $o['code'] : $o['code'];
