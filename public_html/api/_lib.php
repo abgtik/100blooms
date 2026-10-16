@@ -764,15 +764,17 @@ function invoice_msg(array $o, ?string $payUrl = null): string {
   $slot = $o['del_type'] === 'spec' ? ($o['del_time'] ?: 'masa khusus') : (SLOT_EN[$o['del_type']] ?? '');
   $paid = $o['pay_status'] === 'paid';
   $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
-  return "🌸 *Invoice 100 Blooms*\nNo. order: *{$o['code']}*\n\n"
-    . "Hai $first, terima kasih kerana memilih 100 Blooms! 💐\n"
-    . "Hadiah$occ untuk *{$o['r_name']}* akan dihantar pada *" . fmt_day((string)$o['del_date']) . ' ' . date('Y', strtotime((string)$o['del_date'])) . "*" . ($slot ? " ($slot)" : '') . ".\n\n"
-    . "Jumlah: *RM" . number_format((float)$o['total'], 2) . '* ' . ($paid ? '✅ Dah dibayar' : '⏳ Belum dibayar') . "\n\n"
-    . ($paid ? '' : ($payUrl ? "💳 Bayar online (DuitNow / FPX / kad):\n$payUrl\n\n" : ''))
-    . "🧾 Invoice (PDF):\n" . doc_url($o, 'invoice') . "\n\n"
-    . "📦 Semak order & lengkapkan hadiah:\n$track\n\nDi link ni awak boleh:\n"
-    . "• Upload gambar polaroid 📸\n• Tulis / edit ayat wishcard ✍️\n• Ikuti status penghantaran 🚚\n"
-    . ($paid || $payUrl ? '' : "• Bayar melalui QR bank 💳\n") . "\n— 100 Blooms";
+  $photo = (int)$o['photo_count'] > 0;
+  return "🌷 Invoice 100 Blooms\n🧾 No. Order: {$o['code']}\n\n"
+    . "Hai $first, terima kasih kerana memilih 100 Blooms! ❤️\n\n"
+    . "🎁 Hadiah$occ untuk {$o['r_name']} akan dihantar pada " . fmt_day((string)$o['del_date']) . ' ' . date('Y', strtotime((string)$o['del_date'])) . ($slot ? " ($slot)" : '') . ".\n\n"
+    . "💰 Jumlah: RM" . number_format((float)$o['total'], 2) . "\n" . ($paid ? '✅ Status: Dah Dibayar' : '⏳ Status: Belum Dibayar') . "\n\n"
+    . ($paid ? '' : ($payUrl ? "💳 Bayar Online (DuitNow / FPX / Kad):\n$payUrl\n\n" : ''))
+    . "📄 Invoice (PDF):\n" . doc_url($o, 'invoice') . "\n\n"
+    . "🔗 Semak Order & Lengkapkan Hadiah:\n$track\n\n"
+    . "Di link ni awak boleh:\n" . ($photo ? "📸 Upload gambar polaroid\n" : '') . "💌 Tulis / edit ayat wishcard\n🚚 Ikuti status penghantaran\n"
+    . ($paid || $payUrl ? '' : "🏦 Bayar melalui QR bank\n")
+    . "\nTerima kasih kerana mempercayai kami! 💕\n\n— 100 Blooms 🌹";
 }
 /** Printable invoice (before payment) / receipt (after payment) for this order. */
 function doc_url(array $o, string $type): string { return SITE_URL . '/api/doc.php?c=' . rawurlencode($o['code']) . '&k=' . $o['token'] . '&t=' . $type; }
