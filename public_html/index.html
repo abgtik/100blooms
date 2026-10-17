@@ -207,6 +207,7 @@ textarea{min-height:150px;resize:vertical;line-height:1.6}
 /* bouquet photos + detail sheet */
 .card .art.photo{aspect-ratio:4/5}
 .card .art img{width:100%;height:100%;object-fit:contain;padding:4px}
+.card .peek.low{top:40px;left:14px;right:auto}
 .card .peek{position:absolute;top:14px;right:14px;font-size:10.5px;font-weight:700;background:rgba(255,255,255,.92);color:var(--ink);padding:3px 8px;border-radius:99px}
 .sheet>*{flex-shrink:0}
 .gal{display:flex;flex:none;gap:10px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;margin:0 -2px;padding-bottom:4px;scrollbar-width:none}
@@ -585,7 +586,7 @@ const SCR={
   el.innerHTML=`<div class="eyebrow">Langkah 1 · Bouquet</div><h1>Pilih bouquet untuk ${h(callName())}</h1>
    <p class="sub">Semua bouquet harga sama dalam set ${rm(BASE)}. Yang paling atas paling sesuai dengan jawapan awak.</p>
    <div class="grid">${list.map((b,i)=>`<button class="card" data-id="${b.id}" aria-pressed="${S.bq===b.id}">
-    ${i<2?'<span class="badge">Sesuai</span>':''}${IMGS(b.id).cust.length?`<span class="peek">${IMGS(b.id).cust.length} foto penerima</span>`:''}<div class="art${IMGS(b.id).bq?' photo':''}" style="background:#fff">${IMGS(b.id).bq?`<img src="${IMGS(b.id).bq}" alt="Bouquet ${b.t}" loading="lazy">`:bqArt(b)}</div><b>${b.t}</b><small>${b.d}</small></button>`).join('')}</div>
+    ${i<2?'<span class="badge">Sesuai</span>':''}${IMGS(b.id).cust.length?`<span class="peek${i<2?' low':''}">${IMGS(b.id).cust.length} foto penerima</span>`:''}<div class="art${IMGS(b.id).bq?' photo':''}" style="background:#fff">${IMGS(b.id).bq?`<img src="${IMGS(b.id).bq}" alt="Bouquet ${b.t}" loading="lazy">`:bqArt(b)}</div><b>${b.t}</b><small>${b.d}</small></button>`).join('')}</div>
    <p class="hint">Tekan bouquet untuk tengok gambar penerima sebenar. Warna wrapping mungkin berbeza sedikit ikut stok.</p>`;
   el.querySelectorAll('.card').forEach(c=>c.onclick=()=>openBq(c.dataset.id,el));
   foot('Seterusnya',!!S.bq);
@@ -631,6 +632,7 @@ const SCR={
     <input id="file" type="file" accept="image/*" multiple aria-label="Pilih gambar"></label>
    <p class="status warn" id="pmsg" hidden></p>
    ${S.photos.length?`<div class="polas">${S.photos.map((p,i)=>`<div class="pola"><img src="${p}" alt="Gambar polaroid ${i+1}"><button class="x" data-i="${i}" aria-label="Buang gambar">×</button><span class="free">${i===0?'Percuma':'+RM10'}</span></div>`).join('')}</div>`:''}
+   ${S.photos.length?'':'<p class="status" style="margin:0">Belum ada gambar sekarang? Tekan <b>Skip dulu</b>. Awak boleh upload kemudian melalui link Semak Order yang kami hantar selepas bayaran.</p>'}
    <p class="note">Tip: gambar muka yang jelas dan terang paling cantik bila dicetak.</p>
    <p class="hint" style="text-align:center">Tak boleh pilih gambar? Buka link ni dalam Chrome atau Safari, kemudian cuba semula.</p>`;
   const M=1600;
@@ -693,7 +695,7 @@ const SCR={
  del(el){
   const now=myNow(),today=ymd(now),isToday=S.date===today,hr=now.getHours()+now.getMinutes()/60;
   const closed={free:isToday&&hr>=17,A:isToday&&hr>=9,B:isToday&&hr>=14,C:isToday&&hr>=18,spec:isToday&&hr>=18},allShut=Object.values(closed).every(Boolean);
-  const opts=[['free','Percuma','Masa rawak antara 10 pagi – 6 petang',0],['A','Slot A','9 pagi – 12 tengah hari',10],['B','Slot B','1 petang – 4 petang',10],['C','Slot C','5 petang – 8 malam',10],['spec','Masa khusus','Pilih jam tepat (9 pagi – 10 malam). Tempah sekurang-kurangnya 5 jam awal. Untuk hari ini, tempah sebelum 6 petang.',50]];
+  const opts=[['free','Percuma','Sampai antara 10 pagi – 6 petang (tiada masa tetap)',0],['A','Slot A','9 pagi – 12 tengah hari',10],['B','Slot B','1 petang – 4 petang',10],['C','Slot C','5 petang – 8 malam',10],['spec','Masa khusus','Pilih jam tepat (9 pagi – 10 malam). Tempah sekurang-kurangnya 5 jam awal. Untuk hari ini, tempah sebelum 6 petang.',50]];
   if(closed[S.del])S.del=closed.free?(['A','B','C','spec'].find(k=>!closed[k])||'free'):'free';
   const quick=[[0,'Hari ini'],[1,'Esok'],[2,'Lusa']],qset=quick.map(([k])=>ymd(new Date(now.getFullYear(),now.getMonth(),now.getDate()+k))),other=!!S.date&&!qset.includes(S.date);
   el.innerHTML=`<div class="eyebrow">Langkah 7 · Penghantaran</div><h1>Bila nak sampai?</h1>
