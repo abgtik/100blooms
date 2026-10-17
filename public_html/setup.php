@@ -22,7 +22,7 @@ if ($has === 0 && $_SERVER['REQUEST_METHOD'] === 'POST') {
 ?><!doctype html><html lang="ms"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Setup 100 Blooms</title>
 <style>body{font:15px/1.5 system-ui,sans-serif;background:#fbeef0;color:#3b2732;margin:0;padding:24px 16px}main{max-width:420px;margin:0 auto;background:#fff;border-radius:18px;padding:22px}
 label{display:block;font-weight:600;font-size:13px;margin:12px 0 4px}input{width:100%;box-sizing:border-box;padding:11px;border:1.5px solid #ecd6dc;border-radius:10px;font:inherit}
-button{margin-top:16px;width:100%;padding:13px;border:0;border-radius:12px;background:#d94f74;color:#fff;font:600 16px system-ui}.e{background:#f8e0e3;color:#b6404f;padding:10px;border-radius:10px}.k{background:#e3f4ea;color:#2f8f63;padding:10px;border-radius:10px}</style></head>
+button{margin-top:16px;width:100%;padding:13px;border:0;border-radius:12px;background:#8e1b2f;color:#fff;font:600 16px system-ui}.e{background:#f8e0e3;color:#b6404f;padding:10px;border-radius:10px}.k{background:#e3f4ea;color:#2f8f63;padding:10px;border-radius:10px}</style></head>
 <body><main><h1 style="margin-top:0">Setup 100 Blooms</h1>
 <?php if ($msg): ?><p class="e"><?= $msg ?></p><?php endif; ?>
 <?php if ($ok || $has > 0): ?>

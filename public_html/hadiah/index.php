@@ -86,7 +86,7 @@ footer{text-align:center;margin-top:28px;color:var(--soft);font-size:13px}footer
   <div class="code"><span id="vc"><?= $e($vcode) ?></span><button type="button" id="cp">Salin</button></div>
   <p class="small">Sah hingga <?= $e(date('j/n/Y', strtotime($vends))) ?> · sekali guna</p>
   <a class="btn" href="../?v=<?= $e(rawurlencode($vcode)) ?>">Pilih hadiah sekarang →</a><?php endif ?></section><?php endif ?>
- <footer><img src="../assets/logo.png" alt="100 Blooms">100 Blooms · Hadiah lengkap, terus ke pintu dia<br><a href="../" style="color:var(--acc)">100blooms.my</a></footer>
+ <footer><img src="../assets/logo-icon.svg" alt="100 Blooms">100 Blooms · Hadiah lengkap, terus ke pintu dia<br><a href="../" style="color:var(--acc)">100blooms.my</a></footer>
 </main>
 <script>
 (()=>{const b=document.getElementById('cp');if(b)b.onclick=async()=>{try{await navigator.clipboard.writeText(document.getElementById('vc').textContent);b.textContent='✓ Disalin'}catch(e){}};

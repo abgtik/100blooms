@@ -26,7 +26,7 @@ $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?= $e($title . ' ' . $docNo . ' · 100 Blooms') ?></title>
 <style>
-:root{--ink:#2e2329;--soft:#6e5d66;--line:#d9cdd2;--head:#f1ebee;--accent:#d94f74;--ok:#1f8a4c}
+:root{--ink:#2e2329;--soft:#6e5d66;--line:#d9cdd2;--head:#f1ebee;--accent:#8e1b2f;--ok:#1f8a4c}
 *{box-sizing:border-box}html{background:#ece6e9}body{margin:0;font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink)}
 .page{background:#fff;width:210mm;min-height:297mm;margin:16px auto;padding:16mm 15mm 14mm;box-shadow:0 10px 40px -14px rgba(0,0,0,.25);position:relative}
 h1{font-size:24px;margin:0 0 14px;letter-spacing:-.01em}

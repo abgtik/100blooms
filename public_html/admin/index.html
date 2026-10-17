@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Figtree:wght@400;500;600;700&display=swap">
 <script>try{const k=localStorage.getItem('hb_skin');if(k&&k!=='bunga')document.documentElement.dataset.skin=k;if(localStorage.getItem('hb_mascot')==='0')document.documentElement.dataset.nomascot=''}catch(e){}</script>
 <style>
-:root{--on:#fff;--bar:#e9799a;--bar2:#f6cfdb;--barh:#d94f74;--grid:#f1e4e8;--paper:#fffdf9;--tint:#fff5f7;--hl:#fff7e8;--hlb:#f1d38f;--seg:#fff;--off:#cdbfc4;--bg:#f7f1f3;--card:#fff;--ink:#3b2732;--soft:#7d6370;--line:#ecdde2;--accent:#d94f74;--ok:#2f8f63;--okb:#e3f4ea;--warn:#a8691b;--warnb:#fbefd9;--bad:#b6404f;--badb:#f8e0e3;--info:#2f6fc1;--infob:#e4eefb;
+:root{--on:#fff;--bar:#e9799a;--bar2:#f6cfdb;--barh:#8e1b2f;--grid:#f1e4e8;--paper:#fffdf9;--tint:#fff5f7;--hl:#fff7e8;--hlb:#f1d38f;--seg:#fff;--off:#cdbfc4;--bg:#f7f1f3;--card:#fff;--ink:#3b2732;--soft:#7d6370;--line:#ecdde2;--accent:#8e1b2f;--ok:#2f8f63;--okb:#e3f4ea;--warn:#a8691b;--warnb:#fbefd9;--bad:#b6404f;--badb:#f8e0e3;--info:#2f6fc1;--infob:#e4eefb;
   --display:"Fredoka",ui-rounded,system-ui,sans-serif;--body:"Figtree",system-ui,-apple-system,sans-serif;color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 var(--body);-webkit-tap-highlight-color:transparent}
@@ -1084,7 +1084,7 @@ function solatPop(){
 }
 async function solatInit(){if(!SOL)await solatLoad();solatTick();if(!solT)solT=setInterval(solatTick,1000)}
 /* ---------- skins ---------- */
-const SKINS=[['bunga','Bunga','Default 100 Blooms',['#d94f74','#f7f1f3','#3b2732']],['api','Semangat Api','Oren bertenaga, gaya ninja',['#e8611a','#211915','#f8f1ea']],
+const SKINS=[['bunga','Bunga','Default 100 Blooms',['#8e1b2f','#f7f1f3','#3b2732']],['api','Semangat Api','Oren bertenaga, gaya ninja',['#e8611a','#211915','#f8f1ea']],
   ['angin','Angin Wuxia','Kertas beras, dakwat & jed',['#2e6b5b','#1d2523','#b23a2e']],['tenang','Chill Tenang','Sage lembut, tenang di mata',['#4f9580','#edf3f0','#2b3a35']]];
 const SKIN_FONTS={api:'family=Russo+One&family=Rubik:wght@400;500;600;700',angin:'family=Cormorant+Garamond:wght@600;700&family=Noto+Sans:wght@400;500;600;700',tenang:'family=Quicksand:wght@500;600;700&family=Nunito:wght@400;500;600;700'};
 function skinFonts(k){if(!SKIN_FONTS[k]||document.getElementById('sf-'+k))return;const l=document.createElement('link');l.id='sf-'+k;l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?'+SKIN_FONTS[k]+'&display=swap';document.head.appendChild(l)}
