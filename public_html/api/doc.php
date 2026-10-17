@@ -64,7 +64,7 @@ table.it tr{break-inside:avoid;page-break-inside:avoid}
 <?php if ($type === 'receipt'): ?><div class="stamp">PAID</div><?php endif ?>
 <h1><?= $title ?></h1>
 <div class="top">
- <div class="biz"><img src="../assets/logo.png" alt="100 Blooms" width="88" height="88">
+ <div class="biz"><img src="../assets/logo-icon.svg?v=20261018" alt="100 Blooms" width="88" height="88">
   <div><b>100 Blooms</b><?= $e($B['name']) ?><br><?= $B['reg'] !== '' ? '(' . $e($B['reg']) . ')<br>' : '' ?><?= $B['addr'] !== '' ? nl2br($e($B['addr'])) . '<br>' : '' ?><?= $e($B['phone']) ?><?= $B['email'] !== '' ? '<br>' . $e($B['email']) : '' ?></div></div>
  <div class="meta"><b><?= $type === 'receipt' ? 'Receipt No:' : 'Invoice No:' ?></b><?= $e($docNo) ?><?php if ($type === 'receipt'): ?><b style="margin-top:4px">Invoice No:</b><?= $e($o['code']) ?><?php endif ?>
   <b style="margin-top:4px">Date:</b><?= $e(date('j M Y', strtotime($type === 'receipt' ? ($o['paid_at'] ?: $o['created_at']) : $o['created_at']))) ?>
