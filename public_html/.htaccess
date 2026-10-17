@@ -4,3 +4,14 @@ Options -Indexes
   Require all denied
 </FilesMatch>
 DirectoryIndex index.html index.php
+
+# Old website URLs (e.g. /ms, /product/...) still indexed by Google → permanent redirect to the homepage,
+# so the search result points to the new site instead of a 404. Real files/folders of this app are untouched.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_URI} !^/(api|admin|assets|uploads|semak|hadiah|sales|agent|mcp)(/|$)
+  RewriteCond %{REQUEST_URI} !^/(robots\.txt|sitemap\.xml|favicon\.ico)$
+  RewriteRule ^ / [R=301,L]
+</IfModule>

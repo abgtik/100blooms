@@ -1,0 +1,9 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /api/
+Disallow: /semak/
+Disallow: /hadiah/
+Disallow: /sales/
+Disallow: /agent/
+Disallow: /uploads/
+Sitemap: https://100blooms.my/sitemap.xml
