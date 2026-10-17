@@ -21,7 +21,7 @@ function schema_sql(string $driver): array {
   del_date DATE NOT NULL, del_type VARCHAR(6) NOT NULL, del_time VARCHAR(5) NULL,
   b_name VARCHAR(100) NOT NULL, b_phone VARCHAR(30) NOT NULL,
   price_lines TEXT NOT NULL, total DECIMAL(8,2) NOT NULL,
-  agent_ref VARCHAR(20) NULL, voucher VARCHAR(30) NULL, discount DECIMAL(8,2) NOT NULL DEFAULT 0, notes TEXT NULL, prep TEXT NULL, del_steps TEXT NULL, lalamove_url VARCHAR(300) NULL, created_by VARCHAR(100) NULL, bq_note VARCHAR(100) NULL, pay_mode VARCHAR(10) NOT NULL DEFAULT 'gateway', recipient_photo VARCHAR(80) NULL, wish_edits INT NOT NULL DEFAULT 0, wa_log TEXT NULL, bill_to TEXT NULL, updated_by VARCHAR(100) NULL
+  agent_ref VARCHAR(20) NULL, voucher VARCHAR(30) NULL, discount DECIMAL(8,2) NOT NULL DEFAULT 0, notes TEXT NULL, prep TEXT NULL, del_steps TEXT NULL, lalamove_url VARCHAR(300) NULL, created_by VARCHAR(100) NULL, bq_note VARCHAR(100) NULL, pay_mode VARCHAR(10) NOT NULL DEFAULT 'gateway', recipient_photo VARCHAR(80) NULL, wish_edits INT NOT NULL DEFAULT 0, wa_log TEXT NULL, bill_to TEXT NULL, issue TEXT NULL, aftercare TEXT NULL, updated_by VARCHAR(100) NULL
 )$tail",
 "CREATE INDEX idx_orders_del ON orders (del_date)",
 "CREATE INDEX idx_orders_created ON orders (created_at)",

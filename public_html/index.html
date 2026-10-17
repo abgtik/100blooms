@@ -1112,6 +1112,7 @@ if(STEPS[S.step]==='done'||STEPS[S.step]==='pay')S.step=STEPS.indexOf('sum');
 (async()=>{
   try{const r=await fetch('api/catalog.php',{cache:'no-store'});if(r.ok){const j=await r.json();CAT=Object.assign(CAT,j,{t0:Date.now()});}}catch(e){}
   const P=new URLSearchParams(location.search);
+  {const v=(P.get('v')||'').trim().toUpperCase();if(/^[A-Z0-9-]{3,24}$/.test(v)&&S.voucher!==v){S.voucher=v;S.vinfo=null;save();try{history.replaceState(null,'',location.pathname)}catch(e){}}}
   if(HQ){hqBar();if(!(await hqMe()))hqLogin();render();}
   else if(P.get('r')&&P.get('k')){checkReturn(P.get('r'),P.get('k'),0);}
   else render();

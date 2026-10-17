@@ -69,15 +69,16 @@ case 'orders':
   if ($f === 'pending') $W[] = "pay_status<>'paid'";
   elseif ($f === 'paid') { $W[] = "pay_status='paid'"; $W[] = "status NOT IN ('selesai','batal')"; }
   elseif ($f === 'delivered') $W[] = "status='selesai'";
+  elseif ($f === 'issue') { $W[] = "issue IS NOT NULL AND issue<>''"; $W[] = "issue NOT LIKE '%\"resolved\"%'"; }
   elseif ($f === 'today') { $W[] = 'del_date=?'; $P[] = date('Y-m-d'); $W[] = "status<>'batal'"; } // same as the calendar: paid and unpaid
   if (!empty($_GET['from'])) { $W[] = "$by>=?"; $P[] = $_GET['from'] . ($by === 'created_at' ? ' 00:00:00' : ''); }
   if (!empty($_GET['to'])) { $W[] = "$by<=?"; $P[] = $_GET['to'] . ($by === 'created_at' ? ' 23:59:59' : ''); }
   if ($qq !== '') { $W[] = '(code LIKE ? OR r_name LIKE ? OR b_name LIKE ? OR r_phone LIKE ? OR b_phone LIKE ?)'; array_push($P, ...array_fill(0, 5, "%$qq%")); }
   $where = $W ? 'WHERE ' . implode(' AND ', $W) : '';
   $order = $f === 'pending' || $by === 'created_at' ? 'created_at DESC' : "del_date ASC, CASE del_type WHEN 'A' THEN 1 WHEN 'spec' THEN 2 WHEN 'free' THEN 3 WHEN 'B' THEN 4 ELSE 5 END, created_at";
-  if ($f === 'all' || $f === 'delivered') $order = 'created_at DESC';
-  $rows = q("SELECT id,code,created_at,pay_status,status,bouquet,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher,wish,photos,created_by,agent_ref FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
-  foreach ($rows as &$r) { $r['src'] = order_source($r); unset($r['created_by'], $r['agent_ref']); $r['progress'] = progress_text($r); $r['need'] = array_values(array_filter([$r['wish'] === WISH_NONE ? 'Wishcard belum' : null, count(jdec($r['photos'])) < (int)$r['photo_count'] ? 'Polaroid ' . count(jdec($r['photos'])) . '/' . (int)$r['photo_count'] : null])); unset($r['price_lines'], $r['prep'], $r['del_steps'], $r['wish'], $r['photos']); } unset($r);
+  if ($f === 'all' || $f === 'delivered' || $f === 'issue') $order = 'created_at DESC';
+  $rows = q("SELECT id,code,created_at,pay_status,status,bouquet,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher,wish,photos,created_by,agent_ref,issue FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
+  foreach ($rows as &$r) { $r['src'] = order_source($r); $ii = issue_of($r); $r['issue'] = $ii ? (empty($ii['resolved']) ? 'open' : 'done') : null; unset($r['created_by'], $r['agent_ref']); $r['progress'] = progress_text($r); $r['need'] = array_values(array_filter([$r['wish'] === WISH_NONE ? 'Wishcard belum' : null, count(jdec($r['photos'])) < (int)$r['photo_count'] ? 'Polaroid ' . count(jdec($r['photos'])) . '/' . (int)$r['photo_count'] : null])); unset($r['price_lines'], $r['prep'], $r['del_steps'], $r['wish'], $r['photos']); } unset($r);
   $t = date('Y-m-d');
   $legacy = []; $olToday = 0; $olLeft = 0;
   try { // Orderla orders for today's deliveries sit beside the new ones
@@ -94,6 +95,7 @@ case 'orders':
   $counts = [
     'today' => $olToday + (int)q("SELECT COUNT(*) FROM orders WHERE del_date=? AND status<>'batal'", [$t])->fetchColumn(),
     'today_left' => $olLeft + (int)q("SELECT COUNT(*) FROM orders WHERE del_date=? AND status NOT IN ('selesai','batal')", [$t])->fetchColumn(),
+    'issue_open' => (int)q("SELECT COUNT(*) FROM orders WHERE issue IS NOT NULL AND issue<>'' AND issue NOT LIKE '%\"resolved\"%'")->fetchColumn(),
     'today_unpaid' => (int)q("SELECT COUNT(*) FROM orders WHERE del_date=? AND pay_status<>'paid' AND status<>'batal'", [$t])->fetchColumn(),
     'pending' => (int)q("SELECT COUNT(*) FROM orders WHERE pay_status='pending' AND created_at>=?", [date('Y-m-d H:i:s', time() - 86400)])->fetchColumn(),
     'paid_today_rm' => (float)q("SELECT COALESCE(SUM(total),0) FROM orders WHERE pay_status='paid' AND paid_at>=?", [$t . ' 00:00:00'])->fetchColumn(),
@@ -104,7 +106,10 @@ case 'order':
   need_login();
   $o = q('SELECT * FROM orders WHERE id=?', [(int)($_GET['id'] ?? 0)])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404);
   $o['track_url'] = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
-  $o['src'] = order_source($o); $o['doc_invoice'] = doc_url($o, 'invoice'); $o['doc_receipt'] = doc_url($o, 'receipt');
+  $o['src'] = order_source($o); $o['doc_invoice'] = doc_url($o, 'invoice');
+  $o['issue'] = issue_of($o) ?: null; $o['aftercare'] = aftercare($o) ?: null; $o['issue_reasons'] = ISSUE_REASONS; $o['rcp_url'] = rcp_url($o);
+  $dAt = (string)(jdec($o['del_steps'])['delivered']['at'] ?? ''); $o['after_due'] = $dAt !== '' ? date('Y-m-d H:i:s', strtotime($dAt) + AFTERCARE_MIN * 60) : null;
+  $o['after_auto'] = $dAt !== '' && $dAt >= (string)setting('aftercare_since', '9999') ; $o['wa_on'] = wa_ready('buyer_done'); $o['doc_receipt'] = doc_url($o, 'receipt');
   unset($o['token']);
   $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS; $o['invoice'] = invoice_msg($o, $o['pay_status'] !== 'paid' && $o['bill_code'] ? pay_url($o['bill_code']) : null);
   $o['agent'] = $o['agent_ref'] ? (q('SELECT a.id,a.name,c.amount,c.payout_id FROM agents a LEFT JOIN commissions c ON c.order_id=? AND c.agent_id=a.id WHERE a.id=?', [$o['id'], (int)$o['agent_ref']])->fetch() ?: null) : null;
@@ -193,6 +198,39 @@ case 'items': // change bouquet / balloon / cake / occasion on an existing order
   refresh_status($o['id']);
   json_out(['ok' => true, 'warn' => $warn]);
 
+case 'issue': // flag / update / clear a delivery problem (stops the automatic thank-you messages)
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0)); $i = issue_of($o);
+  $reasons = array_values(array_intersect(array_keys(ISSUE_REASONS), array_map('strval', (array)($body['reasons'] ?? []))));
+  if (!$reasons && empty($i['voucher'])) { q('UPDATE orders SET issue=NULL, updated_by=? WHERE id=?', [$m['name'], $o['id']]); json_out(['ok' => true, 'cleared' => true]); }
+  $i = array_merge($i, ['reasons' => $reasons, 'note' => str_in($body['note'] ?? ($i['note'] ?? ''), 500), 'action' => str_in($body['action'] ?? ($i['action'] ?? ''), 200)]);
+  $i['by'] = $i['by'] ?? $m['name']; $i['at'] = $i['at'] ?? date('Y-m-d H:i:s');
+  q('UPDATE orders SET issue=?, updated_by=? WHERE id=?', [json_encode($i, JSON_UNESCAPED_UNICODE), $m['name'], $o['id']]);
+  json_out(['ok' => true]);
+
+case 'issue_voucher': // RM30 apology voucher, one per problem order
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0)); $i = issue_of($o);
+  if (!$i) fail('Tanda masalah dulu.');
+  if (empty($i['voucher'])) { [$c, $e] = make_voucher('MAAF', 'rm', 30, 'Maaf order ' . $o['code'] . ' oleh ' . $m['name']); $i['voucher'] = $c; $i['voucher_ends'] = $e; $i['voucher_by'] = $m['name'];
+    q('UPDATE orders SET issue=? WHERE id=?', [json_encode($i, JSON_UNESCAPED_UNICODE), $o['id']]); }
+  json_out(['ok' => true, 'code' => $i['voucher'], 'ends' => $i['voucher_ends']]);
+
+case 'issue_done':
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0)); $i = issue_of($o); if (!$i) fail('Tiada masalah ditanda.');
+  $i['resolved'] = empty($body['undo']) ? ['by' => $m['name'], 'at' => date('Y-m-d H:i:s')] : null; if (!$i['resolved']) unset($i['resolved']);
+  q('UPDATE orders SET issue=? WHERE id=?', [json_encode($i, JSON_UNESCAPED_UNICODE), $o['id']]);
+  json_out(['ok' => true]);
+
+case 'aftermsg': // message text for the team to send by hand (WhatsApp opens with it); also records that it went out
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0)); $who = (string)($body['who'] ?? '');
+  if ($o['pay_status'] !== 'paid') fail('Order belum dibayar.');
+  $a = aftercare($o); $now = date('Y-m-d H:i:s');
+  if ($who === 'issue') { $i = issue_of($o); if (!$i) fail('Tiada masalah ditanda.'); $i['msg_at'] = $now; $i['msg_by'] = $m['name'];
+    q('UPDATE orders SET issue=? WHERE id=?', [json_encode($i, JSON_UNESCAPED_UNICODE), $o['id']]); json_out(['phone' => wa_num($o['b_phone']), 'text' => issue_msg($o)]); }
+  if ($who === 'rcp') { rcp_voucher($o); $o = load_order((int)$o['id']); $a = aftercare($o); $a['rcp_manual_at'] = $now; aftercare_save((int)$o['id'], $a);
+    $rp = first_phone((string)$o['r_phone']); if ($rp === '') fail('Nombor penerima tidak sah.'); json_out(['phone' => wa_num($rp), 'text' => aftercare_msg($o, 'rcp')]); }
+  if ($who === 'buyer') { $a['offer'] = true; $a['buyer_manual_at'] = $now; aftercare_save((int)$o['id'], $a); json_out(['phone' => wa_num($o['b_phone']), 'text' => aftercare_msg($o, 'buyer')]); }
+  fail('Pilihan tidak sah.');
+
 case 'prep': // tick / untick a production checklist item
   $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
   if ($o['pay_status'] !== 'paid' || $o['status'] === 'batal') fail('Order belum dibayar atau dibatalkan.');
@@ -211,7 +249,7 @@ case 'dstep': // advance delivery by exactly one step
   if ($step !== $next) fail('Ikut urutan: langkah seterusnya ialah "' . (DEL_STEPS[$next] ?? '-') . '".');
   if ($step === 'booked' && derive_status($o) !== 'siap' && empty($body['force'])) fail('Penyediaan belum lengkap. Tick semua item dulu.');
   if ($step === 'booked' && !empty($body['force'])) need_owner();
-  if ($step === 'delivered' && !$o['recipient_photo']) fail('Upload gambar penerima dulu.');
+  if ($step === 'delivered' && !$o['recipient_photo'] && !in_array('no_photo', issue_of($o)['reasons'] ?? [], true)) fail('Upload gambar penerima dulu (atau tanda masalah "Tiada gambar penerima").');
   $d[$step] = ['by' => $m['name'], 'at' => date('Y-m-d H:i:s')];
   $set = 'del_steps=?'; $P = [json_encode($d, JSON_UNESCAPED_UNICODE)];
   if ($step === 'booked' && isset($body['url'])) { $u = trim((string)$body['url']); if ($u !== '' && !preg_match('#^https://#i', $u)) fail('Link mesti bermula dengan https://'); $set .= ', lalamove_url=?'; $P[] = mb_substr($u, 0, 300) ?: null; }
@@ -669,7 +707,21 @@ case 'reportcsv':
   $nPaid = count($paid) + $olN;
   foreach ($rank as &$r) { uasort($r, fn($x, $y) => $y[0] <=> $x[0] ?: $y[1] <=> $x[1]); $r = array_map(fn($k, $x) => ['name' => (string)$k, 'n' => $x[0], 'sales' => round($x[1], 2)], array_keys($r), $r); } unset($r);
   $days = []; for ($d = strtotime($from); $d <= strtotime($to) && count($days) < 400; $d += 86400) $days[date('Y-m-d', $d)] = round($series[date('Y-m-d', $d)] ?? 0, 2);
-  json_out(['from' => $from, 'to' => $to, 'by' => $by, 'sales' => round($sales, 2), 'paid' => $nPaid, 'avg' => $nPaid ? round($sales / $nPaid, 2) : 0,
+  // after-delivery care: problems (by delivery date), and how the thank-you / apology / recipient vouchers performed (by voucher creation date)
+  $after = ['issues' => 0, 'reasons' => [], 'auto' => 0, 'rcp_views' => 0, 'v' => []];
+  foreach (q("SELECT issue, aftercare FROM orders WHERE pay_status='paid' AND status<>'batal' AND del_date>=? AND del_date<=?", [$from, $to])->fetchAll() as $r) {
+    $i = jdec($r['issue']); $ac = jdec($r['aftercare']);
+    if ($i && !empty($i['reasons'])) { $after['issues']++; foreach ($i['reasons'] as $k) { $nm = ISSUE_REASONS[$k] ?? $k; $after['reasons'][$nm] = ($after['reasons'][$nm] ?? 0) + 1; } }
+    if (!empty($ac['auto_at'])) $after['auto']++; if (!empty($ac['rcp_viewed_at'])) $after['rcp_views']++;
+  }
+  arsort($after['reasons']);
+  foreach (['TQ' => 'Hadiah terima kasih (TQ)', 'HAI' => 'Voucher penerima (HAI)', 'MAAF' => 'Voucher maaf (MAAF)'] as $px => $nm) {
+    $w = "v.code LIKE '$px%' AND LENGTH(v.code)=" . (strlen($px) + 6) . " AND v.created_at>=? AND v.created_at<=?";
+    $iss = (int)q("SELECT COUNT(*) FROM vouchers v WHERE $w", ["$from 00:00:00", "$to 23:59:59"])->fetchColumn();
+    $u = q("SELECT COUNT(*) n, COALESCE(SUM(o.total),0) s FROM orders o JOIN vouchers v ON v.code=o.voucher WHERE o.pay_status='paid' AND o.status<>'batal' AND $w", ["$from 00:00:00", "$to 23:59:59"])->fetch();
+    $after['v'][] = ['name' => $nm, 'issued' => $iss, 'used' => (int)$u['n'], 'sales' => round((float)$u['s'], 2)];
+  }
+  json_out(['after' => $after, 'from' => $from, 'to' => $to, 'by' => $by, 'sales' => round($sales, 2), 'paid' => $nPaid, 'avg' => $nPaid ? round($sales / $nPaid, 2) : 0,
     'orderla' => ['n' => $olN, 's' => round($olS, 2)], 'created' => $createdN, 'pay_rate' => $createdN ? round($createdPaid / $createdN * 100) : 0, 'discount' => round($disc, 2), 'rank' => $rank, 'series' => $days]);
 
 case 'calendar':

@@ -77,7 +77,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 16) return;
+  if ($v >= 17) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -116,6 +116,10 @@ function migrate(PDO $pdo): void {
   $run('ALTER TABLE orders ADD COLUMN bill_to TEXT NULL');
   // v13: name a team member shows on invoices/receipts (e.g. "Hanie HQ (60143467099)")
   $run('ALTER TABLE admins ADD COLUMN doc_name VARCHAR(100) NULL');
+  // v17: after-delivery care: problems flagged by the team, thank-you messages, gifts and vouchers
+  $run('ALTER TABLE orders ADD COLUMN issue TEXT NULL');
+  $run('ALTER TABLE orders ADD COLUMN aftercare TEXT NULL');
+  if ($v < 17) { $pdo->exec("DELETE FROM settings WHERE k='aftercare_since'"); $pdo->prepare("INSERT INTO settings (k,v) VALUES ('aftercare_since',?)")->execute([date('Y-m-d H:i:s')]); }
   // v14/v15: new catalogue items (e.g. Congrats Grad Polkadot balloon) get a row in Stok
   // v16: cake menu change (New York Cheese added) - cakes get their Stok rows too
   $ins = $my ? 'INSERT IGNORE' : 'INSERT OR IGNORE'; $C = catalog();
@@ -127,7 +131,7 @@ function migrate(PDO $pdo): void {
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','16')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','17')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
@@ -545,7 +549,8 @@ function after_paid(int $id): void {
 const UNPAID_MIN = 5; // minutes before an unpaid website order is followed up
 const WA_TYPES = ['team_paid' => 'Team: order baru dibayar', 'team_unpaid' => 'Team: order website belum dibayar selepas 5 minit (untuk follow up)',
   'buyer_unpaid' => 'Pembeli: peringatan bayar selepas 5 minit (dengan link bayaran)', 'buyer_paid' => 'Pembeli: bayaran diterima', 'buyer_otw' => 'Pembeli: hadiah dalam perjalanan',
-  'buyer_done' => 'Pembeli: hadiah dah sampai (dengan link gambar penerima)', 'agent_comm' => 'Agent: komisen baru', 'agent_payout' => 'Agent: komisen dibayar', 'agent_welcome' => 'Agent: selamat datang selepas daftar'];
+  'buyer_done' => 'Pembeli: terima kasih + gambar penerima + hadiah + link ulasan (30 minit selepas sampai, jika tiada masalah)',
+  'rcp_gift' => 'Penerima: page kenangan (wish + gambar) + voucher RM10 (30 minit selepas sampai, jika tiada masalah)', 'agent_comm' => 'Agent: komisen baru', 'agent_payout' => 'Agent: komisen dibayar', 'agent_welcome' => 'Agent: selamat datang selepas daftar'];
 function wa_cfg(): array {
   static $c = null; if ($c !== null) return $c;
   $on = json_decode((string)setting('wa_on', ''), true);
@@ -632,11 +637,80 @@ function wa_order(array $o, string $event): void {
         . "Kalau ada masalah masa bayar tadi, boleh sambung bayar di sini:\n$pay\n\nAtau balas mesej ni, team kami sedia bantu 😊\n— 100 Blooms");
     } elseif ($event === 'otw') {
       $add('buyer_otw', 'buyer_otw', $o['b_phone'], "Hai $first 🚗\n\nHadiah untuk *{$o['r_name']}* sedang dalam perjalanan bersama runner kami 💐\n\nSemak status:\n$track\n\n— 100 Blooms");
-    } elseif ($event === 'delivered') {
-      $add('buyer_done', 'buyer_done', $o['b_phone'], "Hai $first 🎉\n\nHadiah untuk *{$o['r_name']}* dah selamat sampai! 🌸\n\nGambar penerima masa hadiah sampai boleh dilihat di sini:\n$track\n\nTerima kasih kerana memilih 100 Blooms 💕\n— 100 Blooms");
+    } elseif ($event === 'aftercare') { // 30 minutes after delivery, only when no problem was flagged (aftercare_sweep)
+      $add('buyer_done', 'buyer_done', $o['b_phone'], aftercare_msg($o, 'buyer'));
+      $rp = first_phone((string)$o['r_phone']); if ($rp !== '' && norm_phone($rp) !== norm_phone((string)$o['b_phone'])) $add('rcp_gift', 'rcp_gift', $rp, aftercare_msg($o, 'rcp'));
     }
     if ($sent) q('UPDATE orders SET wa_log=? WHERE id=?', [json_encode($log), $o['id']]);
   } catch (Throwable $e) { error_log('100blooms wa_order: ' . $e->getMessage()); }
+}
+// ---------- after delivery: thank-you, gifts, recipient page, problems ----------
+const AFTERCARE_MIN = 30;   // minutes after "Dah sampai" before the automatic messages go out (time to flag a problem)
+const GIFT_DAYS = 90;       // vouchers from this flow are valid for 90 days
+const ISSUE_REASONS = ['balloon' => 'Balloon meletup / kempis', 'cake' => 'Kek rosak', 'late' => 'Sampai lewat', 'no_photo' => 'Tiada gambar penerima',
+  'wrong' => 'Item salah / tertinggal', 'flower' => 'Bunga rosak / layu', 'other' => 'Lain-lain'];
+const REVIEW_URL = 'https://www.google.com/maps/place//data=!4m4!3m3!1s0x31cdaf27fb32636f:0x7bdd6e7a2ce4bca3!9m1!1b1';
+function review_url(): string { return (string)setting('review_url', REVIEW_URL); }
+/** First number when the field holds two ("0122707537 / 0183209"). */
+function first_phone(string $p): string { $p = trim(preg_split('#[/,;]|\bdan\b|\bor\b#i', $p)[0] ?? ''); return strlen(digits($p)) >= 9 ? $p : ''; }
+/** Recipient page key: separate from the buyer's token, so the recipient never gets the buyer's tracking page. */
+function rcp_key(array $o): string { return substr(hash_hmac('sha256', (string)$o['code'], (string)$o['token']), 0, 16); }
+function rcp_url(array $o): string { return SITE_URL . '/hadiah/?c=' . rawurlencode($o['code']) . '&r=' . rcp_key($o); }
+function aftercare(array $o): array { return jdec($o['aftercare'] ?? null); }
+function aftercare_save(int $id, array $a): void { q('UPDATE orders SET aftercare=? WHERE id=?', [json_encode($a, JSON_UNESCAPED_UNICODE), $id]); }
+function issue_of(array $o): array { return jdec($o['issue'] ?? null); }
+/** One-time voucher with a unique code (e.g. TQ7K2M9P), valid GIFT_DAYS days. Returns [code, ends_on]. */
+function make_voucher(string $prefix, string $type, float $value, string $note): array {
+  $ends = date('Y-m-d', strtotime('+' . GIFT_DAYS . ' days'));
+  for ($i = 0; $i < 20; $i++) {
+    $code = $prefix . substr(str_shuffle(str_repeat('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 3)), 0, 6);
+    if (q('SELECT 1 FROM vouchers WHERE code=?', [$code])->fetch()) continue;
+    q('INSERT INTO vouchers (code,type,value,max_off,gift_name,agent_ok,active,starts_on,ends_on,max_uses,once_per_phone,note,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [$code, $type, $value, null, null, 1, 1, date('Y-m-d'), $ends, 1, 1, mb_substr($note, 0, 200), date('Y-m-d H:i:s')]);
+    return [$code, $ends];
+  }
+  throw new RuntimeException('Kod voucher tak dapat dijana.');
+}
+/** The recipient's RM10 first-order voucher (created once per order). */
+function rcp_voucher(array $o): array {
+  $a = aftercare($o);
+  if (empty($a['rcp_code'])) { [$c, $e] = make_voucher('HAI', 'rm', 10, 'Penerima order ' . $o['code'] . ' (RM10 order pertama)'); $a['rcp_code'] = $c; $a['rcp_ends'] = $e; aftercare_save((int)$o['id'], $a); }
+  return [$a['rcp_code'], $a['rcp_ends']];
+}
+function aftercare_msg(array $o, string $who): string {
+  $first = trim(explode(' ', trim((string)$o['b_name']))[0] ?? '') ?: 'awak';
+  $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
+  if ($who === 'rcp') {
+    $rf = trim(explode(' ', trim((string)$o['r_name']))[0] ?? '') ?: 'awak'; $from = trim((string)($o['sender'] ?? '')) ?: $first;
+    return "Hai $rf 🌸\n\nSemoga awak suka hadiah daripada *$from* hari ni! 💐\n\nKami simpan kenangan istimewa untuk awak: ayat kad ucapan" . (!empty($o['recipient_photo']) ? ' dan gambar awak masa terima hadiah' : '') . ". Ada juga hadiah kecil daripada kami 🎁\n\n"
+      . rcp_url($o) . "\n\n— 100 Blooms";
+  }
+  return "Hai $first 🌸\n\nHadiah untuk *{$o['r_name']}* dah selamat sampai! 🎉\n\n" . (!empty($o['recipient_photo']) ? "📸 Gambar {$o['r_name']} masa terima hadiah:\n$track\n\n" : "📦 Status order:\n$track\n\n")
+    . "🎁 Sebagai tanda terima kasih, kami sediakan *hadiah istimewa* untuk order awak yang seterusnya. Tuntut di link yang sama.\n\n"
+    . "⭐ Kalau sudi, kongsikan pengalaman awak di Google. Ia sangat membantu bisnes kecil kami:\n" . review_url() . "\n\nTerima kasih kerana memilih 100 Blooms 💕";
+}
+/** Apology message the team sends by hand for a problem order (voucher and/or replacement are optional). */
+function issue_msg(array $o): string {
+  $first = trim(explode(' ', trim((string)$o['b_name']))[0] ?? '') ?: 'awak'; $i = issue_of($o);
+  $why = implode(', ', array_map(fn($k) => mb_strtolower(ISSUE_REASONS[$k] ?? $k), $i['reasons'] ?? []));
+  $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
+  return "Hai $first 🌸\n\nKami mohon maaf atas masalah pada hadiah untuk *{$o['r_name']}*" . ($why !== '' ? " ($why)" : '') . ". Ini bukan pengalaman yang kami mahu awak lalui 🙏\n\n"
+    . (!empty($i['action']) ? "✅ Tindakan kami: {$i['action']}\n\n" : '')
+    . (!empty($i['voucher']) ? "🎟️ Sebagai tanda maaf, ini voucher *RM30 off* untuk order seterusnya: *{$i['voucher']}* (sah hingga " . date('j/n/Y', strtotime($i['voucher_ends'])) . ", sekali guna).\n\n" : '')
+    . (!empty($o['recipient_photo']) ? "📸 Gambar penerima:\n$track\n\n" : "Status order:\n$track\n\n")
+    . "⭐ Pendapat awak penting untuk kami perbaiki servis. Kalau sudi, kongsikan pengalaman awak di Google:\n" . review_url() . "\n\nTerima kasih atas kesabaran awak 💕\n— 100 Blooms";
+}
+/** Sends the automatic after-delivery messages 30 minutes after "Dah sampai", only for orders without a flagged problem. */
+function aftercare_sweep(): void {
+  if (!wa_ready('buyer_done') && !wa_ready('rcp_gift')) return; // not connected / switched off: the team sends these by hand from the order panel
+  $since = (string)setting('aftercare_since', date('Y-m-d H:i:s')); $cut = date('Y-m-d H:i:s', time() - AFTERCARE_MIN * 60);
+  foreach (q("SELECT * FROM orders WHERE status IN ('sampai','selesai') AND pay_status='paid' AND (issue IS NULL OR issue='') AND (aftercare IS NULL OR aftercare NOT LIKE '%auto_at%') AND del_date>=? ORDER BY id LIMIT 80", [date('Y-m-d', strtotime('-3 days'))])->fetchAll() as $o) {
+    $at = (string)(jdec($o['del_steps'])['delivered']['at'] ?? '');
+    if ($at === '' || $at < $since || $at > $cut) continue;
+    $a = aftercare($o); $a['offer'] = true; $a['auto_at'] = date('Y-m-d H:i:s'); aftercare_save((int)$o['id'], $a); $o['aftercare'] = json_encode($a);
+    try { rcp_voucher($o); $o = q('SELECT * FROM orders WHERE id=?', [$o['id']])->fetch(); } catch (Throwable $e) { error_log('100blooms rcp voucher: ' . $e->getMessage()); }
+    wa_order($o, 'aftercare');
+  }
 }
 /** Background jobs, run after a response at most once a minute (also callable from api/cron.php via Plesk Scheduled Tasks). */
 function cron_tick(bool $force = false): void {
@@ -645,6 +719,7 @@ function cron_tick(bool $force = false): void {
     set_setting('cron_at', (string)time());
     if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
     unpaid_sweep();
+    aftercare_sweep();
     if ($GLOBALS['WA_Q']) wa_flush();
     orderla_autosync();
   } catch (Throwable $e) { error_log('100blooms cron: ' . $e->getMessage()); }

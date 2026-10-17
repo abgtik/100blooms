@@ -218,6 +218,10 @@ html:not([data-nomascot]) .ranks{row-gap:26px}
 @media (prefers-reduced-motion:no-preference){html:not([data-nomascot]) .kpi::before{animation:bob 4.5s ease-in-out infinite}html:not([data-nomascot]) .kpi:nth-child(2n)::before{animation-delay:-2.2s}}
 @keyframes bob{50%{transform:translateY(-2px) rotate(3deg)}}
 @media print{.card::before,.kpi::before{display:none!important}}
+.iss{border:1.5px solid #f3b4b4;background:#fff5f5;border-radius:14px;padding:12px;margin-top:6px}.iss.ok{border-color:#b7dfc3;background:#f3fbf5}
+.ichk{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;margin:8px 0}.ichk label{display:flex;gap:6px;align-items:center;font-size:14px}
+.pg.pbad{background:#fde2e2;color:#b42318}.pg.pok{background:#e6f4ea;color:#1e7a3c}
+@media (prefers-color-scheme:dark){.iss{background:#3a2020;border-color:#7a3a3a}.iss.ok{background:#1f3326;border-color:#3d6b4a}.pg.pbad{background:#4a2020;color:#ffb4a8}.pg.pok{background:#1f3326;color:#9fe0b0}}
 </style>
 </head>
 <body>
@@ -285,7 +289,7 @@ function bindOl(root,reload){root.querySelectorAll('[data-lid]').forEach(b=>b.on
   }catch(e){toast(e.message)}})}
 /* ---------- orders ---------- */
 async function Orders(el){
-  const F=[['today','Hantar hari ini'],['paid','Perlu diuruskan'],['pending','Menunggu bayaran'],['delivered','Selesai'],['all','Semua']];
+  const F=[['today','Hantar hari ini'],['paid','Perlu diuruskan'],['pending','Menunggu bayaran'],['delivered','Selesai'],['issue','⚠️ Perlu follow up'],['all','Semua']];
   el.innerHTML=`<div class="kpis" id="kp"></div>
    <div class="bar">${F.map(([k,t])=>`<button class="chip" data-f="${k}" aria-pressed="${f===k}">${t}</button>`).join('')}</div>
    <div class="bar"><input type="search" id="qs" placeholder="Cari kod, nama atau telefon" value="${h(qs)}" aria-label="Cari order">
@@ -298,13 +302,13 @@ async function Orders(el){
   $('#rf').onclick=load;
   async function load(){
     let j;try{j=await api('orders',{params:{f,q:qs,from:f==='today'?'':dfrom,to:f==='today'?'':dto}})}catch(e){if(e.message!=='auth')$('#ol').innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
-    const c=j.counts;
+    const c=j.counts;{const fb=el.querySelector('[data-f=issue]');if(fb)fb.textContent='⚠️ Perlu follow up'+(c.issue_open?` (${c.issue_open})`:'')}
     $('#kp').innerHTML=`<div class="kpi"><small>Hantar hari ini</small><b>${c.today}</b> <span class="mini">${c.today_left} belum selesai${c.today_unpaid?` · ${c.today_unpaid} belum bayar`:''}</span></div>
       <div class="kpi"><small>Menunggu bayaran (24 jam)</small><b>${c.pending}</b></div><div class="kpi"><small>Bayaran diterima hari ini</small><b>${rm(c.paid_today_rm)}</b></div>`;
     const LG=j.legacy||[];
     $('#ol').innerHTML=(j.rows.length||LG.length)?j.rows.map(o=>`<button class="ord" data-id="${o.id}">
       <div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">Hantar <b style="color:var(--ink)">${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</div>
-       ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}${(o.need||[]).map(t=>`<span class="pg" style="background:var(--warnb);color:var(--warn)">${h(t)}</span>`).join(' ')}<div class="m">${srcChip(o.src)} Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
+       ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}${(o.need||[]).map(t=>`<span class="pg" style="background:var(--warnb);color:var(--warn)">${h(t)}</span>`).join(' ')}${o.issue?`<span class="pg ${o.issue==='open'?'pbad':'pok'}">${o.issue==='open'?'⚠️ Masalah':'✅ Masalah selesai'}</span>`:''}<div class="m">${srcChip(o.src)} Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
       <div class="r"><div class="t">${rm(o.total)}</div><div class="m">Order ${fmtDT(o.created_at)}</div></div></button>`).join('')+LG.map(o=>olRow(o)).join('')
       :`<div class="empty">Tiada order${f==='today'?' untuk dihantar hari ini':''}.</div>`;
     $('#ol').querySelectorAll('.ord[data-id]').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,load));bindOl($('#ol'),load);
@@ -341,6 +345,33 @@ function wfCards(o){
       ${k==='booked'&&D.booked?`<div class="bar" style="margin:6px 0 0">${o.lalamove_url?`<a class="mini" href="${h(o.lalamove_url)}" target="_blank" rel="noopener">Buka tracking Lalamove ↗</a>`:''}<input id="lle" type="url" value="${h(o.lalamove_url||'')}" placeholder="Link tracking Lalamove" aria-label="Link tracking Lalamove" style="flex:1;min-width:160px"><button class="btn ghost sm" id="llsave">Simpan link</button></div>`:''}</div>`).join('')}
     ${!dN?'<div style="text-align:right;margin-top:10px"><button class="btn ghost sm" id="cn2">Batalkan order</button></div>':''}</div>`;
 }
+function afterCard(o){
+  if(o.pay_status!=='paid'||o.status==='batal')return '';
+  const a=o.aftercare||{},i=o.issue,R=o.issue_reasons||{},dlv=['sampai','selesai'].includes(o.status),open=i&&!i.resolved;
+  let st;
+  if(open)st=`<div class="msg bad" style="margin:0 0 10px">⚠️ Ada masalah. Mesej automatik <b>tidak</b> dihantar. Team sales follow up secara manual di bawah.</div>`;
+  else if(a.auto_at)st=`<div class="msg ok" style="margin:0 0 10px">✅ Mesej terima kasih dihantar automatik ${fmtDT(a.auto_at)}</div>`;
+  else if(!dlv||!o.after_due)st=`<p class="mini" style="margin:0 0 10px">Selepas runner tekan <b>Dah sampai</b>, mesej terima kasih (pembeli) dan halaman hadiah (penerima) dihantar automatik ${o.wa_on?'30 minit kemudian':'— WhatsApp automatik belum disambung, guna butang manual'}. Kalau ada masalah, tandakan dulu supaya mesej automatik tak keluar.</p>`;
+  else if(!o.after_auto)st=`<p class="mini" style="margin:0 0 10px">Order ni dihantar sebelum ciri ni aktif. Mesej automatik tak dihantar. Guna butang manual jika perlu.</p>`;
+  else if(!o.wa_on)st=`<div class="msg bad" style="margin:0 0 10px">WhatsApp automatik belum disambung / dimatikan. Hantar manual guna butang di bawah.</div>`;
+  else st=`<p class="mini" style="margin:0 0 10px">⏳ Mesej automatik dijadualkan sekitar <b>${fmtDT(o.after_due)}</b>. Ada masalah? Tandakan sebelum masa tu.</p>`;
+  const info=[a.buyer_manual_at?`Terima kasih (manual) ${fmtDT(a.buyer_manual_at)}`:'',a.gift?`🎁 Hadiah dituntut: <b>${h(a.gift.code)}</b> (${a.gift.choice==='rm10'?'RM10 off':'1 polaroid'})`:a.offer?'🎁 Hadiah belum dituntut':'',
+    a.rcp_code?`💌 Kod penerima: <b>${h(a.rcp_code)}</b>`:'',a.rcp_manual_at?`Penerima (manual) ${fmtDT(a.rcp_manual_at)}`:'',a.rcp_viewed_at?`👀 Penerima buka halaman ${fmtDT(a.rcp_viewed_at)}`:''].filter(Boolean);
+  const chk=k=>i&&(i.reasons||[]).includes(k)?' checked':'';
+  return `<div class="card" id="acard"><h2>🤝 Selepas hantar</h2>${st}
+   ${info.length?`<div class="mini" style="margin:0 0 10px;line-height:1.7">${info.join('<br>')}</div>`:''}
+   ${dlv?`<div class="bar" style="margin:0 0 6px">${open?'':`<button class="btn ghost sm" data-am="buyer">💬 WhatsApp pembeli (terima kasih)</button>`}<button class="btn ghost sm" data-am="rcp">💌 WhatsApp penerima</button><a class="btn ghost sm" href="${h(o.rcp_url)}" target="_blank" rel="noopener">Lihat halaman penerima</a></div>`:''}
+   ${i?`<div class="iss${i.resolved?' ok':''}"><b>${i.resolved?'✅ Masalah selesai':'⚠️ Masalah'}</b>: ${(i.reasons||[]).map(k=>h(R[k]||k)).join(', ')||'-'}${i.note?`<br><span class="mini">${h(i.note)}</span>`:''}
+     <span class="mini" style="display:block">Ditanda oleh ${h(i.by||'-')} · ${fmtDT(i.at)}${i.resolved?` · selesai oleh ${h(i.resolved.by)} ${fmtDT(i.resolved.at)}`:''}${i.msg_at?` · mesej maaf ${fmtDT(i.msg_at)} (${h(i.msg_by)})`:''}</span>
+     ${i.voucher?`<div style="margin-top:6px">🎟️ Voucher maaf <b>${h(i.voucher)}</b> (RM30, sah hingga ${fmtD(i.voucher_ends)})</div>`:''}
+     <div class="bar" style="margin:8px 0 0">${i.voucher?'':`<button class="btn ghost sm" id="ivv">🎟️ Jana voucher RM30</button>`}<button class="btn sm" data-am="issue">💬 WhatsApp pembeli (minta maaf)</button>
+      <button class="btn ghost sm" id="idn">${i.resolved?'Buka semula':'Tandakan selesai'}</button></div></div>`:''}
+   <details style="margin-top:10px"><summary class="mini" style="cursor:pointer;font-weight:600">${i?'✏️ Kemas kini masalah':'⚠️ Tandakan ada masalah'}</summary>
+    <div class="ichk">${Object.entries(R).map(([k,t])=>`<label><input type="checkbox" value="${k}"${chk(k)}> ${h(t)}</label>`).join('')}</div>
+    <label class="fl">Nota (apa jadi)<input id="isn" maxlength="500" value="${h(i?.note||'')}" placeholder="Contoh: balloon pecah masa sampai"></label>
+    <label class="fl">Tindakan kami (keluar dalam mesej maaf)<input id="isa" maxlength="200" value="${h(i?.action||'')}" placeholder="Contoh: Kami hantar balloon baru petang ni"></label>
+    <div class="bar" style="margin:8px 0 0"><button class="btn sm" id="iss">Simpan</button>${i&&!i.voucher?'<button class="btn ghost sm danger" id="isx">Buang tanda masalah</button>':''}</div>
+    <p class="mini" style="margin:6px 0 0">Tanda "Tiada gambar penerima" membolehkan runner tekan Dah sampai tanpa gambar.</p></details></div>`}
 async function openOrder(id,reload){
   let o;try{o=(await api('order',{params:{id}})).order}catch(e){toast(e.message);return}
   const ph=(n,dl)=>`photo.php?o=${encodeURIComponent(o.code)}&f=${encodeURIComponent(n)}${dl?'&dl=1':''}`;
@@ -355,6 +386,7 @@ async function openOrder(id,reload){
       <hr><a role="menuitem" href="#" id="ddbill">Bill To (nama syarikat)…</a></div></div><button class="btn ghost sm" id="cx">Tutup</button></div></div>
    <div id="om"></div>
    ${wfCards(o)}
+   ${afterCard(o)}
    <div class="card"><h2>Butiran penghantaran</h2>
     <div class="rowx"><span>Tarikh</span><span><b>${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</span></div>
     <div class="rowx"><span>Penerima</span><span>${h(o.r_name)}</span></div>
@@ -426,7 +458,7 @@ async function openOrder(id,reload){
   document.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>{const st=b.dataset.step,body={id,step:st};
     if(st==='booked'&&$('#llm'))body.url=$('#llm').value.trim();
     if(b.dataset.force){if(!confirm('Penyediaan belum lengkap. Teruskan juga?'))return;body.force=1}
-    if(st==='done'){window.open(wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}! Hadiah untuk ${o.call_name} dah selamat sampai 🌸 Gambar penerima dan status order ada di sini: ${o.track_url}\n\nTerima kasih pilih 100 Blooms!`),'_blank','noopener')}
+    if(st==='done'&&!(o.wa_on&&o.after_auto)&&!(o.aftercare||{}).buyer_manual_at&&!(o.issue&&!o.issue.resolved)){window.open(wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}! Hadiah untuk ${o.call_name} dah selamat sampai 🌸 Gambar penerima dan status order ada di sini: ${o.track_url}\n\nTerima kasih pilih 100 Blooms!`),'_blank','noopener')}
     done(api('dstep',{method:'POST',body}),'Dikemas kini')});
   if($('#dundo'))$('#dundo').onclick=e=>{e.preventDefault();if(confirm('Undo langkah terakhir?'))done(api('dundo',{method:'POST',body:{id}}),'Langkah di-undo')};
   if($('#llsave'))$('#llsave').onclick=()=>done(api('lalamove',{method:'POST',body:{id,url:$('#lle').value.trim()}}),'Link disimpan');
@@ -446,6 +478,14 @@ async function openOrder(id,reload){
   $('#wsv').onclick=()=>done(api('wish',{method:'POST',body:{id,wish:$('#wt').value,sender:$('#ws').value}}),'Wishcard disimpan');
   if($('#pau'))$('#pau').onclick=()=>{const fs=[...$('#paf').files];if(!fs.length)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fs.forEach(f=>fd.append('photo[]',f));done(api('padd',{method:'POST',body:fd}),'Polaroid dimuat naik')};
   document.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=()=>{if(confirm('Padam gambar polaroid ni?'))done(api('pdel',{method:'POST',body:{id,f:b.dataset.pdel}}),'Gambar dipadam')});
+  document.querySelectorAll('[data-am]').forEach(b=>b.onclick=async()=>{const w=window.open('','_blank');
+    try{const j=await api('aftermsg',{method:'POST',body:{id,who:b.dataset.am}});const u='https://api.whatsapp.com/send?phone='+j.phone+'&text='+encodeURIComponent(j.text);if(w)w.location=u;else location.href=u;reload&&reload();openOrder(id,reload)}
+    catch(e){w&&w.close();$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}});
+  if($('#iss'))$('#iss').onclick=()=>{const rs=[...document.querySelectorAll('.ichk input:checked')].map(x=>x.value);if(!rs.length)return toast('Pilih sekurang-kurangnya satu masalah');
+    done(api('issue',{method:'POST',body:{id,reasons:rs,note:$('#isn').value,action:$('#isa').value}}),'Masalah ditanda')};
+  if($('#isx'))$('#isx').onclick=()=>{if(confirm('Buang tanda masalah? Mesej automatik akan dihantar seperti biasa.'))done(api('issue',{method:'POST',body:{id,reasons:[]}}),'Tanda dibuang')};
+  if($('#ivv'))$('#ivv').onclick=()=>{if(confirm('Jana voucher RM30 off (sekali guna, 90 hari) untuk pembeli ni?'))done(api('issue_voucher',{method:'POST',body:{id}}),'Voucher dijana')};
+  if($('#idn'))$('#idn').onclick=()=>done(api('issue_done',{method:'POST',body:{id,undo:!!o.issue?.resolved}}),o.issue?.resolved?'Dibuka semula':'Ditanda selesai');
   if($('#rpu'))$('#rpu').onclick=()=>{const f=$('#rpf').files[0];if(!f)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fd.append('file',f);done(api('rphoto',{method:'POST',body:fd}),'Gambar dimuat naik')};
 }
 
@@ -705,6 +745,12 @@ async function Report(el){
    <div class="card"><h2>Jualan harian (${rp.by==='del'?'ikut tarikh hantar':'ikut tarikh bayar'})</h2><div class="chartbox"><div id="ch2" style="height:260px"></div></div></div>
    <div class="ranks">${tbl('Bouquet',R.bouquet)}${tbl('Momen',R.occasion)}${tbl('Balloon',R.balloon)}${tbl('Kek',R.cake)}${tbl('Jenis penghantaran',R.del)}${tbl('Zon',R.zone)}${tbl('Kawasan (poskod)',R.area)}${tbl('Sumber order',R.source)}${tbl('Voucher',R.voucher)}</div>
    <p class="mini">Order batal tak dikira. "Kadar bayar" = order masuk dalam tempoh ni yang dah dibayar.${j.orderla&&j.orderla.n?` Termasuk <b>${j.orderla.n} order Orderla</b> (${rm(j.orderla.s)}): tarikh bayar dikira ikut tarikh order, bouquet/balloon/kek dibaca dari nama item, dan Orderla tiada data momen kecuali ada soalan "occasion" dalam borang.`:''}</p>`;
+  const A=j.after;if(A){const bx=document.createElement('div');bx.className='card';
+    bx.innerHTML=`<h2>🤝 Selepas hantar</h2><div class="grid4" style="margin-bottom:10px"><div class="kpi"><small>Order bermasalah</small><b>${A.issues}</b></div><div class="kpi"><small>Mesej terima kasih automatik</small><b>${A.auto}</b></div><div class="kpi"><small>Penerima buka halaman hadiah</small><b>${A.rcp_views}</b></div></div>
+     ${Object.keys(A.reasons).length?`<table class="rt">${Object.entries(A.reasons).map(([k,n])=>`<tr><td>${h(k)}</td><td>${n}</td></tr>`).join('')}</table>`:'<p class="mini">Tiada masalah dilaporkan dalam tempoh ni 🎉</p>'}
+     <table class="rt" style="margin-top:10px"><tr><td><b>Voucher</b></td><td><b>Diberi · Diguna · Jualan</b></td></tr>${A.v.map(v=>`<tr><td>${h(v.name)}</td><td>${v.issued} · ${v.used} · ${rm(v.sales)}</td></tr>`).join('')}</table>
+     <p class="mini" style="margin:6px 0 0">Masalah ikut tarikh hantar. Voucher ikut tarikh dijana; "Jualan" = order baru yang guna voucher tu (lead baru dari penerima = HAI).</p>`;
+    $('#rbody').appendChild(bx)}
   barChart('ch2',Object.keys(j.series).map(dShort),Object.values(j.series));
 }
 

@@ -77,6 +77,8 @@ textarea{width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(
 .zoom{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px}.zoom img{max-width:100%;max-height:100%;border-radius:12px}
 .foot{text-align:center;font-size:13px;color:var(--soft);margin-top:18px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+.vc{border:1.5px dashed var(--accent);border-radius:16px;padding:14px;margin-top:10px;text-align:center}.vc small{display:block;color:var(--muted,#888)}.vc b{display:block;font:700 24px var(--display);letter-spacing:2px;margin:4px 0}.vca{display:flex;gap:8px}.vca .btn{flex:1;margin-top:10px}
+.gch{display:grid;grid-template-columns:1fr 1fr;gap:10px}.gch button{border:1.5px solid var(--accent);background:transparent;border-radius:16px;padding:14px 8px;cursor:pointer;color:inherit;font:inherit}.gch button b{display:block;font:700 18px var(--display);color:var(--accent)}.gch button span{font-size:13px}.gch button:disabled{opacity:.5}
 .docs{display:flex;gap:8px}.docs .btn{flex:1;text-align:center;text-decoration:none}.bill{margin-top:12px}.bill summary{cursor:pointer;font-weight:600;color:var(--accent)}.bill textarea{width:100%}.bill .btn{margin-top:8px}
 .bankalt{margin-top:12px}.bankalt summary{cursor:pointer;font-weight:600;color:var(--accent);padding:6px 0}
 </style>
@@ -116,6 +118,14 @@ function form(err,code,phone){
     catch(x){form('Tiada sambungan internet. Cuba lagi.',c,p)}};
 }
 
+function afterCards(o){const a=o.after||{};let x='';
+ const exp=d=>{try{return new Date(d+'T00:00:00').toLocaleDateString('ms-MY',{day:'numeric',month:'long',year:'numeric'})}catch(e){return d}};
+ const vc=(code,lab,ends)=>`<div class="vc"><small>${h(lab)}</small><b>${h(code)}</b><span class="hint">Sah sehingga ${h(exp(ends))} · sekali guna</span><div class="vca"><button class="btn ghost" data-cp="${h(code)}">Salin kod</button><a class="btn" href="/?v=${encodeURIComponent(code)}">Order lagi →</a></div></div>`;
+ if(a.sorry)x+=`<section class="card"><h2>Maaf atas kesulitan 🙏</h2><p class="hint" style="margin:0 0 4px">Terima kasih kerana bersabar. Ini voucher untuk order seterusnya.</p>${vc(a.sorry.code,'Voucher RM30 off',a.sorry.ends)}</section>`;
+ if(a.offer)x+=`<section class="card gift"><h2>🎁 Hadiah terima kasih</h2>${a.gift?`<p class="hint" style="margin:0 0 4px">Hadiah awak untuk order seterusnya:</p>${vc(a.gift.code,a.gift.choice==='rm10'?'RM10 off':'1 polaroid tambahan percuma',a.gift.ends)}`
+  :`<p class="hint" style="margin:0 0 10px">Terima kasih memilih 100 Blooms! Pilih satu hadiah untuk order seterusnya:</p><div class="gch"><button data-gift="rm10"><b>RM10</b><span>off order seterusnya</span></button><button data-gift="photo"><b>📸 1 polaroid</b><span>tambahan percuma</span></button></div><p class="hint" style="margin:8px 0 0">Pilihan tak boleh ditukar selepas dipilih.</p><div id="gm"></div>`}</section>`;
+ if(a.review)x+=`<section class="card"><h2>⭐ Kongsi pengalaman awak</h2><p class="hint" style="margin:0">Pendapat awak — baik atau ada yang boleh diperbaiki — sangat membantu kami dan pelanggan lain.</p><a class="btn ghost" href="${h(a.review)}" target="_blank" rel="noopener">Tulis ulasan di Google</a></section>`;
+ return x}
 function show(o){
   const I=window.IMG||{};
   const steps=[['Order diterima',fmtDT(o.created_at)],['Bayaran diterima',fmtDT(o.paid_at)],['Hadiah sedang disiapkan',o.status==='siap'?'Hadiah dah siap dan menunggu runner':'Team kami sedang susun bouquet, kek dan balloon'],['Dalam penghantaran','Runner dalam perjalanan ke penerima'],['Hadiah dah sampai','Terima kasih kerana memilih 100 Blooms']];
@@ -136,6 +146,7 @@ function show(o){
     <div class="del"><svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
      <div><b>${fmtD(o.del_date)}</b><span class="hint">${h(delTxt)}</span></div></div></section>`:''}
    ${o.recipient_photo?`<section class="card rp" aria-labelledby="t4"><h2 id="t4">Saat hadiah sampai 🌸</h2><img src="${ph(o.recipient_photo)}" alt="Gambar penerima dengan hadiah" data-z><p class="hint" style="margin:8px 0 0">Tekan gambar untuk besarkan, kemudian tekan lama untuk simpan.</p></section>`:''}
+   ${afterCards(o)}
    <section class="card" aria-labelledby="t2"><h2 id="t2">Isi hadiah awak</h2>
     <div class="items">
      <div class="item"><div class="pic">${bq?`<img src="${img(bq)}" alt="Bouquet ${h(o.bouquet.name)}">`:''}</div><small>Bouquet</small><b>${h(o.bouquet.name)}</b></div>
@@ -179,6 +190,11 @@ function show(o){
     const fd=new FormData();fd.append('c',o.code);fd.append('k',o.k);fd.append('a','photo_add');fs.forEach(f=>fd.append('photo[]',f));
     $('#pm').innerHTML='<p class="hint" style="margin:8px 0 0">Memuat naik…</p>';try{await post(fd,true);await reload()}catch(x){$('#pm').innerHTML=`<div class="msg bad" role="alert">${h(x.message)}</div>`}};
   document.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=async e=>{e.stopPropagation();if(!confirm('Buang gambar ni?'))return;try{await post({c:o.code,k:o.k,a:'photo_del',f:b.dataset.pdel});await reload()}catch(x){alert(x.message)}});
+  document.querySelectorAll('[data-cp]').forEach(b=>b.onclick=async()=>{try{await navigator.clipboard.writeText(b.dataset.cp);b.textContent='Disalin ✓'}catch(e){prompt('Salin kod:',b.dataset.cp)}});
+  document.querySelectorAll('[data-gift]').forEach(b=>b.onclick=async()=>{const lab=b.dataset.gift==='rm10'?'RM10 off':'1 polaroid percuma';if(!confirm('Pilih '+lab+'? Pilihan tak boleh ditukar.'))return;
+    document.querySelectorAll('[data-gift]').forEach(x=>x.disabled=true);
+    try{const r=await fetch('/api/gift.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({c:o.code,k:o.k,choice:b.dataset.gift})});const j=await r.json();if(!r.ok)throw new Error(j.error||'Ralat');await reload()}
+    catch(x){$('#gm').innerHTML=`<div class="msg bad">${h(x.message)}</div>`;document.querySelectorAll('[data-gift]').forEach(x=>x.disabled=false)}});
   document.querySelectorAll('[data-z]').forEach(i=>i.onclick=()=>{const z=document.createElement('div');z.className='zoom';z.innerHTML=`<img src="${i.src}" alt="">`;z.onclick=()=>z.remove();document.body.appendChild(z)});
 }
 
