@@ -77,7 +77,7 @@ function db(): PDO {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 17) return;
+  if ($v >= 18) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -120,6 +120,8 @@ function migrate(PDO $pdo): void {
   $run('ALTER TABLE orders ADD COLUMN issue TEXT NULL');
   $run('ALTER TABLE orders ADD COLUMN aftercare TEXT NULL');
   if ($v < 17) { $pdo->exec("DELETE FROM settings WHERE k='aftercare_since'"); $pdo->prepare("INSERT INTO settings (k,v) VALUES ('aftercare_since',?)")->execute([date('Y-m-d H:i:s')]); }
+  // v18: language the customer ordered in (ms / en) for messages, Semak, the recipient page and documents
+  $run("ALTER TABLE orders ADD COLUMN lang VARCHAR(2) NOT NULL DEFAULT 'ms'");
   // v14/v15: new catalogue items (e.g. Congrats Grad Polkadot balloon) get a row in Stok
   // v16: cake menu change (New York Cheese added) - cakes get their Stok rows too
   $ins = $my ? 'INSERT IGNORE' : 'INSERT OR IGNORE'; $C = catalog();
@@ -131,7 +133,7 @@ function migrate(PDO $pdo): void {
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','17')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','18')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
@@ -599,9 +601,10 @@ function wa_order(array $o, string $event): void {
     $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
     $first = explode(' ', trim($o['b_name']))[0];
     $day = fmt_day($o['del_date']); $slot = $o['del_type'] === 'spec' ? 'Masa khusus ' . $o['del_time'] : (DELIVERY[$o['del_type']]['label'] ?? '');
-    $need = [];
-    if ($o['wish'] === WISH_NONE) $need[] = 'tulis ayat wishcard';
-    $miss = (int)$o['photo_count'] - count(jdec($o['photos'])); if ($miss > 0) $need[] = "upload $miss gambar polaroid";
+    $en = order_en($o); $dayB = fmt_day_l($o['del_date'], $en); $slotB = $en ? tr_en($slot) : $slot; // buyer-facing (order language)
+    $need = []; $needE = [];
+    if ($o['wish'] === WISH_NONE) { $need[] = 'tulis ayat wishcard'; $needE[] = 'write the card message'; }
+    $miss = (int)$o['photo_count'] - count(jdec($o['photos'])); if ($miss > 0) { $need[] = "upload $miss gambar polaroid"; $needE[] = "upload $miss polaroid photo" . ($miss > 1 ? 's' : ''); }
     $add = function (string $key, string $type, string $to, string $msg) use (&$log, &$sent) {
       if (isset($log[$key]) || !wa_ready($type)) return;
       wa_queue($to, $msg); $log[$key] = date('Y-m-d H:i:s'); $sent[] = $key;
@@ -615,7 +618,11 @@ function wa_order(array $o, string $event): void {
         . ($ag ? "\n🤝 Agent #{$ag['id']} {$ag['name']}" : '') . ($o['voucher'] ? "\n🎟️ Voucher {$o['voucher']}" : '')
         . ($need ? "\n⚠️ Belum: " . implode(', ', $need) : '') . "\n\n" . SITE_URL . '/admin/';
       foreach (wa_cfg()['team'] as $i => $t) $add("team$i", 'team_paid', $t, $team);
-      $add('buyer_paid', 'buyer_paid', $o['b_phone'], "Hai $first 🌸\n\nTerima kasih! Bayaran untuk order *{$o['code']}* (RM" . number_format((float)$o['total'], 2) . ") dah kami terima.\n\n"
+      if ($en) $add('buyer_paid', 'buyer_paid', $o['b_phone'], "Hi $first 🌸\n\nThank you! We've received payment for order *{$o['code']}* (RM" . number_format((float)$o['total'], 2) . ").\n\n"
+        . "💐 Gift for *{$o['r_name']}*\n🚚 $dayB · $slotB\n\n"
+        . ($needE ? "📝 Don't forget to " . implode(' and ', $needE) . " at the link below, so we can prepare the gift.\n\n" : '')
+        . "Track your order:\n$track\n\n🧾 Receipt (PDF):\n" . doc_url($o, 'receipt') . "\n\n— 100 Blooms");
+      else $add('buyer_paid', 'buyer_paid', $o['b_phone'], "Hai $first 🌸\n\nTerima kasih! Bayaran untuk order *{$o['code']}* (RM" . number_format((float)$o['total'], 2) . ") dah kami terima.\n\n"
         . "💐 Hadiah untuk *{$o['r_name']}*\n🚚 $day · $slot\n\n"
         . ($need ? '📝 Jangan lupa ' . implode(' dan ', $need) . " di link bawah ya, supaya kami boleh siapkan hadiah.\n\n" : '')
         . "Semak status order:\n$track\n\n🧾 Resit (PDF):\n" . doc_url($o, 'receipt') . "\n\n— 100 Blooms");
@@ -633,10 +640,13 @@ function wa_order(array $o, string $event): void {
         . "\n\nFollow up pembeli: https://wa.me/$bw\n" . SITE_URL . '/admin/';
       foreach (wa_cfg()['team'] as $i => $t) $add("unpaid_team$i", 'team_unpaid', $t, $team);
       $pay = $o['bill_code'] ? (pay_url($o['bill_code']) ?: $track) : $track;
-      $add('buyer_unpaid', 'buyer_unpaid', $o['b_phone'], "Hai $first 🌸\n\nOrder *{$o['code']}* (RM" . number_format((float)$o['total'], 2) . ") untuk *{$o['r_name']}* dah kami simpan, tapi bayaran belum kami terima.\n\n"
+      if ($en) $add('buyer_unpaid', 'buyer_unpaid', $o['b_phone'], "Hi $first 🌸\n\nWe've saved order *{$o['code']}* (RM" . number_format((float)$o['total'], 2) . ") for *{$o['r_name']}*, but we haven't received payment yet.\n\n"
+        . "If something went wrong while paying, you can continue here:\n$pay\n\nOr just reply to this message, our team is happy to help 😊\n— 100 Blooms");
+      else $add('buyer_unpaid', 'buyer_unpaid', $o['b_phone'], "Hai $first 🌸\n\nOrder *{$o['code']}* (RM" . number_format((float)$o['total'], 2) . ") untuk *{$o['r_name']}* dah kami simpan, tapi bayaran belum kami terima.\n\n"
         . "Kalau ada masalah masa bayar tadi, boleh sambung bayar di sini:\n$pay\n\nAtau balas mesej ni, team kami sedia bantu 😊\n— 100 Blooms");
     } elseif ($event === 'otw') {
-      $add('buyer_otw', 'buyer_otw', $o['b_phone'], "Hai $first 🚗\n\nHadiah untuk *{$o['r_name']}* sedang dalam perjalanan bersama runner kami 💐\n\nSemak status:\n$track\n\n— 100 Blooms");
+      if ($en) $add('buyer_otw', 'buyer_otw', $o['b_phone'], "Hi $first 🚗\n\nThe gift for *{$o['r_name']}* is on its way with our runner 💐\n\nTrack status:\n$track\n\n— 100 Blooms");
+      else $add('buyer_otw', 'buyer_otw', $o['b_phone'], "Hai $first 🚗\n\nHadiah untuk *{$o['r_name']}* sedang dalam perjalanan bersama runner kami 💐\n\nSemak status:\n$track\n\n— 100 Blooms");
     } elseif ($event === 'aftercare') { // 30 minutes after delivery, only when no problem was flagged (aftercare_sweep)
       $add('buyer_done', 'buyer_done', $o['b_phone'], aftercare_msg($o, 'buyer'));
       $rp = first_phone((string)$o['r_phone']); if ($rp !== '' && norm_phone($rp) !== norm_phone((string)$o['b_phone'])) $add('rcp_gift', 'rcp_gift', $rp, aftercare_msg($o, 'rcp'));
@@ -649,6 +659,7 @@ const AFTERCARE_MIN = 30;   // minutes after "Dah sampai" before the automatic m
 const GIFT_DAYS = 90;       // vouchers from this flow are valid for 90 days
 const ISSUE_REASONS = ['balloon' => 'Balloon meletup / kempis', 'cake' => 'Kek rosak', 'late' => 'Sampai lewat', 'no_photo' => 'Tiada gambar penerima',
   'wrong' => 'Item salah / tertinggal', 'flower' => 'Bunga rosak / layu', 'other' => 'Lain-lain'];
+const ISSUE_EN = ['balloon' => 'Balloon popped / deflated', 'cake' => 'Cake damaged', 'late' => 'Late delivery', 'no_photo' => 'No recipient photo', 'wrong' => 'Wrong / missing item', 'flower' => 'Flowers damaged / wilted', 'other' => 'Other'];
 const REVIEW_URL = 'https://search.google.com/local/writereview?placeid=ChIJb2My-yevzTERo7zkLHpu3Xs';
 function review_url(): string { return (string)setting('review_url', REVIEW_URL); }
 /** First number when the field holds two ("0122707537 / 0183209"). */
@@ -659,6 +670,19 @@ function rcp_url(array $o): string { return SITE_URL . '/hadiah/?c=' . rawurlenc
 function aftercare(array $o): array { return jdec($o['aftercare'] ?? null); }
 function aftercare_save(int $id, array $a): void { q('UPDATE orders SET aftercare=? WHERE id=?', [json_encode($a, JSON_UNESCAPED_UNICODE), $id]); }
 function issue_of(array $o): array { return jdec($o['issue'] ?? null); }
+/** English for customer-facing text, from the same dictionary the website uses (assets/i18n-en.json). Unknown text is returned unchanged. */
+function tr_en(string $s, int $d = 0): string {
+  static $D = null;
+  if ($D === null) { $j = json_decode((string)@file_get_contents(__DIR__ . '/../assets/i18n-en.json'), true) ?: ['x' => [], 'r' => []];
+    $D = ['x' => $j['x'], 'r' => array_map(fn($r) => ['/' . str_replace('/', '\\/', $r[0]) . '/u', $r[1]], $j['r'])]; }
+  if ($d > 3 || trim($s) === '') return $s;
+  $core = trim($s); $pre = substr($s, 0, strpos($s, $core)); $post = substr($s, strlen($pre) + strlen($core));
+  if (isset($D['x'][$core])) return $pre . $D['x'][$core] . $post;
+  foreach ($D['r'] as [$re, $rep]) if (@preg_match($re, $core, $m)) {
+    return $pre . preg_replace_callback('/([$%])(\d)/', fn($g) => $g[1] === '%' ? ($m[(int)$g[2]] ?? '') : tr_en($m[(int)$g[2]] ?? '', $d + 1), $rep) . $post; }
+  return $s;
+}
+function order_en(array $o): bool { return ($o['lang'] ?? 'ms') === 'en'; }
 /** One-time voucher with a unique code (e.g. TQ7K2M9P), valid GIFT_DAYS days. Returns [code, ends_on]. */
 function make_voucher(string $prefix, string $type, float $value, string $note): array {
   $ends = date('Y-m-d', strtotime('+' . GIFT_DAYS . ' days'));
@@ -680,6 +704,17 @@ function rcp_voucher(array $o): array {
 function aftercare_msg(array $o, string $who): string {
   $first = trim(explode(' ', trim((string)$o['b_name']))[0] ?? '') ?: 'awak';
   $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
+  if (order_en($o)) {
+    if ($who === 'rcp') {
+      $rf = trim(explode(' ', trim((string)$o['r_name']))[0] ?? '') ?: 'there'; $from = trim((string)($o['sender'] ?? '')) ?: $first;
+      return "Hi $rf 🌸\n\nWe hope you love your gift from *$from* today! 💐\n\nWe've saved a keepsake for you: the message from the card" . (!empty($o['recipient_photo']) ? ' and your photo receiving the gift' : '') . ". There's also a little gift from us 🎁\n\n"
+        . rcp_url($o) . "\n\n— 100 Blooms";
+    }
+    $first = $first === 'awak' ? 'there' : $first;
+    return "Hi $first 🌸\n\nThe gift for *{$o['r_name']}* has been delivered! 🎉\n\n" . (!empty($o['recipient_photo']) ? "📸 {$o['r_name']} receiving the gift:\n$track\n\n" : "📦 Order status:\n$track\n\n")
+      . "🎁 As a thank you, we've prepared a *special gift* for your next order. Claim it at the same link.\n\n"
+      . "⭐ If you have a moment, we'd love to hear about your experience on Google. It really helps our small business:\n" . review_url() . "\n\nThank you for choosing 100 Blooms 💕";
+  }
   if ($who === 'rcp') {
     $rf = trim(explode(' ', trim((string)$o['r_name']))[0] ?? '') ?: 'awak'; $from = trim((string)($o['sender'] ?? '')) ?: $first;
     return "Hai $rf 🌸\n\nSemoga awak suka hadiah daripada *$from* hari ni! 💐\n\nKami simpan kenangan istimewa untuk awak: ayat kad ucapan" . (!empty($o['recipient_photo']) ? ' dan gambar awak masa terima hadiah' : '') . ". Ada juga hadiah kecil daripada kami 🎁\n\n"
@@ -694,6 +729,12 @@ function issue_msg(array $o): string {
   $first = trim(explode(' ', trim((string)$o['b_name']))[0] ?? '') ?: 'awak'; $i = issue_of($o);
   $why = implode(', ', array_map(fn($k) => mb_strtolower(ISSUE_REASONS[$k] ?? $k), $i['reasons'] ?? []));
   $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
+  if (order_en($o)) { $first = $first === 'awak' ? 'there' : $first; $whyE = implode(', ', array_map(fn($k) => mb_strtolower(ISSUE_EN[$k] ?? $k), $i['reasons'] ?? []));
+    return "Hi $first 🌸\n\nWe're very sorry about the problem with the gift for *{$o['r_name']}*" . ($whyE !== '' ? " ($whyE)" : '') . ". This isn't the experience we want for you 🙏\n\n"
+    . (!empty($i['action']) ? "✅ What we're doing: {$i['action']}\n\n" : '')
+    . (!empty($i['voucher']) ? "🎟️ As an apology, here's an *RM30 off* voucher for your next order: *{$i['voucher']}* (valid until " . date('j/n/Y', strtotime($i['voucher_ends'])) . ", one-time use).\n\n" : '')
+    . (!empty($o['recipient_photo']) ? "📸 Recipient photo:\n$track\n\n" : "Order status:\n$track\n\n")
+    . "⭐ Your feedback helps us improve. If you'd like, please share your experience on Google:\n" . review_url() . "\n\nThank you for your patience 💕\n— 100 Blooms"; }
   return "Hai $first 🌸\n\nKami mohon maaf atas masalah pada hadiah untuk *{$o['r_name']}*" . ($why !== '' ? " ($why)" : '') . ". Ini bukan pengalaman yang kami mahu awak lalui 🙏\n\n"
     . (!empty($i['action']) ? "✅ Tindakan kami: {$i['action']}\n\n" : '')
     . (!empty($i['voucher']) ? "🎟️ Sebagai tanda maaf, ini voucher *RM30 off* untuk order seterusnya: *{$i['voucher']}* (sah hingga " . date('j/n/Y', strtotime($i['voucher_ends'])) . ", sekali guna).\n\n" : '')
@@ -739,6 +780,7 @@ function unpaid_sweep(): void {
   }
 }
 function wa_agent(array $ag, string $type, string $msg): void { if (wa_ready($type)) wa_queue($ag['phone'], $msg); }
+function fmt_day_l(string $ymd, bool $en): string { return $en ? date('D, j M', strtotime($ymd)) : fmt_day($ymd); }
 function fmt_day(string $ymd): string {
   $t = strtotime($ymd); $D = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu']; $Mo = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogos', 'Sep', 'Okt', 'Nov', 'Dis'];
   return $D[(int)date('w', $t)] . ', ' . date('j', $t) . ' ' . $Mo[(int)date('n', $t) - 1];
@@ -845,6 +887,17 @@ function invoice_msg(array $o, ?string $payUrl = null): string {
   $paid = $o['pay_status'] === 'paid';
   $track = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
   $photo = (int)$o['photo_count'] > 0;
+  if (order_en($o)) { $first = $first === 'awak' ? 'there' : $first; $occE = $occ !== '' ? ' ' . tr_en(trim($occ)) : '';
+    return "🌷 Invoice 100 Blooms\n🧾 Order No.: {$o['code']}\n\n"
+    . "Hi $first, thank you for choosing 100 Blooms! ❤️\n\n"
+    . "🎁 Your$occE gift for {$o['r_name']} will be delivered on " . fmt_day_l((string)$o['del_date'], true) . ' ' . date('Y', strtotime((string)$o['del_date'])) . ($slot ? ' (' . ($slot === 'masa khusus' ? 'specific time' : $slot) . ')' : '') . ".\n\n"
+    . "💰 Total: RM" . number_format((float)$o['total'], 2) . "\n" . ($paid ? '✅ Status: Paid' : '⏳ Status: Unpaid') . "\n\n"
+    . ($paid ? '' : ($payUrl ? "💳 Pay online (DuitNow / FPX / Card):\n$payUrl\n\n" : ''))
+    . "📄 Invoice (PDF):\n" . doc_url($o, 'invoice') . "\n\n"
+    . "🔗 Track your order & complete your gift:\n$track\n\n"
+    . "With this link you can:\n" . ($photo ? "📸 Upload your polaroid photo\n" : '') . "💌 Write / edit the card message\n🚚 Follow the delivery status\n"
+    . ($paid || $payUrl ? '' : "🏦 Pay by bank QR\n")
+    . "\nThank you for trusting us! 💕\n\n— 100 Blooms 🌹"; }
   return "🌷 Invoice 100 Blooms\n🧾 No. Order: {$o['code']}\n\n"
     . "Hai $first, terima kasih kerana memilih 100 Blooms! ❤️\n\n"
     . "🎁 Hadiah$occ untuk {$o['r_name']} akan dihantar pada " . fmt_day((string)$o['del_date']) . ' ' . date('Y', strtotime((string)$o['del_date'])) . ($slot ? " ($slot)" : '') . ".\n\n"
@@ -1024,6 +1077,7 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
     'price_lines' => json_encode($L, JSON_UNESCAPED_UNICODE), 'total' => $total,
     'voucher' => $vcode, 'discount' => $discount,
     'bq_note' => !empty($opts['manual']) ? (str_in($in['bq_note'] ?? '', 100) ?: null) : null,
+    'lang' => ($in['lang'] ?? '') === 'en' ? 'en' : 'ms',
   ]];
 }
 

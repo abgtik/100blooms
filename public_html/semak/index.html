@@ -16,6 +16,7 @@
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-webkit-tap-highlight-color:transparent}
 .wrap{max-width:460px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-left)) 60px}
 a{color:var(--accent)}
+.wrap{position:relative}.langb{position:absolute;right:0;top:4px;display:flex;align-items:center;gap:3px;border:1px solid var(--line);background:var(--card);color:var(--soft);border-radius:99px;padding:6px 10px;font:600 12px var(--body);text-decoration:none}.langb span{opacity:.4}.langb b.on{color:var(--accent)}
 .brand{display:flex;align-items:center;gap:10px;margin-bottom:18px;text-decoration:none;color:inherit}
 .brand svg{width:32px;height:36px}.brand b{font:400 19px Marcellus,serif;letter-spacing:.06em;text-transform:uppercase;color:#8e1b2f}
 h1{font:600 26px/1.15 var(--display);margin:0 0 6px;text-wrap:balance}
@@ -92,11 +93,16 @@ textarea{width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(
   <main id="main"></main>
 </div>
 <script src="/assets/img.js?v=20261016c"></script>
+<script src="/assets/i18n.js?v=1"></script>
 <script>
+let LANG='ms';const QL=new URLSearchParams(location.search).get('lang');
+async function useLang(l){l=QL||l;if(l==='en'&&!I18N){LANG='en';await loadLang();}langBtn();}
+function langBtn(){let b=document.getElementById('langb');if(!b){b=document.createElement('a');b.id='langb';b.className='langb';b.setAttribute('data-notr','');document.querySelector('.brand').after(b);}
+  const to=LANG==='en'?'ms':'en',P=new URLSearchParams(location.search);P.set('lang',to);b.href='?'+P.toString();b.innerHTML=`<b class="${LANG==='ms'?'on':''}">BM</b><span>|</span><b class="${LANG==='en'?'on':''}">EN</b>`;b.setAttribute('aria-label',LANG==='en'?'Tukar ke Bahasa Melayu':'Switch to English');}
 const $=s=>document.querySelector(s);
 const h=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmtD=s=>s?new Date(s+'T00:00').toLocaleDateString('ms-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'-';
-const fmtDT=s=>s?new Date(s.replace(' ','T')).toLocaleString('ms-MY',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
+const fmtD=s=>s?new Date(s+'T00:00').toLocaleDateString((LANG==='en'?'en-MY':'ms-MY'),{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'-';
+const fmtDT=s=>s?new Date(s.replace(' ','T')).toLocaleString((LANG==='en'?'en-MY':'ms-MY'),{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
 const img=p=>p?'/'+p.replace(/^\//,''):'';
 const FLOWER='<svg viewBox="0 0 460 520" aria-hidden="true"><g fill="#f2d4d3"><path d="M150 70C95 140 90 250 140 300C175 330 210 332 232 330C150 300 110 190 150 70Z"/><path d="M232 330C200 300 190 230 220 175C260 230 280 290 232 330Z"/><path d="M240 330C300 300 360 230 395 160C415 230 380 300 300 325Z"/><path d="M60 330C110 345 165 362 200 405C150 400 95 385 60 330Z"/><path d="M400 340C350 345 290 365 248 412C300 405 370 392 400 340Z"/></g><g fill="#8e1b2f"><path d="M20 119C45 113 70 100 92 72L96 104C76 110 50 118 20 119Z"/><path d="M25 292C62 340 130 352 178 368C210 380 222 420 223 498C219 430 202 398 168 386C118 370 52 350 25 292Z"/><path d="M436 292C402 340 334 352 284 370C252 383 228 420 223 498C228 432 246 400 276 388C330 370 404 350 436 292Z"/></g><g fill="none" stroke="#8e1b2f" stroke-linecap="round" stroke-linejoin="round"><path d="M90 84C80 150 76 230 112 278C140 314 180 326 230 330" stroke-width="13"/><path d="M232 330C150 318 112 255 118 180C124 110 175 55 220 25C262 60 300 120 308 185C316 260 290 315 238 330" stroke-width="9"/><ellipse cx="300" cy="207" rx="64" ry="136" transform="rotate(25 300 207)" stroke-width="9"/></g></svg>';
 const TICK='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>';
@@ -120,14 +126,14 @@ function form(err,code,phone){
 }
 
 function afterCards(o){const a=o.after||{};let x='';
- const exp=d=>{try{return new Date(d+'T00:00:00').toLocaleDateString('ms-MY',{day:'numeric',month:'long',year:'numeric'})}catch(e){return d}};
- const vc=(code,lab,ends)=>`<div class="vc"><small>${h(lab)}</small><b>${h(code)}</b><span class="hint">Sah sehingga ${h(exp(ends))} · sekali guna</span><div class="vca"><button class="btn ghost" data-cp="${h(code)}">Salin kod</button><a class="btn" href="/?v=${encodeURIComponent(code)}">Order lagi →</a></div></div>`;
+ const exp=d=>{try{return new Date(d+'T00:00:00').toLocaleDateString((LANG==='en'?'en-MY':'ms-MY'),{day:'numeric',month:'long',year:'numeric'})}catch(e){return d}};
+ const vc=(code,lab,ends)=>`<div class="vc"><small>${h(lab)}</small><b>${h(code)}</b><span class="hint">Sah sehingga ${h(exp(ends))} · sekali guna</span><div class="vca"><button class="btn ghost" data-cp="${h(code)}">Salin kod</button><a class="btn" href="${LANG==='en'?'/en/':'/'}?v=${encodeURIComponent(code)}">Order lagi →</a></div></div>`;
  if(a.sorry)x+=`<section class="card"><h2>Maaf atas kesulitan 🙏</h2><p class="hint" style="margin:0 0 4px">Terima kasih kerana bersabar. Ini voucher untuk order seterusnya.</p>${vc(a.sorry.code,'Voucher RM30 off',a.sorry.ends)}</section>`;
  if(a.offer)x+=`<section class="card gift"><h2>🎁 Hadiah terima kasih</h2>${a.gift?`<p class="hint" style="margin:0 0 4px">Hadiah awak untuk order seterusnya:</p>${vc(a.gift.code,a.gift.choice==='rm10'?'RM10 off':'1 polaroid tambahan percuma',a.gift.ends)}`
   :`<p class="hint" style="margin:0 0 10px">Terima kasih memilih 100 Blooms! Pilih satu hadiah untuk order seterusnya:</p><div class="gch"><button data-gift="rm10"><b>RM10</b><span>off order seterusnya</span></button><button data-gift="photo"><b>📸 1 polaroid</b><span>tambahan percuma</span></button></div><p class="hint" style="margin:8px 0 0">Pilihan tak boleh ditukar selepas dipilih.</p><div id="gm"></div>`}</section>`;
  if(a.review)x+=`<section class="card"><h2>⭐ Kongsi pengalaman awak</h2><p class="hint" style="margin:0">Pendapat awak — baik atau ada yang boleh diperbaiki — sangat membantu kami dan pelanggan lain.</p><a class="btn ghost" href="${h(a.review)}" target="_blank" rel="noopener">Tulis ulasan di Google</a></section>`;
  return x}
-function show(o){
+async function show(o){await useLang(o.lang||'ms');
   const I=window.IMG||{};
   const steps=[['Order diterima',fmtDT(o.created_at)],['Bayaran diterima',fmtDT(o.paid_at)],['Hadiah sedang disiapkan',o.status==='siap'?'Hadiah dah siap dan menunggu runner':'Team kami sedang susun bouquet, kek dan balloon'],['Dalam penghantaran','Runner dalam perjalanan ke penerima'],['Hadiah dah sampai','Terima kasih kerana memilih 100 Blooms']];
   const idx=o.status==='batal'?-1:!o.paid?0:({baru:1,disiapkan:2,siap:2,dalam_penghantaran:3,sampai:4,selesai:4}[o.status]??1);
@@ -135,13 +141,13 @@ function show(o){
   const bq=(I[o.bouquet.id]||{}).bq, bal=(I.bal||{})[o.balloon.id]||'assets/img/balloon/'+o.balloon.id+'.webp', cake=(I.cake||{})[o.cake];
   const cakeTxt=o.cake_flavours.length?'Pilihan: '+o.cake_flavours.join(' / '):o.cake;
   const ext=Object.entries(o.extra_cakes||{}).map(([k,n])=>`${k} × ${n}`).join(', ');
-  const wa='https://api.whatsapp.com/send?phone='+(o.wa||'601165862584')+'&text='+encodeURIComponent(`Hai 100 Blooms, saya nak tukar tarikh delivery untuk order ${o.code}.`);
+  const wa='https://api.whatsapp.com/send?phone='+(o.wa||'601165862584')+'&text='+encodeURIComponent(LANG==='en'?`Hi 100 Blooms, I'd like to change the delivery date for order ${o.code}.`:`Hai 100 Blooms, saya nak tukar tarikh delivery untuk order ${o.code}.`);
   const ed=o.edit||{};
   const doc=t=>`/api/doc.php?c=${encodeURIComponent(o.code)}&k=${encodeURIComponent(o.k)}&t=${t}`;
   const delTxt=o.del_type==='spec'&&o.del_time?`Masa khusus ${o.del_time}`:o.del_label;
   $('#main').innerHTML=`<p class="code">ORDER ${h(o.code)}</p><h1>Hadiah untuk ${h(o.call)}</h1><p class="sub">${o.manual&&(!o.occ_id||o.occ_id==='saja')?'Dihantar kepada ':h(o.occasion)+' · dihantar kepada '}${h(o.r_name)}</p>
    ${o.status==='batal'?`<div class="msg bad" style="margin:0 0 14px">Order ini telah dibatalkan. WhatsApp kami jika ada pertanyaan.</div>`:''}
-   ${!o.paid&&o.status!=='batal'?`<div class="card"><h2>Bayaran belum diterima</h2><p class="hint" style="margin:0">Order disimpan tapi kami belum terima bayaran. Hadiah hanya disiapkan selepas bayaran berjaya.</p><p style="margin:12px 0 8px">Jumlah perlu dibayar: <b style="font-size:20px">RM${Number(o.total).toFixed(2)}</b></p>${o.payUrl?`<a class="btn" href="${h(o.payUrl)}">💳 Bayar sekarang · DuitNow / FPX / Kad</a>`:`<button class="btn" id="paynow" type="button">💳 Bayar sekarang · DuitNow / FPX / Kad</button>`}<div id="paymsg"></div>${o.bank?`<details class="bankalt"><summary>Atau bayar melalui pemindahan bank / QR</summary>${o.bank.qr?`<img src="/api/bankqr.php" alt="QR bayaran 100 Blooms" style="display:block;max-width:240px;width:100%;margin:8px auto;border-radius:12px">`:''}${o.bank.text?`<p class="hint" style="white-space:pre-line;text-align:center">${h(o.bank.text)}</p>`:''}<a class="btn ghost" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?phone=${o.wa||'601165862584'}&text=${encodeURIComponent('Hai 100 Blooms, saya dah bayar untuk order '+o.code+'. Ini resit saya.')}">Hantar resit melalui WhatsApp</a></details>`:''}</div>`:''}
+   ${!o.paid&&o.status!=='batal'?`<div class="card"><h2>Bayaran belum diterima</h2><p class="hint" style="margin:0">Order disimpan tapi kami belum terima bayaran. Hadiah hanya disiapkan selepas bayaran berjaya.</p><p style="margin:12px 0 8px">Jumlah perlu dibayar: <b style="font-size:20px">RM${Number(o.total).toFixed(2)}</b></p>${o.payUrl?`<a class="btn" href="${h(o.payUrl)}">💳 Bayar sekarang · DuitNow / FPX / Kad</a>`:`<button class="btn" id="paynow" type="button">💳 Bayar sekarang · DuitNow / FPX / Kad</button>`}<div id="paymsg"></div>${o.bank?`<details class="bankalt"><summary>Atau bayar melalui pemindahan bank / QR</summary>${o.bank.qr?`<img src="/api/bankqr.php" alt="QR bayaran 100 Blooms" style="display:block;max-width:240px;width:100%;margin:8px auto;border-radius:12px">`:''}${o.bank.text?`<p class="hint" style="white-space:pre-line;text-align:center">${h(o.bank.text)}</p>`:''}<a class="btn ghost" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?phone=${o.wa||'601165862584'}&text=${encodeURIComponent(LANG==='en'?'Hi 100 Blooms, I have paid for order '+o.code+'. Here is my receipt.':'Hai 100 Blooms, saya dah bayar untuk order '+o.code+'. Ini resit saya.')}">Hantar resit melalui WhatsApp</a></details>`:''}</div>`:''}
    ${o.status!=='batal'?`<section class="card" aria-labelledby="t1"><h2 id="t1">Status hadiah</h2>
     <ol class="tl">${steps.map(([t,s],i)=>`<li class="${i<idx||(i===idx&&i===4)?'done':i===idx?'now':''}"><span class="dot">${i<idx||(i===idx&&i===4)?TICK:''}</span><b>${t}</b>${(i<=idx&&s)?`<small>${h(s)}</small>`:''}</li>`).join('')}</ol>
     <div class="del"><svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
@@ -201,6 +207,7 @@ function show(o){
 
 (async()=>{
   const P=new URLSearchParams(location.search);
+  {let pref='ms';try{pref=localStorage.getItem('hb_lang')||'ms'}catch(e){}await useLang(P.get('c')&&P.get('k')?'ms':pref);}
   if(P.get('c')&&P.get('k')){
     $('#main').innerHTML='<p class="sub">Memuatkan order…</p>';
     try{const r=await fetch('/api/track.php?c='+encodeURIComponent(P.get('c'))+'&k='+encodeURIComponent(P.get('k')));const j=await r.json();if(r.ok)return show(j);form(j.error,P.get('c'))}catch(e){form('Tiada sambungan internet.',P.get('c'))}

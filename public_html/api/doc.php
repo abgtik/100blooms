@@ -14,6 +14,7 @@ $f = fn($n) => number_format((float)$n, 2, '.', ',');
 $dt = fn($s) => $s ? date('j M Y, g:i A', strtotime($s)) : '-';
 if ($type === 'receipt' && !$paid) { http_response_code(409); echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Resit belum tersedia</title><body style="font-family:system-ui;padding:40px 20px;text-align:center;color:#3b2732"><h2>Resit belum tersedia</h2><p>Resit dikeluarkan selepas bayaran diterima. Invoice boleh dimuat turun di <a href="?c=' . $e($o['code']) . '&k=' . $e($o['token']) . '&t=invoice">sini</a>.</p>'; exit; }
 $R = invoice_rows($o); $B = biz_info();
+if (order_en($o)) { foreach ($R['items'] as &$it) { $it['name'] = tr_en($it['name']); $it['subs'] = array_map('tr_en', $it['subs']); } unset($it); $R['extra'] = array_map(fn($x) => [tr_en((string)$x[0]), $x[1]], $R['extra']); if (isset($R['del_name'])) $R['del_name'] = tr_en((string)$R['del_name']); }
 [$sk, $sl] = order_source($o);
 $dn = $sk === 'hq' ? (string)(q('SELECT doc_name FROM admins WHERE name=? AND doc_name IS NOT NULL AND doc_name<>\'\' ORDER BY id LIMIT 1', [$sl])->fetchColumn() ?: '') : '';
 $sales = $sk === 'hq' ? ($dn !== '' ? $dn : "$sl (Sales HQ)") : ($sk === 'agent' ? "$sl (Agent)" : 'Website (100blooms.my)');
@@ -56,10 +57,10 @@ table.it tr{break-inside:avoid;page-break-inside:avoid}
 @media print{html,body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:12px}.bar{display:none}.page{margin:0;box-shadow:none;width:auto;min-height:0;padding:0}
  h1{margin-bottom:10px}.row{padding:9px 0}h2{margin:10px 0 6px}.top{padding-bottom:10px}.stamp{top:-2mm;right:0}table.it th,table.it td{padding:4px 7px}.lbl{margin-top:2px}.foot{margin-top:8px}.pay{margin-top:8px;padding:7px 10px}.biz img{width:76px;height:76px}.cols{gap:0 24px}}
 </style></head><body>
-<div class="bar"><button class="pri" onclick="print()">⬇️ Simpan PDF / Cetak</button>
-<?php if ($paid && $type === 'invoice'): ?><a href="?c=<?= $e($o['code']) ?>&k=<?= $e($o['token']) ?>&t=receipt">Lihat resit</a><?php endif ?>
-<?php if ($type === 'receipt'): ?><a href="?c=<?= $e($o['code']) ?>&k=<?= $e($o['token']) ?>&t=invoice">Lihat invoice</a><?php endif ?>
-<a href="<?= $e($track) ?>">Semak order</a></div>
+<div class="bar"><button class="pri" onclick="print()">⬇️ <?= order_en($o) ? 'Save PDF / Print' : 'Simpan PDF / Cetak' ?></button>
+<?php if ($paid && $type === 'invoice'): ?><a href="?c=<?= $e($o['code']) ?>&k=<?= $e($o['token']) ?>&t=receipt"><?= order_en($o) ? 'View receipt' : 'Lihat resit' ?></a><?php endif ?>
+<?php if ($type === 'receipt'): ?><a href="?c=<?= $e($o['code']) ?>&k=<?= $e($o['token']) ?>&t=invoice"><?= order_en($o) ? 'View invoice' : 'Lihat invoice' ?></a><?php endif ?>
+<a href="<?= $e($track) ?>"><?= order_en($o) ? 'Track order' : 'Semak order' ?></a></div>
 <div class="page">
 <?php if ($type === 'receipt'): ?><div class="stamp">PAID</div><?php endif ?>
 <h1><?= $title ?></h1>

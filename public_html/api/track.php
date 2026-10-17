@@ -32,7 +32,7 @@ if ($o['pay_status'] !== 'paid' && $o['bill_code'] && $o['status'] !== 'batal') 
 $C = catalog();
 $extra = json_decode((string)$o['extra_cakes'], true) ?: [];
 json_out([
-  'code' => $o['code'], 'k' => $o['token'],
+  'code' => $o['code'], 'k' => $o['token'], 'lang' => $o['lang'] ?? 'ms',
   'paid' => $o['pay_status'] === 'paid', 'pay_status' => $o['pay_status'], 'status' => $o['status'],
   'created_at' => $o['created_at'], 'paid_at' => $o['paid_at'],
   'del_date' => $o['del_date'], 'del_type' => $o['del_type'], 'del_time' => $o['del_time'], 'del_label' => DELIVERY[$o['del_type']]['label'] ?? '',

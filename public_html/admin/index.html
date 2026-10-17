@@ -309,7 +309,7 @@ async function Orders(el){
     const LG=j.legacy||[];
     $('#ol').innerHTML=(j.rows.length||LG.length)?j.rows.map(o=>`<button class="ord" data-id="${o.id}">
       <div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">Hantar <b style="color:var(--ink)">${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</div>
-       ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}${(o.need||[]).map(t=>`<span class="pg" style="background:var(--warnb);color:var(--warn)">${h(t)}</span>`).join(' ')}${o.issue?`<span class="pg ${o.issue==='open'?'pbad':'pok'}">${o.issue==='open'?'⚠️ Masalah':'✅ Masalah selesai'}</span>`:''}<div class="m">${srcChip(o.src)} Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
+       ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}${(o.need||[]).map(t=>`<span class="pg" style="background:var(--warnb);color:var(--warn)">${h(t)}</span>`).join(' ')}${o.issue?`<span class="pg ${o.issue==='open'?'pbad':'pok'}">${o.issue==='open'?'⚠️ Masalah':'✅ Masalah selesai'}</span>`:''}<div class="m">${srcChip(o.src)}${o.lang==='en'?' 🇬🇧':''} Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
       <div class="r"><div class="t">${rm(o.total)}</div><div class="m">Order ${fmtDT(o.created_at)}</div></div></button>`).join('')+LG.map(o=>olRow(o)).join('')
       :`<div class="empty">Tiada order${f==='today'?' untuk dihantar hari ini':''}.</div>`;
     $('#ol').querySelectorAll('.ord[data-id]').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,load));bindOl($('#ol'),load);
@@ -370,7 +370,7 @@ function afterCard(o){
    <details style="margin-top:10px"><summary class="mini" style="cursor:pointer;font-weight:600">${i?'✏️ Kemas kini masalah':'⚠️ Tandakan ada masalah'}</summary>
     <div class="ichk">${Object.entries(R).map(([k,t])=>`<label><input type="checkbox" value="${k}"${chk(k)}> ${h(t)}</label>`).join('')}</div>
     <label class="fl">Nota (apa jadi)<input id="isn" maxlength="500" value="${h(i?.note||'')}" placeholder="Contoh: balloon pecah masa sampai"></label>
-    <label class="fl">Tindakan kami (keluar dalam mesej maaf)<input id="isa" maxlength="200" value="${h(i?.action||'')}" placeholder="Contoh: Kami hantar balloon baru petang ni"></label>
+    <label class="fl">Tindakan kami (keluar dalam mesej maaf${o.lang==='en'?', <b>tulis dalam English</b>':''})<input id="isa" maxlength="200" value="${h(i?.action||'')}" placeholder="Contoh: Kami hantar balloon baru petang ni"></label>
     <div class="bar" style="margin:8px 0 0"><button class="btn sm" id="iss">Simpan</button>${i&&!i.voucher?'<button class="btn ghost sm danger" id="isx">Buang tanda masalah</button>':''}</div>
     <p class="mini" style="margin:6px 0 0">Tanda "Tiada gambar penerima" membolehkan runner tekan Dah sampai tanpa gambar.</p></details></div>`}
 async function openOrder(id,reload){
@@ -380,7 +380,7 @@ async function openOrder(id,reload){
   const cakeTxt=o.cake+(o.cake_flavours&&o.cake_flavours.length?` → pilihan: ${o.cake_flavours.join(' / ')}`:'');
   const ext=o.extra_cakes&&Object.keys(o.extra_cakes).length?Object.entries(o.extra_cakes).map(([k,n])=>`${k} × ${n}`).join(', '):'Tiada';
   $('#layer').innerHTML=`<div class="scrim" id="sc"><div class="panel" role="dialog" aria-modal="true" aria-label="Order ${h(o.code)}">
-   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 style="font:600 20px var(--display);margin:0">${h(o.code)} ${pill(o)} ${srcChip(o.src)}</h2>
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><h2 style="font:600 20px var(--display);margin:0">${h(o.code)} ${pill(o)} ${srcChip(o.src)}${o.lang==='en'?' <span class="pg" title="Pembeli order dalam English. Mesej automatik, Semak dan invoice dalam English.">🇬🇧 EN</span>':''}</h2>
     <div style="display:flex;gap:6px;align-items:center"><div class="dd"><button class="btn sm" id="ddb" aria-haspopup="true" aria-expanded="false">🧾 Invoice (PDF) ▾</button>
      <div class="ddm" id="ddm" hidden role="menu"><a role="menuitem" href="${h(o.doc_invoice)}" target="_blank" rel="noopener">Invoice (PDF)</a>${o.pay_status==='paid'?`<a role="menuitem" href="${h(o.doc_receipt)}" target="_blank" rel="noopener">Resit / Receipt (PDF)</a>`:'<span class="dis">Resit (selepas bayar)</span>'}
       <a role="menuitem" href="${h(o.doc_invoice)}&print=1" target="_blank" rel="noopener">Cetak invoice</a>${o.pay_status==='paid'?`<a role="menuitem" href="${h(o.doc_receipt)}&print=1" target="_blank" rel="noopener">Cetak resit</a>`:''}

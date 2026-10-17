@@ -7,6 +7,7 @@
 <meta name="description" content="Combo Jimat RM128: bouquet, kek Secret Recipe, balloon, polaroid dan wishcard, dihantar terus ke pintu penerima. Hadiah birthday, anniversary, graduation dan lain-lain. #since2018">
 <title>100 Blooms · Bouquet + Kek Secret Recipe + Balloon · Combo RM128</title>
 <link rel="canonical" href="https://100blooms.my/">
+<link rel="alternate" hreflang="ms" href="https://100blooms.my/"><link rel="alternate" hreflang="en" href="https://100blooms.my/en/"><link rel="alternate" hreflang="x-default" href="https://100blooms.my/">
 <meta property="og:type" content="website"><meta property="og:site_name" content="100 Blooms">
 <meta property="og:title" content="100 Blooms · Bouquet + Kek Secret Recipe + Balloon · Combo RM128">
 <meta property="og:description" content="Hadiah lengkap terus ke pintu penerima: bouquet, kek Secret Recipe, balloon, polaroid dan wishcard.">
@@ -44,6 +45,8 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:fl
 .back:disabled{visibility:hidden}
 .prog{flex:1;height:6px;border-radius:9px;background:rgba(59,39,50,.08);overflow:hidden}
 .prog i{display:block;height:100%;width:0;background:var(--accent);border-radius:9px;transition:width .4s ease}
+.langb{flex:none;display:flex;align-items:center;gap:3px;border:1px solid var(--line);background:var(--card);color:var(--soft);border-radius:99px;padding:6px 10px;font:600 12px var(--body);cursor:pointer}
+.langb span{opacity:.4}.langb b.on{color:var(--accent)}
 .stepn{font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
 main{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;padding-block:6px 120px}
 .screen{display:flex;flex-direction:column;gap:16px;animation:in .45s cubic-bezier(.2,.8,.2,1)}
@@ -276,6 +279,7 @@ textarea{min-height:150px;resize:vertical;line-height:1.6}
     <button class="back" id="back" aria-label="Kembali">‹</button>
     <div class="prog" aria-hidden="true"><i id="bar"></i></div>
     <div class="stepn" id="stepn"></div>
+    <button class="langb" id="langb" aria-label="Tukar bahasa" data-notr><b>BM</b><span>|</span><b>EN</b></button>
   </header>
   <main id="main"></main>
 </div>
@@ -283,7 +287,15 @@ textarea{min-height:150px;resize:vertical;line-height:1.6}
 <div id="layer"></div>
 
 <script src="assets/img.js?v=20261016c"></script>
+<script src="assets/i18n.js?v=1"></script>
 <script>
+/* ---------- LANGUAGE (BM default; English via /en/ or the BM|EN button) ---------- */
+const LANG=(()=>{if(window.FORCE_LANG)return window.FORCE_LANG;try{const v=localStorage.getItem('hb_lang');if(v==='en'||v==='ms')return v}catch(e){}return 'ms'})();
+const LOC=LANG==='en'?'en-MY':'ms-MY';
+function setLang(l){try{localStorage.setItem('hb_lang',l)}catch(e){}
+  const q=location.search+location.hash;
+  if(HQ)return location.reload();
+  location.href=(l==='en'?'/en/':'/')+q;}
 /* ---------- DATA ---------- */
 const BASE=128;
 const OCC=[
@@ -546,7 +558,7 @@ const WISH={
    'Semoga hari {p} lebih ceria dengan hadiah kecil ni.',
    'Untuk {p}, dengan ikhlas.']}
 };
-const wishList=()=>{const o=WISH[S.occ]||WISH.saja;return o[REL_GRP[S.rel]||'kwn']||o.kwn};
+const wishList=()=>{const W=LANG==='en'&&I18N&&I18N.wish?I18N.wish:WISH,o=W[S.occ]||W.saja;return o[REL_GRP[S.rel]||'kwn']||o.kwn};
 // coverage: example postcode ranges (KL, Selangor, Putrajaya). To be replaced with the real list.
 // Zon ikut peta owner (Okt 2026). free = bulatan biru, plus20 = bulatan merah (Rawang/Kuang/Selayang/Sg Buloh). Lain = tak cover.
 // Semakan ikut poskod (sama dengan api/_lib.php zone_of). Fasa seterusnya: lat/lng + poligon zon.
@@ -697,6 +709,8 @@ const SCR={
   if(S.rel==='makcik') list=S.gender==='l'?['Pak Long','Pak Ngah','Pak Su','Pak Cik']:['Mak Long','Mak Ngah','Mak Su','Mak Cik'];
   if(S.rel==='cikgu') list=S.gender==='l'?['Cikgu','Encik','Sir','Dr.']:['Cikgu','Puan','Cik','Teacher','Dr.'];
   if(S.rel==='kerja') list=S.gender==='l'?['Boss','Encik','Abang','Tuan']:['Boss','Puan','Kak','Cik'];
+  if(LANG==='en'&&I18N&&I18N.call){const C=I18N.call;list=C[S.rel+'_'+S.gender]||C[S.rel]||['Dear'];
+    if(S.rel==='tunang')list=list.filter(c=>!(S.gender==='l'&&c==='My bride-to-be')&&!(S.gender==='p'&&c==='My groom-to-be'));}
   const draw=()=>{
    el.innerHTML=`<div class="eyebrow">${h(rel().t)}</div><h1>Awak panggil dia apa?</h1>
     <p class="sub">Panggilan ni akan masuk dalam ayat kad ucapan.</p>
@@ -712,16 +726,19 @@ const SCR={
   const o=occ(),r=rel();
   const warm={birthday:'Mesti dia suka.',anniv:'Sweet sangat.',pujuk:'Kita bantu awak pujuk dia ya.',convo:'Tahniah untuk dia!',rindu:'Mesti dia terharu nanti.',thanks:'Baiknya awak.',sembuh:'Semoga dia cepat sihat.',saja:'Comel.',baby:'Tahniah untuk keluarga baru!'}[S.occ];
   const steps=['Bouquet','Balloon','Kek','Polaroid','Wishcard'];
+  const warmEn={birthday:"They'll love it.",anniv:'So sweet.',pujuk:"We'll help you make it up to them.",convo:'Congrats to them!',rindu:"They'll be so touched.",thanks:"That's so kind of you.",sembuh:'Hope they feel better soon.',saja:'Lovely.',baby:'Congrats to the new family!'}[S.occ];
   el.innerHTML=`<div class="eyebrow">Ringkasan awak</div>
-   <div class="bubble"><p><b>Terima kasih!</b> Jadi awak nak hadiahkan sesuatu untuk <b>${h(r.t.toLowerCase())}</b> sempena <b>${h(o.t.toLowerCase())}</b>, dan awak panggil dia <b>"${h(callName())}"</b>. ${warm}</p>
-   <div class="pickrow"><span class="tagp">${h(o.t)}</span><span class="tagp">${h(r.t)}</span><span class="tagp">${S.gender==='l'?'Lelaki':'Perempuan'}</span><span class="tagp">${h(callName())}</span></div></div>
+   <div class="bubble" data-notr>${LANG==='en'?`<p><b>Thank you!</b> So you'd like to send something to your <b>${h(tr(r.t).toLowerCase())}</b> for <b>${h(tr(o.t).toLowerCase())}</b>, and you call them <b>"${h(callName())}"</b>. ${warmEn}</p>`
+    :`<p><b>Terima kasih!</b> Jadi awak nak hadiahkan sesuatu untuk <b>${h(r.t.toLowerCase())}</b> sempena <b>${h(o.t.toLowerCase())}</b>, dan awak panggil dia <b>"${h(callName())}"</b>. ${warm}</p>`}
+   <div class="pickrow"><span class="tagp">${h(tr(o.t))}</span><span class="tagp">${h(tr(r.t))}</span><span class="tagp">${tr(S.gender==='l'?'Lelaki':'Perempuan')}</span><span class="tagp">${h(callName())}</span></div></div>
    <div class="bubble" id="b2" style="animation-delay:.5s"><span class="typing" aria-label="sedang menaip"><i></i><i></i><i></i></span></div>
    <div id="b3" hidden><div class="grouph" style="margin-bottom:12px">Perjalanan hadiah awak</div>
     <div class="path" aria-hidden="true">${steps.map((s,i)=>`<span><i>${i+1}</i>${s}</span>`).join('')}</div></div>`;
   foot('Jom pilih bouquet',true,next,false);
-  const who=/^(awak|kamu)$/i.test(callName())?'dia':h(callName());
+  const who=/^(awak|kamu|you)$/i.test(callName())?(LANG==='en'?'them':'dia'):h(callName());
   setTimeout(()=>{const b=$('#b2');if(!b)return;
-    b.innerHTML=`<p>Ayat kad ucapan untuk ${who} sedang kami siapkan. Sementara tu, tekan butang di bawah untuk mula pilih bouquet.</p><p class="hint">Ayat tu akan tunggu awak di langkah wishcard nanti.</p>`;
+    b.innerHTML=LANG==='en'?`<p>We're preparing the card message for ${who}. Meanwhile, tap the button below to start choosing a bouquet.</p><p class="hint">It'll be waiting for you at the wishcard step.</p>`
+     :`<p>Ayat kad ucapan untuk ${who} sedang kami siapkan. Sementara tu, tekan butang di bawah untuk mula pilih bouquet.</p><p class="hint">Ayat tu akan tunggu awak di langkah wishcard nanti.</p>`;
     $('#b3').hidden=false;const n=$('#next');if(n){n.classList.add('nudge');
     n.insertAdjacentHTML('beforebegin','<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v14M6 12l6 6 6-6"/></svg>');}},1400);
  },
@@ -846,7 +863,7 @@ const SCR={
   const quick=[[0,'Hari ini'],[1,'Esok'],[2,'Lusa']],qset=quick.map(([k])=>ymd(new Date(now.getFullYear(),now.getMonth(),now.getDate()+k))),other=!!S.date&&!qset.includes(S.date);
   el.innerHTML=`<div class="eyebrow">Langkah 7 · Penghantaran</div><h1>Bila nak sampai?</h1>
    <div class="field"><label for="date">Tarikh penghantaran</label><span class="hint">Tekan hari ini, esok atau lusa untuk pilih cepat. Nak tarikh lain? Tekan ikon kalendar.</span>
-    <div class="qdate">${quick.map(([k,lb])=>{const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+k),v=ymd(d);return `<button class="qd" data-d="${v}" aria-pressed="${S.date===v}" ${isBlocked(v)?'disabled style="opacity:.4"':''}><small>${lb}</small><b>${d.getDate()}</b><small>${d.toLocaleDateString('ms-MY',{month:'short'})}</small></button>`}).join('')}
+    <div class="qdate">${quick.map(([k,lb])=>{const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+k),v=ymd(d);return `<button class="qd" data-d="${v}" aria-pressed="${S.date===v}" ${isBlocked(v)?'disabled style="opacity:.4"':''}><small>${lb}</small><b>${d.getDate()}</b><small>${d.toLocaleDateString(LOC,{month:'short'})}</small></button>`}).join('')}
     <label class="qd cal" aria-pressed="${other}" title="Pilih tarikh lain"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><small>${other?fmtShort(S.date):'Tarikh lain'}</small><input id="date" type="date" min="${today}" value="${S.date}" aria-label="Pilih tarikh lain"></label></div>
     ${S.date&&isBlocked(S.date)?`<div class="status bad">${fmtDate(S.date)} dah penuh atau ditutup. Pilih tarikh lain.</div>`:S.date?`<span class="hint">Dipilih: <b style="color:var(--ink)">${fmtDate(S.date)}</b></span>`:''}</div>
    ${S.date&&allShut?`<div class="status bad">Semua slot hari ini dah ditutup (tempahan hari yang sama sehingga 6 petang). Pilih esok atau tarikh lain.</div>`:''}
@@ -1016,8 +1033,8 @@ function extraCake(){
   $('#okc').onclick=()=>{S.extraCakes=e;S.extraCake=tot();save();closeSheet();render()};
 }
 function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
-function fmtShort(s){const d=new Date(s+'T00:00');return d.toLocaleDateString('ms-MY',{day:'numeric',month:'short'})}
-function fmtDate(s){if(!s)return'-';const d=new Date(s+'T00:00');return d.toLocaleDateString('ms-MY',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}
+function fmtShort(s){const d=new Date(s+'T00:00');return d.toLocaleDateString(LOC,{day:'numeric',month:'short'})}
+function fmtDate(s){if(!s)return'-';const d=new Date(s+'T00:00');return d.toLocaleDateString(LOC,{weekday:'short',day:'numeric',month:'short',year:'numeric'})}
 function specErr(v,isToday,now){
   if(!v)return'';const [H,M]=v.split(':').map(Number),t=H+M/60;
   if(t<9||t>22)return'Masa khusus hanya antara 9 pagi hingga 10 malam.';
@@ -1038,7 +1055,7 @@ async function submitOrder(){
     <button class="btn" id="retry" style="flex:none;width:100%;margin-top:12px">Cuba lagi</button><button class="btn ghost" id="bk2" style="flex:none;width:100%;margin-top:8px">Kembali ke ringkasan</button>`;
     $('#retry').onclick=()=>{$('#perr').innerHTML='';$('#pst').textContent='Cuba sekali lagi…';submitOrder()};$('#bk2').onclick=()=>{dir=-1;S.step=STEPS.indexOf('sum');render()};};
   const d=Object.assign({},S);delete d.photos;delete d.step;
-  d.ref=getRef();
+  d.ref=getRef();d.lang=LANG;
   try{d.test=sessionStorage.getItem('hb_test')||''}catch(e){}
   d.call=callName();
   const fd=new FormData();fd.append('data',JSON.stringify(d));
@@ -1106,6 +1123,8 @@ function hqLogin(then){
 /* ---------- boot ---------- */
 if(STEPS[S.step]==='done'||STEPS[S.step]==='pay')S.step=STEPS.indexOf('sum');
 (async()=>{
+  {const lb=$('#langb');lb.querySelectorAll('b')[LANG==='en'?1:0].classList.add('on');lb.setAttribute('aria-label',LANG==='en'?'Tukar ke Bahasa Melayu':'Switch to English');lb.onclick=()=>setLang(LANG==='en'?'ms':'en');}
+  await loadLang();
   try{const r=await fetch('api/catalog.php',{cache:'no-store'});if(r.ok){const j=await r.json();CAT=Object.assign(CAT,j,{t0:Date.now()});}}catch(e){}
   const P=new URLSearchParams(location.search);
   {const v=(P.get('v')||'').trim().toUpperCase();if(/^[A-Z0-9-]{3,24}$/.test(v)&&S.voucher!==v){S.voucher=v;S.vinfo=null;save();try{history.replaceState(null,'',location.pathname)}catch(e){}}}
