@@ -692,15 +692,16 @@ const SCR={
  },
  del(el){
   const now=myNow(),today=ymd(now),isToday=S.date===today,hr=now.getHours()+now.getMinutes()/60;
-  const closed={free:isToday&&hr>=17,A:isToday&&hr>=9,B:isToday&&hr>=14,C:isToday&&hr>=18};
-  const opts=[['free','Percuma','Masa rawak antara 10 pagi – 6 petang',0],['A','Slot A','9 pagi – 12 tengah hari',10],['B','Slot B','1 petang – 4 petang',10],['C','Slot C','5 petang – 8 malam',10],['spec','Masa khusus','Pilih jam tepat. Tempah sekurang-kurangnya 5 jam awal, sehingga 10 malam',50]];
-  if(closed[S.del])S.del=closed.free?(['A','B','C','spec'].find(k=>!closed[k])||'spec'):'free';
+  const closed={free:isToday&&hr>=17,A:isToday&&hr>=9,B:isToday&&hr>=14,C:isToday&&hr>=18,spec:isToday&&hr>=18},allShut=Object.values(closed).every(Boolean);
+  const opts=[['free','Percuma','Masa rawak antara 10 pagi – 6 petang',0],['A','Slot A','9 pagi – 12 tengah hari',10],['B','Slot B','1 petang – 4 petang',10],['C','Slot C','5 petang – 8 malam',10],['spec','Masa khusus','Pilih jam tepat (9 pagi – 10 malam). Tempah sekurang-kurangnya 5 jam awal. Untuk hari ini, tempah sebelum 6 petang.',50]];
+  if(closed[S.del])S.del=closed.free?(['A','B','C','spec'].find(k=>!closed[k])||'free'):'free';
   const quick=[[0,'Hari ini'],[1,'Esok'],[2,'Lusa']],qset=quick.map(([k])=>ymd(new Date(now.getFullYear(),now.getMonth(),now.getDate()+k))),other=!!S.date&&!qset.includes(S.date);
   el.innerHTML=`<div class="eyebrow">Langkah 7 · Penghantaran</div><h1>Bila nak sampai?</h1>
    <div class="field"><label for="date">Tarikh penghantaran</label><span class="hint">Tekan hari ini, esok atau lusa untuk pilih cepat. Nak tarikh lain? Tekan ikon kalendar.</span>
     <div class="qdate">${quick.map(([k,lb])=>{const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+k),v=ymd(d);return `<button class="qd" data-d="${v}" aria-pressed="${S.date===v}" ${isBlocked(v)?'disabled style="opacity:.4"':''}><small>${lb}</small><b>${d.getDate()}</b><small>${d.toLocaleDateString('ms-MY',{month:'short'})}</small></button>`}).join('')}
     <label class="qd cal" aria-pressed="${other}" title="Pilih tarikh lain"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><small>${other?fmtShort(S.date):'Tarikh lain'}</small><input id="date" type="date" min="${today}" value="${S.date}" aria-label="Pilih tarikh lain"></label></div>
     ${S.date&&isBlocked(S.date)?`<div class="status bad">${fmtDate(S.date)} dah penuh atau ditutup. Pilih tarikh lain.</div>`:S.date?`<span class="hint">Dipilih: <b style="color:var(--ink)">${fmtDate(S.date)}</b></span>`:''}</div>
+   ${S.date&&allShut?`<div class="status bad">Semua slot hari ini dah ditutup (tempahan hari yang sama sehingga 6 petang). Pilih esok atau tarikh lain.</div>`:''}
    ${S.date?`<div class="occ">${opts.map(([id,t,d,p])=>`<button class="dopt" data-id="${id}" aria-pressed="${S.del===id}" ${closed[id]?'disabled':''}><span class="r"></span><div><b>${t}</b><br><small class="hint">${closed[id]?'Ditutup untuk hari ini':d}</small></div><span class="p">${p?'+'+rm(p):'PERCUMA'}</span></button>`).join('')}</div>
    ${S.del==='spec'?`<div class="field"><label for="time">Masa yang diminta</label><input id="time" type="time" min="09:00" max="22:00" value="${S.time}"><div id="terr"></div><span class="hint">Tertakluk kepada pengesahan team kami.</span></div>`:''}`:'<p class="note">Pilih tarikh dulu untuk tengok slot yang masih dibuka.</p>'}
    <p class="note">Runner kami akan ambil gambar penerima semasa hadiah sampai, sebagai kenangan untuk awak.</p>`;
@@ -711,7 +712,7 @@ const SCR={
    di.onclick=e=>{e.stopPropagation();open();};
    box.onclick=e=>{e.preventDefault();open();};}
   el.querySelectorAll('.dopt').forEach(b=>b.onclick=()=>{S.del=b.dataset.id;SCR.del(el);save();});
-  const t=$('#time');let ok=!!S.date&&!isBlocked(S.date)&&S.date>=today;
+  const t=$('#time');let ok=!!S.date&&!isBlocked(S.date)&&S.date>=today&&!closed[S.del];
   if(S.del==='spec'){const v=S.time,err=specErr(v,isToday,now);ok=ok&&v&&!err;$('#terr').innerHTML=err&&v?`<div class="status bad" style="margin-top:6px">${err}</div>`:'';
     t.onchange=e=>{S.time=e.target.value;SCR.del(el);save();};}
   foot('Seterusnya',ok);

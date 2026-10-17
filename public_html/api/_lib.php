@@ -60,7 +60,7 @@ const DELIVERY = [
   'A'    => ['label'=>'Slot A (9am–12pm)',               'fee'=>10, 'close'=>9],
   'B'    => ['label'=>'Slot B (1pm–4pm)',                'fee'=>10, 'close'=>14],
   'C'    => ['label'=>'Slot C (5pm–8pm)',                'fee'=>10, 'close'=>18],
-  'spec' => ['label'=>'Masa khusus',                     'fee'=>50, 'close'=>null],
+  'spec' => ['label'=>'Masa khusus',                     'fee'=>50, 'close'=>18], // same-day specific time: order before 6pm
 ];
 
 // ---------- database ----------
