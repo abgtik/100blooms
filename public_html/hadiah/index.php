@@ -36,7 +36,8 @@ $slug = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower((string)$o['cake'])), 
 $items = [['Bouquet ' . ($C['bq'][$o['bouquet']] ?? ''), $img('bouquet/' . $o['bouquet'] . '.webp')], ['Balloon ' . ($C['bal'][$o['balloon']] ?? ''), $img('balloon/' . $o['balloon'] . '.webp')]];
 if ($cake) $items[] = ['Kek ' . $o['cake'], $img('cake/' . $cake . '.webp')];
 ?><!doctype html>
-<html lang="ms"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<html lang="ms"><head>
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/assets/icon-32.png"><link rel="apple-touch-icon" href="/assets/apple-touch-icon.png"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title><?= $e("Hadiah untuk $rf · 100 Blooms") ?></title>
 <meta property="og:title" content="<?= $e("$emo Ada hadiah istimewa untuk $rf") ?>"><meta property="og:description" content="<?= $e("Daripada $from, bersama 100 Blooms") ?>">
 <meta property="og:image" content="<?= $e(SITE_URL . '/assets/img/combo-poster.webp') ?>"><meta name="theme-color" content="<?= $e($bg1) ?>">
