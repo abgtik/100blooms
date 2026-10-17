@@ -649,7 +649,7 @@ const AFTERCARE_MIN = 30;   // minutes after "Dah sampai" before the automatic m
 const GIFT_DAYS = 90;       // vouchers from this flow are valid for 90 days
 const ISSUE_REASONS = ['balloon' => 'Balloon meletup / kempis', 'cake' => 'Kek rosak', 'late' => 'Sampai lewat', 'no_photo' => 'Tiada gambar penerima',
   'wrong' => 'Item salah / tertinggal', 'flower' => 'Bunga rosak / layu', 'other' => 'Lain-lain'];
-const REVIEW_URL = 'https://www.google.com/maps/place//data=!4m4!3m3!1s0x31cdaf27fb32636f:0x7bdd6e7a2ce4bca3!9m1!1b1';
+const REVIEW_URL = 'https://search.google.com/local/writereview?placeid=ChIJb2My-yevzTERo7zkLHpu3Xs';
 function review_url(): string { return (string)setting('review_url', REVIEW_URL); }
 /** First number when the field holds two ("0122707537 / 0183209"). */
 function first_phone(string $p): string { $p = trim(preg_split('#[/,;]|\bdan\b|\bor\b#i', $p)[0] ?? ''); return strlen(digits($p)) >= 9 ? $p : ''; }
