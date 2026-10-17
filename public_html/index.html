@@ -237,8 +237,10 @@ textarea{min-height:150px;resize:vertical;line-height:1.6}
 .perk{background:rgba(255,255,255,.7);border-radius:16px;padding:12px;font-size:12.5px;color:var(--soft)}
 .perk b{display:block;color:var(--ink);font-family:var(--display);font-weight:600;font-size:14px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.poster{display:block;width:100%;height:auto;border-radius:22px;margin:4px 0 18px;box-shadow:0 14px 34px -18px rgba(80,30,40,.35)}
+.rate .go{font-weight:700;color:var(--accent);margin-left:2px}a.rate{text-decoration:none}
 .rate{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;margin-top:6px;padding:6px 12px;border-radius:99px;background:var(--bg);font-size:13px;color:var(--soft)}.rate .st{color:#f2a900;letter-spacing:1px}.rate b{color:var(--ink);font-family:var(--display)}
-.testi h3{font-size:16px;margin:4px 0 8px;display:flex;justify-content:space-between;align-items:baseline}.testi h3 span{font-size:12px;font-weight:600;color:#b07a2a}
+.testi h3{font-size:16px;margin:4px 0 8px;display:flex;justify-content:space-between;align-items:baseline}.testi h3 span,.testi h3 a{font-size:12px;font-weight:600;color:#b07a2a;text-decoration:none}
 .trow{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;margin:0 -2px 6px}.trow img{flex:none;height:260px;width:auto;border-radius:14px;scroll-snap-align:start;box-shadow:0 2px 10px rgba(0,0,0,.08);cursor:zoom-in}
 .zoom{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px}.zoom img{max-width:100%;max-height:100%;border-radius:12px}
 .hqbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:6px;padding:7px 16px;background:var(--ink,#3b2732);color:#fff;font:500 13px var(--body,system-ui)}
@@ -503,7 +505,8 @@ const SCR={
     <div class="pr"><small>RM</small>128</div>
     <h1 style="font-size:24px">Satu set hadiah lengkap, terus ke pintu dia.</h1>
     <p class="sub">Tak perlu pening fikir nak bagi apa. Pilih bouquet, kami siapkan semuanya dan hantar pada orang tersayang.</p>
-    <div class="rate"><span class="st">★★★★★</span><b>5.0</b><span>· 680+ ulasan Google</span></div></div>
+    <a class="rate" href="https://maps.app.goo.gl/W7orHX96Vs1K8dRN8" target="_blank" rel="noopener"><span class="st">★★★★★</span><b>5.0</b><span>· 680+ ulasan Google</span><span class="go">Baca ›</span></a></div>
+   <img class="poster" src="assets/img/combo-poster.webp" alt="Combo Jimat 100 Blooms: bouquet bunga segar, kek Secret Recipe, foil balloon, polaroid dan wishcard, dengan penghantaran percuma" width="900" height="1289" loading="eager">
    <h2>Dalam setiap set, ada 5 item</h2>
    <ul class="items">
     <li><span class="n">1</span><span><b>Bouquet pilihan awak</b><small>8 design: bunga segar atau bouquet coklat</small></span></li>
@@ -816,7 +819,7 @@ function openBq(id,scr){
     <div>${TICK}<span>Runner ambil gambar penerima dan kami hantar kepada awak</span></div>
     <div>${TICK}<span>Penghantaran PERCUMA 10 pagi – 6 petang</span></div>
    </div>
-   ${(window.IMG&&IMG.testi&&IMG.testi.length)?`<div class="testi"><h3>Kata pelanggan <span>★ 5.0 · 680+ ulasan Google</span></h3><div class="trow">${IMG.testi.map(u=>`<img src="${u}" alt="Ulasan pelanggan 100 Blooms" loading="lazy">`).join('')}</div><p class="hint" style="margin:0">Ulasan sebenar, dikongsi dengan izin pelanggan. Ketik untuk besarkan.</p></div>`:''}
+   ${(window.IMG&&IMG.testi&&IMG.testi.length)?`<div class="testi"><h3>Kata pelanggan <a href="https://maps.app.goo.gl/W7orHX96Vs1K8dRN8" target="_blank" rel="noopener">★ 5.0 · 680+ ulasan Google ›</a></h3><div class="trow">${IMG.testi.map(u=>`<img src="${u}" alt="Ulasan pelanggan 100 Blooms" loading="lazy">`).join('')}</div><p class="hint" style="margin:0">Ulasan sebenar, dikongsi dengan izin pelanggan. Ketik untuk besarkan.</p></div>`:''}
    <button class="btn" id="pick" style="flex:none">Pilih ${b.t}</button>
    <p class="wa">Ada soalan? WhatsApp kami: <a href="https://wa.me/601165862584" target="_blank" rel="noopener">Aliff 011-6586 2584</a> · <a href="https://wa.me/60143467099" target="_blank" rel="noopener">Hanie 014-346 7099</a></p>`);
   const g=$('#gal');g.onscroll=()=>{const i=Math.round(g.scrollLeft/(g.firstElementChild.offsetWidth+10));[...$('#dots').children].forEach((d,j)=>d.classList.toggle('on',j===i))};
