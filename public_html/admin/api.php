@@ -627,7 +627,8 @@ case 'dash': // ?by=paid (tarikh bayar) | created (tarikh order). Sales = paid, 
   $w0 = strtotime('-6 days', $d0);
   $kpi = ['today' => $cmp($d0, $now, $d0 - 86400, $now - 86400), 'week' => $cmp($w0, $now, $w0 - 7 * 86400, $w0 - 1),
     'month' => $cmp(strtotime($m0), $now, $lm0, $lmCut)];
-  $kpi['month']['full'] = $sum($lm0, $lmEnd); // whole of last month, the number to beat
+  $kpi['month']['full'] = $sum($lm0, $lmEnd);
+  $kpi['today']['yday'] = $sum($d0 - 86400, $d0 - 1); // whole of yesterday // whole of last month, the number to beat
   $created = fn(int $a, int $b) => (int)q('SELECT COUNT(*) FROM orders WHERE created_at>=? AND created_at<=?', [date('Y-m-d H:i:s', $a), date('Y-m-d H:i:s', $b)])->fetchColumn();
   $kpi['created'] = ['n' => $created($d0, $now), 'prev' => ['n' => $created($d0 - 86400, $now - 86400)]];
   $pend = q("SELECT COUNT(*) n, COALESCE(SUM(total),0) s FROM orders WHERE pay_status='pending' AND status<>'batal' AND created_at>=?", [date('Y-m-d H:i:s', $now - 7 * 86400)])->fetch();

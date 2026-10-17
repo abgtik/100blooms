@@ -681,7 +681,7 @@ async function Dash(el){
      <p class="mini" style="margin:0">${new Date().toLocaleDateString('ms-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p></div>
     <div><span class="mini" style="margin-right:6px">Kira ikut</span><div class="seg" role="group" aria-label="Kira sales ikut">${[['paid','Tarikh bayar'],['created','Tarikh order']].map(([k,t])=>`<button data-by="${k}" aria-pressed="${dashBy===k}">${t}</button>`).join('')}</div></div></div>
    <div class="grid4">
-    ${card('Sales hari ni',K.today,`sehingga ${j.cut.now}`,`semalam (sehingga ${j.cut.now})`)}
+    ${card('Sales hari ni',K.today,`sehingga ${j.cut.now}`,`semalam pada masa sama (sehingga ${j.cut.now})`).replace(/<\/div>$/,K.today.yday?`<div class="mini">Semalam sehari penuh: <b style="color:var(--ink)">${rm(K.today.yday.s)}</b> (${K.today.yday.n} order)</div></div>`:'</div>')}
     ${card('Sales 7 hari',K.week,'7 hari terakhir','7 hari sebelumnya')}
     ${(()=>{const c=K.month,F=c.full||c.prev,pct=F.s?Math.round(c.s/F.s*100):0,lmName=new Date(lmA+'T00:00').toLocaleDateString('ms-MY',{month:'long'});
       return `<div class="kpi"><small>Sales bulan ni</small><b>${rm(c.s)}</b> ${delta(c.s,F.s)}<div class="mini">${c.n} order · hari ${j.cut.m_days[0]} daripada ${j.cut.m_days[1]}</div>
