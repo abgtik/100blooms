@@ -80,6 +80,15 @@ textarea{width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(
 .foot{text-align:center;font-size:13px;color:var(--soft);margin-top:18px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 .vc{border:1.5px dashed var(--accent);border-radius:16px;padding:14px;margin-top:10px;text-align:center}.vc small{display:block;color:var(--muted,#888)}.vc b{display:block;font:700 24px var(--display);letter-spacing:2px;margin:4px 0}.vca{display:flex;gap:8px}.vca .btn{flex:1;margin-top:10px}
+.giftbar{display:flex;align-items:center;gap:12px;background:var(--accent);color:#fff;border-radius:18px;padding:12px 14px;margin:0 0 14px;text-decoration:none;box-shadow:0 10px 24px -14px var(--accent);animation:gbpop .5s ease both}
+.giftbar b{display:block;font:600 16px var(--display)}.giftbar small{display:block;font-size:13px;opacity:.9}.gb-ic{font-size:26px;animation:gbwig 2.2s ease-in-out infinite}.gb-go{margin-left:auto;font-size:26px;line-height:1}
+.card.gift.todo{box-shadow:0 0 0 2px var(--accent),0 14px 30px -18px var(--accent)}
+.tapme{display:flex;align-items:center;justify-content:center;gap:6px;margin:0 0 6px;color:var(--accent);font-weight:700;font-size:14px}.tapme svg{width:22px;height:22px;animation:tapb 1.1s ease-in-out infinite}
+.card.gift.todo .gch button{animation:gpulse 1.8s ease-in-out infinite}.card.gift.todo .gch button+button{animation-delay:.9s}
+@keyframes tapb{0%,100%{transform:translateY(-3px)}50%{transform:translateY(5px)}}
+@keyframes gpulse{0%,100%{box-shadow:0 0 0 0 rgba(142,27,47,0)}50%{box-shadow:0 0 0 6px rgba(142,27,47,.16)}}
+@keyframes gbwig{0%,80%,100%{transform:rotate(0)}85%{transform:rotate(-12deg)}90%{transform:rotate(12deg)}95%{transform:rotate(-6deg)}}
+@keyframes gbpop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .gch{display:grid;grid-template-columns:1fr 1fr;gap:10px}.gch button{border:1.5px solid var(--accent);background:transparent;border-radius:16px;padding:14px 8px;cursor:pointer;color:inherit;font:inherit}.gch button b{display:block;font:700 18px var(--display);color:var(--accent)}.gch button span{font-size:13px}.gch button:disabled{opacity:.5}
 .docs{display:flex;gap:8px}.docs .btn{flex:1;text-align:center;text-decoration:none}.bill{margin-top:12px}.bill summary{cursor:pointer;font-weight:600;color:var(--accent)}.bill textarea{width:100%}.bill .btn{margin-top:8px}
 .bankalt{margin-top:12px}.bankalt summary{cursor:pointer;font-weight:600;color:var(--accent);padding:6px 0}
@@ -129,8 +138,8 @@ function afterCards(o){const a=o.after||{};let x='';
  const exp=d=>{try{return new Date(d+'T00:00:00').toLocaleDateString((LANG==='en'?'en-MY':'ms-MY'),{day:'numeric',month:'long',year:'numeric'})}catch(e){return d}};
  const vc=(code,lab,ends)=>`<div class="vc"><small>${h(lab)}</small><b>${h(code)}</b><span class="hint">Sah sehingga ${h(exp(ends))} · sekali guna</span><div class="vca"><button class="btn ghost" data-cp="${h(code)}">Salin kod</button><a class="btn" href="${LANG==='en'?'/en/':'/'}?v=${encodeURIComponent(code)}">Order lagi →</a></div></div>`;
  if(a.sorry)x+=`<section class="card"><h2>Maaf atas kesulitan 🙏</h2><p class="hint" style="margin:0 0 4px">Terima kasih kerana bersabar. Ini voucher untuk order seterusnya.</p>${vc(a.sorry.code,'Voucher RM30 off',a.sorry.ends)}</section>`;
- if(a.offer)x+=`<section class="card gift"><h2>🎁 Hadiah terima kasih</h2>${a.gift?`<p class="hint" style="margin:0 0 4px">Hadiah awak untuk order seterusnya:</p>${vc(a.gift.code,a.gift.choice==='rm10'?'RM10 off':'1 polaroid tambahan percuma',a.gift.ends)}`
-  :`<p class="hint" style="margin:0 0 10px">Terima kasih memilih 100 Blooms! Pilih satu hadiah untuk order seterusnya:</p><div class="gch"><button data-gift="rm10"><b>RM10</b><span>off order seterusnya</span></button><button data-gift="photo"><b>📸 1 polaroid</b><span>tambahan percuma</span></button></div><p class="hint" style="margin:8px 0 0">Pilihan tak boleh ditukar selepas dipilih.</p><div id="gm"></div>`}</section>`;
+ if(a.offer)x+=`<section class="card gift${a.gift?'':' todo'}" id="gift"><h2>🎁 Hadiah terima kasih</h2>${a.gift?`<p class="hint" style="margin:0 0 4px">Hadiah awak untuk order seterusnya:</p>${vc(a.gift.code,a.gift.choice==='rm10'?'RM10 off':'1 polaroid tambahan percuma',a.gift.ends)}`
+  :`<p class="hint" style="margin:0 0 10px">Terima kasih memilih 100 Blooms! Pilih satu hadiah untuk order seterusnya:</p><p class="tapme" aria-hidden="true"><span>Pilih satu</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v14M6 12l6 6 6-6"/></svg></p><div class="gch"><button data-gift="rm10"><b>RM10</b><span>off order seterusnya</span></button><button data-gift="photo"><b>📸 1 polaroid</b><span>tambahan percuma</span></button></div><p class="hint" style="margin:8px 0 0">Pilihan tak boleh ditukar selepas dipilih.</p><div id="gm"></div>`}</section>`;
  if(a.review)x+=`<section class="card"><h2>⭐ Kongsi pengalaman awak</h2><p class="hint" style="margin:0">Pendapat awak — baik atau ada yang boleh diperbaiki — sangat membantu kami dan pelanggan lain.</p><a class="btn ghost" href="${h(a.review)}" target="_blank" rel="noopener">Tulis ulasan di Google</a></section>`;
  return x}
 async function show(o){await useLang(o.lang||'ms');
@@ -145,7 +154,8 @@ async function show(o){await useLang(o.lang||'ms');
   const ed=o.edit||{};
   const doc=t=>`/api/doc.php?c=${encodeURIComponent(o.code)}&k=${encodeURIComponent(o.k)}&t=${t}`;
   const delTxt=o.del_type==='spec'&&o.del_time?`Masa khusus ${o.del_time}`:o.del_label;
-  $('#main').innerHTML=`<p class="code">ORDER ${h(o.code)}</p><h1>Hadiah untuk ${h(o.call)}</h1><p class="sub">${o.manual&&(!o.occ_id||o.occ_id==='saja')?'Dihantar kepada ':h(o.occasion)+' · dihantar kepada '}${h(o.r_name)}</p>
+  const giftTodo=o.after&&o.after.offer&&!o.after.gift;
+  $('#main').innerHTML=`${giftTodo?`<a class="giftbar" href="#gift"><span class="gb-ic" aria-hidden="true">🎁</span><span><b>Ada hadiah untuk awak!</b><small>Tekan untuk pilih hadiah order seterusnya</small></span><span class="gb-go" aria-hidden="true">›</span></a>`:''}<p class="code">ORDER ${h(o.code)}</p><h1>Hadiah untuk ${h(o.call)}</h1><p class="sub">${o.manual&&(!o.occ_id||o.occ_id==='saja')?'Dihantar kepada ':h(o.occasion)+' · dihantar kepada '}${h(o.r_name)}</p>
    ${o.status==='batal'?`<div class="msg bad" style="margin:0 0 14px">Order ini telah dibatalkan. WhatsApp kami jika ada pertanyaan.</div>`:''}
    ${!o.paid&&o.status!=='batal'?`<div class="card"><h2>Bayaran belum diterima</h2><p class="hint" style="margin:0">Order disimpan tapi kami belum terima bayaran. Hadiah hanya disiapkan selepas bayaran berjaya.</p><p style="margin:12px 0 8px">Jumlah perlu dibayar: <b style="font-size:20px">RM${Number(o.total).toFixed(2)}</b></p>${o.payUrl?`<a class="btn" href="${h(o.payUrl)}">💳 Bayar sekarang · DuitNow / FPX / Kad</a>`:`<button class="btn" id="paynow" type="button">💳 Bayar sekarang · DuitNow / FPX / Kad</button>`}<div id="paymsg"></div>${o.bank?`<details class="bankalt"><summary>Atau bayar melalui pemindahan bank / QR</summary>${o.bank.qr?`<img src="/api/bankqr.php" alt="QR bayaran 100 Blooms" style="display:block;max-width:240px;width:100%;margin:8px auto;border-radius:12px">`:''}${o.bank.text?`<p class="hint" style="white-space:pre-line;text-align:center">${h(o.bank.text)}</p>`:''}<a class="btn ghost" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?phone=${o.wa||'601165862584'}&text=${encodeURIComponent(LANG==='en'?'Hi 100 Blooms, I have paid for order '+o.code+'. Here is my receipt.':'Hai 100 Blooms, saya dah bayar untuk order '+o.code+'. Ini resit saya.')}">Hantar resit melalui WhatsApp</a></details>`:''}</div>`:''}
    ${o.status!=='batal'?`<section class="card" aria-labelledby="t1"><h2 id="t1">Status hadiah</h2>
@@ -202,6 +212,8 @@ async function show(o){await useLang(o.lang||'ms');
     document.querySelectorAll('[data-gift]').forEach(x=>x.disabled=true);
     try{const r=await fetch('/api/gift.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({c:o.code,k:o.k,choice:b.dataset.gift})});const j=await r.json();if(!r.ok)throw new Error(j.error||'Ralat');await reload()}
     catch(x){$('#gm').innerHTML=`<div class="msg bad">${h(x.message)}</div>`;document.querySelectorAll('[data-gift]').forEach(x=>x.disabled=false)}});
+  if(location.hash==='#gift'&&$('#gift')&&!window._giftJumped){window._giftJumped=1;setTimeout(()=>$('#gift').scrollIntoView({behavior:'smooth',block:'center'}),350);}
+  document.querySelectorAll('.giftbar').forEach(g=>g.onclick=e=>{e.preventDefault();$('#gift').scrollIntoView({behavior:'smooth',block:'center'});});
   document.querySelectorAll('[data-z]').forEach(i=>i.onclick=()=>{const z=document.createElement('div');z.className='zoom';z.innerHTML=`<img src="${i.src}" alt="">`;z.onclick=()=>z.remove();document.body.appendChild(z)});
 }
 

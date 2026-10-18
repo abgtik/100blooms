@@ -712,7 +712,7 @@ function aftercare_msg(array $o, string $who): string {
     }
     $first = $first === 'awak' ? 'there' : $first;
     return "Hi $first 🌸\n\nThe gift for *{$o['r_name']}* has been delivered! 🎉\n\n" . (!empty($o['recipient_photo']) ? "📸 {$o['r_name']} receiving the gift:\n$track\n\n" : "📦 Order status:\n$track\n\n")
-      . "🎁 As a thank you, we've prepared a *special gift* for your next order. Claim it at the same link.\n\n"
+      . "🎁 As a thank you, there's a *special gift* waiting for your next order. Tap to claim it:\n$track#gift\n\n"
       . "⭐ If you have a moment, we'd love to hear about your experience on Google. It really helps our small business:\n" . review_url() . "\n\nThank you for choosing 100 Blooms 💕";
   }
   if ($who === 'rcp') {
@@ -721,7 +721,7 @@ function aftercare_msg(array $o, string $who): string {
       . rcp_url($o) . "\n\n— 100 Blooms";
   }
   return "Hai $first 🌸\n\nHadiah untuk *{$o['r_name']}* dah selamat sampai! 🎉\n\n" . (!empty($o['recipient_photo']) ? "📸 Gambar {$o['r_name']} masa terima hadiah:\n$track\n\n" : "📦 Status order:\n$track\n\n")
-    . "🎁 Sebagai tanda terima kasih, kami sediakan *hadiah istimewa* untuk order awak yang seterusnya. Tuntut di link yang sama.\n\n"
+    . "🎁 Sebagai tanda terima kasih, ada *hadiah istimewa* untuk order awak yang seterusnya. Tekan untuk tuntut:\n$track#gift\n\n"
     . "⭐ Kalau sudi, kongsikan pengalaman awak di Google. Ia sangat membantu bisnes kecil kami:\n" . review_url() . "\n\nTerima kasih kerana memilih 100 Blooms 💕";
 }
 /** Apology message the team sends by hand for a problem order (voucher and/or replacement are optional). */

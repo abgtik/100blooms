@@ -73,3 +73,4 @@ R=[
 [r"^1 polaroid percuma$","1 free polaroid"],
 [r"^Maksimum (\d+) gambar\.$","Maximum %1 photos."],
 ]
+X.update({"Pilih satu":"Pick one","Ada hadiah untuk awak!":"There's a gift for you!","Tekan untuk pilih hadiah order seterusnya":"Tap to choose a gift for your next order"})
