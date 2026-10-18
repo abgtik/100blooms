@@ -192,7 +192,7 @@ async function show(o){await useLang(o.lang||'ms');
      <label for="bt" class="hint" style="display:block;margin:8px 0 4px">Nama syarikat, no. pendaftaran &amp; alamat (dipapar sebagai "Bill To")</label>
      <textarea id="bt" rows="3" maxlength="400" placeholder="Contoh: ABC Sdn Bhd (201901012345)&#10;No 1, Jalan Industri, 47000 Sungai Buloh">${h(o.bill_to||'')}</textarea>
      <div id="bm"></div><button class="btn" id="bsv" type="button">Simpan</button></details></section>`:''}
-   <p class="foot"><a href="/semak/">Semak order lain</a> · <a href="https://wa.me/601165862584" target="_blank" rel="noopener">WhatsApp kami</a></p>`;
+   <p class="foot"><a href="/semak/">Semak order lain</a> · <a href="https://wa.me/${o.wa||'601165862584'}" target="_blank" rel="noopener">WhatsApp kami</a></p>`;
   const post=async(body,isForm)=>{const r=await fetch('/api/edit.php',isForm?{method:'POST',body}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Tak dapat simpan. Cuba lagi.');return j};
   if($('#bsv'))$('#bsv').onclick=async()=>{$('#bsv').disabled=true;try{await post({c:o.code,k:o.k,a:'bill',bill_to:$('#bt').value});$('#bm').innerHTML='<div class="msg ok">Disimpan. Buka semula invoice/resit untuk lihat.</div>'}catch(x){$('#bm').innerHTML=`<div class="msg bad">${h(x.message)}</div>`}$('#bsv').disabled=false};
   if($('#paynow'))$('#paynow').onclick=async()=>{const b=$('#paynow');b.disabled=true;b.textContent='Membuka halaman bayaran…';

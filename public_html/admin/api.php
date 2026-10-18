@@ -380,13 +380,19 @@ case 'waset': // owner: WhatsApp (Murpati) settings; the API key is never sent b
     if (isset($body['key']) && trim((string)$body['key']) !== '') set_setting('wa_key', trim((string)$body['key']));
     if (!empty($body['clear_key'])) { set_setting('wa_key', null); set_setting('wa_session', null); }
     if (isset($body['session'])) set_setting('wa_session', preg_replace('/[^A-Za-z0-9_:.-]/', '', (string)$body['session']) ?: null);
-    if (isset($body['session2'])) set_setting('wa_session2', preg_replace('/[^A-Za-z0-9_:.-]/', '', (string)$body['session2']) ?: null);
+    $sid = fn($v) => preg_replace('/[^A-Za-z0-9_:.-]/', '', (string)$v);
+    if (isset($body['session2'])) set_setting('wa_session2', $sid($body['session2']) ?: null);
+    if (isset($body['session_agent'])) set_setting('wa_session_agent', $sid($body['session_agent']) ?: null);
+    if (isset($body['by_user']) && is_array($body['by_user'])) { $names = array_column(q('SELECT name FROM admins')->fetchAll(), 'name'); $map = [];
+      foreach ($body['by_user'] as $n => $v) if (in_array((string)$n, $names, true) && $sid($v) !== '') $map[(string)$n] = $sid($v);
+      set_setting('wa_user_sess', $map ? json_encode($map, JSON_UNESCAPED_UNICODE) : null); }
     if (isset($body['team'])) set_setting('wa_team', implode(',', array_filter(array_map('wa_num', explode(',', (string)$body['team'])))));
     if (isset($body['on']) && is_array($body['on'])) set_setting('wa_on', json_encode(array_map(fn($k) => !empty($body['on'][$k]), array_combine(array_keys(WA_TYPES), array_keys(WA_TYPES)))));
     json_out(['ok' => true]);
   }
   $k = (string)setting('wa_key', ''); $c = wa_cfg();
-  json_out(['has_key' => $k !== '', 'key_hint' => $k !== '' ? substr($k, 0, 3) . '…' . substr($k, -4) : '', 'session' => $c['session'], 'session2' => $c['session2'], 'team' => implode(', ', $c['team']),
+  json_out(['has_key' => $k !== '', 'key_hint' => $k !== '' ? substr($k, 0, 3) . '…' . substr($k, -4) : '', 'session' => $c['session'], 'session2' => $c['session2'], 'session_agent' => $c['session_agent'], 'by_user' => (object)$c['by_user'],
+    'users' => q('SELECT name, doc_name FROM admins ORDER BY id')->fetchAll(), 'team' => implode(', ', $c['team']),
     'on' => $c['on'], 'types' => WA_TYPES, 'last' => json_decode((string)setting('wa_last', ''), true)]);
 
 case 'wasess': // owner: numbers connected in Murpati, to pick the sending number
@@ -394,6 +400,8 @@ case 'wasess': // owner: numbers connected in Murpati, to pick the sending numbe
   [$code, $j, $raw] = wa_http('GET', '/v1/sessions', null, $key);
   if ($code >= 400) fail('Murpati: ' . ($j['error'] ?? "HTTP $code"));
   $list = $j['sessions'] ?? $j['data'] ?? (array_is_list($j) ? $j : []);
+  $ph = []; foreach ((array)$list as $x) if (is_array($x) && ($x['session_id'] ?? $x['id'] ?? '') !== '') $ph[$x['session_id'] ?? $x['id']] = (string)($x['phone_number'] ?? $x['phone'] ?? '');
+  set_setting('wa_sess_phone', json_encode($ph)); // lets Semak point each customer to the number that messages them
   json_out(['rows' => array_values(array_map(fn($x) => ['id' => $x['session_id'] ?? $x['id'] ?? '', 'phone' => $x['phone_number'] ?? $x['phone'] ?? '', 'pipeline' => $x['pipeline'] ?? $x['type'] ?? '',
     'status' => $x['status'] ?? '', 'name' => $x['name'] ?? $x['label'] ?? ''], array_filter((array)$list, 'is_array')))]);
 

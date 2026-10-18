@@ -556,20 +556,29 @@ const WA_TYPES = ['team_paid' => 'Team: order baru dibayar', 'team_unpaid' => 'T
 function wa_cfg(): array {
   static $c = null; if ($c !== null) return $c;
   $on = json_decode((string)setting('wa_on', ''), true);
-  return $c = ['key' => (string)setting('wa_key', ''), 'session' => (string)setting('wa_session', ''), 'session2' => (string)setting('wa_session2', ''),
+  return $c = ['key' => (string)setting('wa_key', ''), 'session' => (string)setting('wa_session', ''), 'session2' => (string)setting('wa_session2', ''), 'session_agent' => (string)setting('wa_session_agent', ''),
+    'by_user' => json_decode((string)setting('wa_user_sess', ''), true) ?: [], 'phones' => json_decode((string)setting('wa_sess_phone', ''), true) ?: [],
     'team' => array_values(array_filter(array_map(fn($x) => wa_num($x), explode(',', (string)setting('wa_team', WA_MAIN))))),
     'on' => array_merge(array_fill_keys(array_keys(WA_TYPES), true), is_array($on) ? $on : [])]; // new message types start switched on
 }
 function wa_num(string $p): string { $d = digits($p); if ($d === '') return ''; if (str_starts_with($d, '60')) return $d; return '60' . ltrim($d, '0'); }
 /** Which Murpati number sends this message type: team alerts use the main number; messages to buyers, recipients and agents
  *  can go out from a second number (e.g. the same phone logged in by QR), since the official API only reaches people who chatted in the last 24h. */
-function wa_session_for(string $type): string { $c = wa_cfg(); return !str_starts_with($type, 'team_') && $c['session2'] !== '' ? $c['session2'] : $c['session']; }
-function wa_ready(string $type): bool { $c = wa_cfg(); return $c['key'] !== '' && wa_session_for($type) !== '' && !empty($c['on'][$type]); }
+function wa_session_for(string $type, ?array $o = null): string {
+  $c = wa_cfg();
+  if (str_starts_with($type, 'team_')) return $c['session'];
+  if (str_starts_with($type, 'agent_')) return $c['session_agent'] ?: ($c['session2'] ?: $c['session']);
+  $own = $o && !empty($o['created_by']) ? (string)($c['by_user'][(string)$o['created_by']] ?? '') : ''; // the salesperson who keyed in the order talks to their own customer
+  return $own ?: ($c['session2'] ?: $c['session']);
+}
+/** The WhatsApp number customers of this order should reply to (the number that messages them). */
+function wa_contact_for(array $o): string { $s = wa_session_for('buyer_paid', $o); $p = wa_num((string)(wa_cfg()['phones'][$s] ?? '')); return strlen($p) >= 10 ? $p : WA_MAIN; }
+function wa_ready(string $type, ?array $o = null): bool { $c = wa_cfg(); return $c['key'] !== '' && wa_session_for($type, $o) !== '' && !empty($c['on'][$type]); }
 $GLOBALS['WA_Q'] = [];
-function wa_queue(string $to, string $msg, string $type = 'team_'): void {
+function wa_queue(string $to, string $msg, string $type = 'team_', ?array $o = null): void {
   $to = wa_num($to); if (strlen($to) < 10) return;
   if (!$GLOBALS['WA_Q']) register_shutdown_function('wa_flush');
-  $GLOBALS['WA_Q'][] = [$to, $msg, wa_session_for($type)];
+  $GLOBALS['WA_Q'][] = [$to, $msg, wa_session_for($type, $o)];
 }
 function wa_flush(): void {
   $q = $GLOBALS['WA_Q']; $GLOBALS['WA_Q'] = []; if (!$q) return;
@@ -608,9 +617,9 @@ function wa_order(array $o, string $event): void {
     $need = []; $needE = [];
     if ($o['wish'] === WISH_NONE) { $need[] = 'tulis ayat wishcard'; $needE[] = 'write the card message'; }
     $miss = (int)$o['photo_count'] - count(jdec($o['photos'])); if ($miss > 0) { $need[] = "upload $miss gambar polaroid"; $needE[] = "upload $miss polaroid photo" . ($miss > 1 ? 's' : ''); }
-    $add = function (string $key, string $type, string $to, string $msg) use (&$log, &$sent) {
-      if (isset($log[$key]) || !wa_ready($type)) return;
-      wa_queue($to, $msg, $type); $log[$key] = date('Y-m-d H:i:s'); $sent[] = $key;
+    $add = function (string $key, string $type, string $to, string $msg) use (&$log, &$sent, $o) {
+      if (isset($log[$key]) || !wa_ready($type, $o)) return;
+      wa_queue($to, $msg, $type, $o); $log[$key] = date('Y-m-d H:i:s'); $sent[] = $key;
     };
     if ($event === 'paid') {
       $bal = $C['bal'][$o['balloon']] ?? $o['balloon']; $bc = $M['bal'][$o['balloon']]['code'] ?? '';
