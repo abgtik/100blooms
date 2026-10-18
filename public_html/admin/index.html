@@ -353,22 +353,22 @@ function afterCard(o){
   const a=o.aftercare||{},i=o.issue,R=o.issue_reasons||{},dlv=['sampai','selesai'].includes(o.status),open=i&&!i.resolved;
   let st;
   if(open)st=`<div class="msg bad" style="margin:0 0 10px">⚠️ Ada masalah. Mesej automatik <b>tidak</b> dihantar. Team sales follow up secara manual di bawah.</div>`;
-  else if(a.buyer_manual_at&&a.rcp_manual_at)st=`<div class="msg ok" style="margin:0 0 10px">✅ Pembeli &amp; penerima dah dihantar secara manual. Mesej automatik takkan dihantar lagi (tiada mesej berganda).</div>`;
-  else if(a.auto_at)st=`<div class="msg ok" style="margin:0 0 10px">✅ Mesej selepas hantar diproses ${fmtDT(a.auto_at)}${a.buyer_manual_at||a.rcp_manual_at?` (yang dah dihantar manual tak dihantar semula)`:''}</div>`;
+  else if(a.buyer_manual_at&&a.rcp_manual_at)st=`<div class="msg ok" style="margin:0 0 10px">✅ Pembeli &amp; penerima dah dihantar. Mesej automatik takkan dihantar lagi (tiada mesej berganda).</div>`;
+  else if(a.auto_at)st=`<div class="msg ok" style="margin:0 0 10px">✅ Mesej selepas hantar diproses ${fmtDT(a.auto_at)}${a.buyer_manual_at||a.rcp_manual_at?` (yang dah dihantar guna butang tak dihantar semula)`:''}</div>`;
   else if(!dlv||!o.after_due)st=`<p class="mini" style="margin:0 0 10px">Selepas runner tekan <b>Dah sampai</b>, mesej terima kasih (pembeli) dan halaman hadiah (penerima) dihantar automatik ${o.wa_on?'30 minit kemudian':'— WhatsApp automatik belum disambung, guna butang manual'}. Kalau ada masalah, tandakan dulu supaya mesej automatik tak keluar.</p>`;
   else if(!o.after_auto)st=`<p class="mini" style="margin:0 0 10px">Order ni dihantar sebelum ciri ni aktif. Mesej automatik tak dihantar. Guna butang manual jika perlu.</p>`;
   else if(!o.wa_on)st=`<div class="msg bad" style="margin:0 0 10px">WhatsApp automatik belum disambung / dimatikan. Hantar manual guna butang di bawah.</div>`;
-  else st=`<p class="mini" style="margin:0 0 10px">⏳ Mesej automatik dijadualkan sekitar <b>${fmtDT(o.after_due)}</b>. Ada masalah? Tandakan sebelum masa tu.${a.buyer_manual_at||a.rcp_manual_at?` <b>${a.buyer_manual_at?'Pembeli':'Penerima'}</b> dah dihantar manual, jadi takkan dihantar lagi secara automatik.`:' Kalau awak tekan butang di bawah, mesej automatik untuk orang tu dibatalkan (tak berganda).'}</p>`;
-  const info=[a.buyer_manual_at?`Terima kasih (manual) ${fmtDT(a.buyer_manual_at)}`:'',a.gift?`🎁 Hadiah dituntut: <b>${h(a.gift.code)}</b> (${a.gift.choice==='rm10'?'RM10 off':'1 polaroid'})`:a.offer?'🎁 Hadiah belum dituntut':'',
-    a.rcp_code?`💌 Kod penerima: <b>${h(a.rcp_code)}</b>`:'',a.rcp_manual_at?`Penerima (manual) ${fmtDT(a.rcp_manual_at)}`:'',a.rcp_viewed_at?`👀 Penerima buka halaman ${fmtDT(a.rcp_viewed_at)}`:''].filter(Boolean);
+  else st=`<p class="mini" style="margin:0 0 10px">⏳ Mesej automatik dijadualkan sekitar <b>${fmtDT(o.after_due)}</b>. Ada masalah? Tandakan sebelum masa tu.${a.buyer_manual_at||a.rcp_manual_at?` <b>${a.buyer_manual_at?'Pembeli':'Penerima'}</b> dah dihantar guna butang, jadi takkan dihantar lagi secara automatik.`:' Nak hantar lebih awal? Tekan butang di bawah: mesej terus dihantar melalui Murpati, dan mesej automatik untuk orang tu dibatalkan (tak berganda).'}</p>`;
+  const info=[a.buyer_manual_at?`💬 Terima kasih dihantar ${a.buyer_how==='murpati'?'(Murpati)':'(WhatsApp sendiri)'} ${fmtDT(a.buyer_manual_at)}`:'',a.gift?`🎁 Hadiah dituntut: <b>${h(a.gift.code)}</b> (${a.gift.choice==='rm10'?'RM10 off':'1 polaroid'})`:a.offer?'🎁 Hadiah belum dituntut':'',
+    a.rcp_code?`💌 Kod penerima: <b>${h(a.rcp_code)}</b>`:'',a.rcp_manual_at?`💌 Penerima dihantar ${a.rcp_how==='murpati'?'(Murpati)':'(WhatsApp sendiri)'} ${fmtDT(a.rcp_manual_at)}`:'',a.rcp_viewed_at?`👀 Penerima buka halaman ${fmtDT(a.rcp_viewed_at)}`:''].filter(Boolean);
   const chk=k=>i&&(i.reasons||[]).includes(k)?' checked':'';
   return `<div class="card" id="acard"><h2>🤝 Selepas hantar</h2>${st}
    ${info.length?`<div class="mini" style="margin:0 0 10px;line-height:1.7">${info.join('<br>')}</div>`:''}
-   ${dlv?`<div class="bar" style="margin:0 0 6px">${open?'':`<button class="btn ghost sm" data-am="buyer">💬 WhatsApp pembeli (terima kasih)</button>`}<button class="btn ghost sm" data-am="rcp">💌 WhatsApp penerima</button><a class="btn ghost sm" href="${h(o.rcp_url)}" target="_blank" rel="noopener">Lihat halaman penerima</a></div>`:''}
+   ${dlv?`<div class="bar" style="margin:0 0 6px">${open?'':`<button class="btn ghost sm" data-am="buyer">${a.buyer_manual_at||a.auto_at?'↻ Hantar semula terima kasih':'💬 Hantar terima kasih ke pembeli'}</button>`}<button class="btn ghost sm" data-am="rcp">${a.rcp_manual_at||a.auto_at?'↻ Hantar semula ke penerima':'💌 Hantar halaman hadiah ke penerima'}</button><a class="btn ghost sm" href="${h(o.rcp_url)}" target="_blank" rel="noopener">Lihat halaman penerima</a></div>`:''}
    ${i?`<div class="iss${i.resolved?' ok':''}"><b>${i.resolved?'✅ Masalah selesai':'⚠️ Masalah'}</b>: ${(i.reasons||[]).map(k=>h(R[k]||k)).join(', ')||'-'}${i.note?`<br><span class="mini">${h(i.note)}</span>`:''}
      <span class="mini" style="display:block">Ditanda oleh ${h(i.by||'-')} · ${fmtDT(i.at)}${i.resolved?` · selesai oleh ${h(i.resolved.by)} ${fmtDT(i.resolved.at)}`:''}${i.msg_at?` · mesej maaf ${fmtDT(i.msg_at)} (${h(i.msg_by)})`:''}</span>
      ${i.voucher?`<div style="margin-top:6px">🎟️ Voucher maaf <b>${h(i.voucher)}</b> (RM30, sah hingga ${fmtD(i.voucher_ends)})</div>`:''}
-     <div class="bar" style="margin:8px 0 0">${i.voucher?'':`<button class="btn ghost sm" id="ivv">🎟️ Jana voucher RM30</button>`}<button class="btn sm" data-am="issue">💬 WhatsApp pembeli (minta maaf)</button>
+     <div class="bar" style="margin:8px 0 0">${i.voucher?'':`<button class="btn ghost sm" id="ivv">🎟️ Jana voucher RM30</button>`}<button class="btn sm" data-am="issue">💬 Hantar mesej minta maaf</button>
       <button class="btn ghost sm" id="idn">${i.resolved?'Buka semula':'Tandakan selesai'}</button></div></div>`:''}
    <details style="margin-top:10px"><summary class="mini" style="cursor:pointer;font-weight:600">${i?'✏️ Kemas kini masalah':'⚠️ Tandakan ada masalah'}</summary>
     <div class="ichk">${Object.entries(R).map(([k,t])=>`<label><input type="checkbox" value="${k}"${chk(k)}> ${h(t)}</label>`).join('')}</div>
@@ -482,8 +482,16 @@ async function openOrder(id,reload){
   $('#wsv').onclick=()=>done(api('wish',{method:'POST',body:{id,wish:$('#wt').value,sender:$('#ws').value}}),'Wishcard disimpan');
   if($('#pau'))$('#pau').onclick=()=>{const fs=[...$('#paf').files];if(!fs.length)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fs.forEach(f=>fd.append('photo[]',f));done(api('padd',{method:'POST',body:fd}),'Polaroid dimuat naik')};
   document.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=()=>{if(confirm('Padam gambar polaroid ni?'))done(api('pdel',{method:'POST',body:{id,f:b.dataset.pdel}}),'Gambar dipadam')});
-  document.querySelectorAll('[data-am]').forEach(b=>b.onclick=async()=>{const w=window.open('','_blank');
-    try{const j=await api('aftermsg',{method:'POST',body:{id,who:b.dataset.am}});const u='https://api.whatsapp.com/send?phone='+j.phone+'&text='+encodeURIComponent(j.text);if(w)w.location=u;else location.href=u;reload&&reload();openOrder(id,reload)}
+  const waOpen=(j,who)=>{const u='https://api.whatsapp.com/send?phone='+j.phone+'&text='+encodeURIComponent(j.text);return `<a class="btn sm" href="${u}" target="_blank" rel="noopener" data-amx="${who}">Buka di WhatsApp saya</a>`};
+  document.querySelectorAll('[data-am]').forEach(b=>b.onclick=async()=>{const who=b.dataset.am,lab=b.textContent.trim();
+    if(o.wa_on){if(!confirm('Hantar sekarang melalui WhatsApp 100 Blooms (Murpati)?\n\n'+lab))return;b.disabled=true;
+      try{const j=await api('aftermsg',{method:'POST',body:{id,who,send:1}});
+        if(j.sent){toast('✅ Dihantar melalui Murpati');reload&&reload();openOrder(id,reload);return}
+        $('#om').innerHTML=`<div class="msg bad">Tak dapat hantar melalui Murpati: ${h(j.error||'ralat')}. Hantar dari WhatsApp sendiri:</div><div class="bar" style="margin:6px 0 10px">${waOpen(j,who)}</div>`;$('#om').scrollIntoView({block:'nearest'});
+        const x=document.querySelector('[data-amx]');if(x)x.onclick=()=>setTimeout(async()=>{try{await api('aftermsg',{method:'POST',body:{id,who}})}catch(e){}reload&&reload();openOrder(id,reload)},400);}
+      catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}b.disabled=false;return}
+    const w=window.open('','_blank'); // WhatsApp automation not connected: open the team's own WhatsApp with the message
+    try{const j=await api('aftermsg',{method:'POST',body:{id,who}});const u='https://api.whatsapp.com/send?phone='+j.phone+'&text='+encodeURIComponent(j.text);if(w)w.location=u;else location.href=u;reload&&reload();openOrder(id,reload)}
     catch(e){w&&w.close();$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}});
   if($('#iss'))$('#iss').onclick=()=>{const rs=[...document.querySelectorAll('.ichk input:checked')].map(x=>x.value);if(!rs.length)return toast('Pilih sekurang-kurangnya satu masalah');
     done(api('issue',{method:'POST',body:{id,reasons:rs,note:$('#isn').value,action:$('#isa').value}}),'Masalah ditanda')};

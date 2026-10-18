@@ -220,17 +220,27 @@ case 'issue_done':
   q('UPDATE orders SET issue=? WHERE id=?', [json_encode($i, JSON_UNESCAPED_UNICODE), $o['id']]);
   json_out(['ok' => true]);
 
-case 'aftermsg': // message text for the team to send by hand (WhatsApp opens with it); also records that it went out
+case 'aftermsg': // after-delivery / apology message: sent straight away through Murpati (the right number for this customer), or opened in the team's own WhatsApp
   $m = need_login(); $o = load_order((int)($body['id'] ?? 0)); $who = (string)($body['who'] ?? '');
   if ($o['pay_status'] !== 'paid') fail('Order belum dibayar.');
-  $a = aftercare($o); $now = date('Y-m-d H:i:s');
-  if ($who === 'issue') { $i = issue_of($o); if (!$i) fail('Tiada masalah ditanda.'); $i['msg_at'] = $now; $i['msg_by'] = $m['name'];
-    q('UPDATE orders SET issue=? WHERE id=?', [json_encode($i, JSON_UNESCAPED_UNICODE), $o['id']]); json_out(['phone' => wa_num($o['b_phone']), 'text' => issue_msg($o)]); }
-  $markSent = function (string $key) use ($o, $now) { $l = jdec($o['wa_log'] ?? null); $l[$key] = $l[$key] ?? $now; q('UPDATE orders SET wa_log=? WHERE id=?', [json_encode($l), $o['id']]); }; // the automatic message then skips it (no double)
-  if ($who === 'rcp') { $markSent('rcp_gift'); rcp_voucher($o); $o = load_order((int)$o['id']); $a = aftercare($o); $a['rcp_manual_at'] = $now; aftercare_save((int)$o['id'], $a);
-    $rp = first_phone((string)$o['r_phone']); if ($rp === '') fail('Nombor penerima tidak sah.'); json_out(['phone' => wa_num($rp), 'text' => aftercare_msg($o, 'rcp')]); }
-  if ($who === 'buyer') { $markSent('buyer_done'); $a['offer'] = true; $a['buyer_manual_at'] = $now; aftercare_save((int)$o['id'], $a); json_out(['phone' => wa_num($o['b_phone']), 'text' => aftercare_msg($o, 'buyer')]); }
-  fail('Pilihan tidak sah.');
+  $now = date('Y-m-d H:i:s');
+  if ($who === 'rcp') { rcp_voucher($o); $o = load_order((int)$o['id']); $phone = wa_num(first_phone((string)$o['r_phone'])); if (strlen($phone) < 10) fail('Nombor penerima tidak sah.'); $text = aftercare_msg($o, 'rcp'); $type = 'rcp_gift'; }
+  elseif ($who === 'buyer') { $phone = wa_num($o['b_phone']); $text = aftercare_msg($o, 'buyer'); $type = 'buyer_done'; }
+  elseif ($who === 'issue') { if (!issue_of($o)) fail('Tiada masalah ditanda.'); $phone = wa_num($o['b_phone']); $text = issue_msg($o); $type = 'buyer_issue'; }
+  else fail('Pilihan tidak sah.');
+  $sent = false; $err = null;
+  if (!empty($body['send'])) {
+    $c = wa_cfg();
+    if ($c['key'] === '' || wa_session_for($type, $o) === '') $err = 'WhatsApp automatik belum disambung.';
+    else { try { wa_send($phone, $text, wa_session_for($type, $o)); $sent = true; } catch (Throwable $e) { $err = $e->getMessage(); } }
+    if (!$sent) json_out(['sent' => false, 'error' => $err, 'phone' => $phone, 'text' => $text]); // nothing recorded; the team can open WhatsApp instead
+  }
+  // record it, so the automatic message for the same person is skipped (no doubles)
+  $l = jdec($o['wa_log'] ?? null); if ($who !== 'issue') { $l[$type] = $l[$type] ?? $now; q('UPDATE orders SET wa_log=? WHERE id=?', [json_encode($l), $o['id']]); }
+  $how = $sent ? 'murpati' : 'manual';
+  if ($who === 'issue') { $i = issue_of($o); $i['msg_at'] = $now; $i['msg_by'] = $m['name']; $i['msg_how'] = $how; q('UPDATE orders SET issue=? WHERE id=?', [json_encode($i, JSON_UNESCAPED_UNICODE), $o['id']]); }
+  else { $a = aftercare(load_order((int)$o['id'])); if ($who === 'buyer') $a['offer'] = true; $a[$who === 'buyer' ? 'buyer_manual_at' : 'rcp_manual_at'] = $now; $a[$who . '_how'] = $how; aftercare_save((int)$o['id'], $a); }
+  json_out(['sent' => $sent, 'phone' => $phone, 'text' => $text]);
 
 case 'prep': // tick / untick a production checklist item
   $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
