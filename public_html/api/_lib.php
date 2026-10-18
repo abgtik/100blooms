@@ -727,7 +727,6 @@ function aftercare_msg(array $o, string $who): string {
     $first = $first === 'awak' ? 'there' : $first;
     return "Hi $first 🌸\n\nThe gift for *{$o['r_name']}* has been delivered! 🎉\n\n" . (!empty($o['recipient_photo']) ? "📸 {$o['r_name']} receiving the gift:\n$track\n\n" : "📦 Order status:\n$track\n\n")
       . "🎁 As a thank you, there's a *special gift* waiting for your next order. Tap to claim it:\n$track#gift\n\n"
-      . (!rcp_reachable($o) && !empty(aftercare($o)['rcp_code']) ? "💌 We've made a keepsake page for *{$o['r_name']}* (card message, photo and a little gift). Please forward this link to them:\n" . rcp_url($o) . "\n\n" : '')
       . "⭐ If you have a moment, we'd love to hear about your experience on Google. It really helps our small business:\n" . review_url() . "\n\nThank you for choosing 100 Blooms 💕";
   }
   if ($who === 'rcp') {
@@ -737,7 +736,6 @@ function aftercare_msg(array $o, string $who): string {
   }
   return "Hai $first 🌸\n\nHadiah untuk *{$o['r_name']}* dah selamat sampai! 🎉\n\n" . (!empty($o['recipient_photo']) ? "📸 Gambar {$o['r_name']} masa terima hadiah:\n$track\n\n" : "📦 Status order:\n$track\n\n")
     . "🎁 Sebagai tanda terima kasih, ada *hadiah istimewa* untuk order awak yang seterusnya. Tekan untuk tuntut:\n$track#gift\n\n"
-    . (!rcp_reachable($o) && !empty(aftercare($o)['rcp_code']) ? "💌 Kami sediakan halaman kenangan untuk *{$o['r_name']}* (ayat kad, gambar dan hadiah kecil). Boleh forward link ni kepada dia ya:\n" . rcp_url($o) . "\n\n" : '')
     . "⭐ Kalau sudi, kongsikan pengalaman awak di Google. Ia sangat membantu bisnes kecil kami:\n" . review_url() . "\n\nTerima kasih kerana memilih 100 Blooms 💕";
 }
 /** Apology message the team sends by hand for a problem order (voucher and/or replacement are optional). */
@@ -765,7 +763,7 @@ function aftercare_sweep(): void {
     $at = (string)(jdec($o['del_steps'])['delivered']['at'] ?? '');
     if ($at === '' || $at < $since || $at > $cut) continue;
     $a = aftercare($o); $a['offer'] = true; $a['auto_at'] = date('Y-m-d H:i:s'); aftercare_save((int)$o['id'], $a); $o['aftercare'] = json_encode($a);
-    try { rcp_voucher($o); $o = q('SELECT * FROM orders WHERE id=?', [$o['id']])->fetch(); } catch (Throwable $e) { error_log('100blooms rcp voucher: ' . $e->getMessage()); }
+    if (rcp_reachable($o)) try { rcp_voucher($o); $o = q('SELECT * FROM orders WHERE id=?', [$o['id']])->fetch(); } catch (Throwable $e) { error_log('100blooms rcp voucher: ' . $e->getMessage()); }
     wa_order($o, 'aftercare');
   }
 }

@@ -227,9 +227,9 @@ case 'aftermsg': // after-delivery / apology message: sent straight away through
   $m = need_login(); $o = load_order((int)($body['id'] ?? 0)); $who = (string)($body['who'] ?? '');
   if ($o['pay_status'] !== 'paid') fail('Order belum dibayar.');
   $now = date('Y-m-d H:i:s');
-  if ($who === 'rcp' && !rcp_reachable($o)) fail('Nombor penerima sama dengan nombor pembeli (atau tiada). Halaman hadiah dimasukkan dalam mesej terima kasih pembeli untuk di-forward.');
+  if ($who === 'rcp' && !rcp_reachable($o)) fail('Nombor penerima sama dengan nombor pembeli (atau tiada), jadi mesej penerima tak dihantar.');
   if ($who === 'rcp') { rcp_voucher($o); $o = load_order((int)$o['id']); $phone = wa_num(first_phone((string)$o['r_phone'])); if (strlen($phone) < 10) fail('Nombor penerima tidak sah.'); $text = aftercare_msg($o, 'rcp'); $type = 'rcp_gift'; }
-  elseif ($who === 'buyer') { if (!rcp_reachable($o)) { rcp_voucher($o); $o = load_order((int)$o['id']); } $phone = wa_num($o['b_phone']); $text = aftercare_msg($o, 'buyer'); $type = 'buyer_done'; }
+  elseif ($who === 'buyer') { $phone = wa_num($o['b_phone']); $text = aftercare_msg($o, 'buyer'); $type = 'buyer_done'; }
   elseif ($who === 'issue') { if (!issue_of($o)) fail('Tiada masalah ditanda.'); $phone = wa_num($o['b_phone']); $text = issue_msg($o); $type = 'buyer_issue'; }
   else fail('Pilihan tidak sah.');
   $sent = false; $err = null;
