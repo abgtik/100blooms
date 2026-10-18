@@ -353,11 +353,12 @@ function afterCard(o){
   const a=o.aftercare||{},i=o.issue,R=o.issue_reasons||{},dlv=['sampai','selesai'].includes(o.status),open=i&&!i.resolved;
   let st;
   if(open)st=`<div class="msg bad" style="margin:0 0 10px">⚠️ Ada masalah. Mesej automatik <b>tidak</b> dihantar. Team sales follow up secara manual di bawah.</div>`;
-  else if(a.auto_at)st=`<div class="msg ok" style="margin:0 0 10px">✅ Mesej terima kasih dihantar automatik ${fmtDT(a.auto_at)}</div>`;
+  else if(a.buyer_manual_at&&a.rcp_manual_at)st=`<div class="msg ok" style="margin:0 0 10px">✅ Pembeli &amp; penerima dah dihantar secara manual. Mesej automatik takkan dihantar lagi (tiada mesej berganda).</div>`;
+  else if(a.auto_at)st=`<div class="msg ok" style="margin:0 0 10px">✅ Mesej selepas hantar diproses ${fmtDT(a.auto_at)}${a.buyer_manual_at||a.rcp_manual_at?` (yang dah dihantar manual tak dihantar semula)`:''}</div>`;
   else if(!dlv||!o.after_due)st=`<p class="mini" style="margin:0 0 10px">Selepas runner tekan <b>Dah sampai</b>, mesej terima kasih (pembeli) dan halaman hadiah (penerima) dihantar automatik ${o.wa_on?'30 minit kemudian':'— WhatsApp automatik belum disambung, guna butang manual'}. Kalau ada masalah, tandakan dulu supaya mesej automatik tak keluar.</p>`;
   else if(!o.after_auto)st=`<p class="mini" style="margin:0 0 10px">Order ni dihantar sebelum ciri ni aktif. Mesej automatik tak dihantar. Guna butang manual jika perlu.</p>`;
   else if(!o.wa_on)st=`<div class="msg bad" style="margin:0 0 10px">WhatsApp automatik belum disambung / dimatikan. Hantar manual guna butang di bawah.</div>`;
-  else st=`<p class="mini" style="margin:0 0 10px">⏳ Mesej automatik dijadualkan sekitar <b>${fmtDT(o.after_due)}</b>. Ada masalah? Tandakan sebelum masa tu.</p>`;
+  else st=`<p class="mini" style="margin:0 0 10px">⏳ Mesej automatik dijadualkan sekitar <b>${fmtDT(o.after_due)}</b>. Ada masalah? Tandakan sebelum masa tu.${a.buyer_manual_at||a.rcp_manual_at?` <b>${a.buyer_manual_at?'Pembeli':'Penerima'}</b> dah dihantar manual, jadi takkan dihantar lagi secara automatik.`:' Kalau awak tekan butang di bawah, mesej automatik untuk orang tu dibatalkan (tak berganda).'}</p>`;
   const info=[a.buyer_manual_at?`Terima kasih (manual) ${fmtDT(a.buyer_manual_at)}`:'',a.gift?`🎁 Hadiah dituntut: <b>${h(a.gift.code)}</b> (${a.gift.choice==='rm10'?'RM10 off':'1 polaroid'})`:a.offer?'🎁 Hadiah belum dituntut':'',
     a.rcp_code?`💌 Kod penerima: <b>${h(a.rcp_code)}</b>`:'',a.rcp_manual_at?`Penerima (manual) ${fmtDT(a.rcp_manual_at)}`:'',a.rcp_viewed_at?`👀 Penerima buka halaman ${fmtDT(a.rcp_viewed_at)}`:''].filter(Boolean);
   const chk=k=>i&&(i.reasons||[]).includes(k)?' checked':'';

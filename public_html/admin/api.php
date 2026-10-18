@@ -226,9 +226,10 @@ case 'aftermsg': // message text for the team to send by hand (WhatsApp opens wi
   $a = aftercare($o); $now = date('Y-m-d H:i:s');
   if ($who === 'issue') { $i = issue_of($o); if (!$i) fail('Tiada masalah ditanda.'); $i['msg_at'] = $now; $i['msg_by'] = $m['name'];
     q('UPDATE orders SET issue=? WHERE id=?', [json_encode($i, JSON_UNESCAPED_UNICODE), $o['id']]); json_out(['phone' => wa_num($o['b_phone']), 'text' => issue_msg($o)]); }
-  if ($who === 'rcp') { rcp_voucher($o); $o = load_order((int)$o['id']); $a = aftercare($o); $a['rcp_manual_at'] = $now; aftercare_save((int)$o['id'], $a);
+  $markSent = function (string $key) use ($o, $now) { $l = jdec($o['wa_log'] ?? null); $l[$key] = $l[$key] ?? $now; q('UPDATE orders SET wa_log=? WHERE id=?', [json_encode($l), $o['id']]); }; // the automatic message then skips it (no double)
+  if ($who === 'rcp') { $markSent('rcp_gift'); rcp_voucher($o); $o = load_order((int)$o['id']); $a = aftercare($o); $a['rcp_manual_at'] = $now; aftercare_save((int)$o['id'], $a);
     $rp = first_phone((string)$o['r_phone']); if ($rp === '') fail('Nombor penerima tidak sah.'); json_out(['phone' => wa_num($rp), 'text' => aftercare_msg($o, 'rcp')]); }
-  if ($who === 'buyer') { $a['offer'] = true; $a['buyer_manual_at'] = $now; aftercare_save((int)$o['id'], $a); json_out(['phone' => wa_num($o['b_phone']), 'text' => aftercare_msg($o, 'buyer')]); }
+  if ($who === 'buyer') { $markSent('buyer_done'); $a['offer'] = true; $a['buyer_manual_at'] = $now; aftercare_save((int)$o['id'], $a); json_out(['phone' => wa_num($o['b_phone']), 'text' => aftercare_msg($o, 'buyer')]); }
   fail('Pilihan tidak sah.');
 
 case 'prep': // tick / untick a production checklist item
