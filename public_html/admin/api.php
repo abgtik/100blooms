@@ -107,7 +107,7 @@ case 'order':
   $o = q('SELECT * FROM orders WHERE id=?', [(int)($_GET['id'] ?? 0)])->fetch(); if (!$o) fail('Order tidak dijumpai.', 404);
   $o['track_url'] = SITE_URL . '/semak/?c=' . rawurlencode($o['code']) . '&k=' . $o['token'];
   $o['src'] = order_source($o); $o['doc_invoice'] = doc_url($o, 'invoice');
-  $o['issue'] = issue_of($o) ?: null; $o['aftercare'] = aftercare($o) ?: null; $o['issue_reasons'] = ISSUE_REASONS; $o['rcp_url'] = rcp_url($o);
+  $o['issue'] = issue_of($o) ?: null; $o['aftercare'] = aftercare($o) ?: null; $o['issue_reasons'] = ISSUE_REASONS; $o['rcp_url'] = rcp_url($o); $o['rcp_ok'] = rcp_reachable($o);
   $dAt = (string)(jdec($o['del_steps'])['delivered']['at'] ?? ''); $o['after_due'] = $dAt !== '' ? date('Y-m-d H:i:s', strtotime($dAt) + AFTERCARE_MIN * 60) : null;
   $o['after_auto'] = $dAt !== '' && $dAt >= (string)setting('aftercare_since', '9999') ; $o['wa_on'] = wa_ready('buyer_done'); $o['doc_receipt'] = doc_url($o, 'receipt');
   unset($o['token']);
@@ -126,6 +126,9 @@ case 'update':
     else fail('Status tidak sah.');
   }
   if (array_key_exists('notes', $body)) { $set[] = 'notes=?'; $P[] = str_in($body['notes'], 2000); }
+  if (isset($body['r_name'])) { $v = str_in($body['r_name'], 100); if ($v === '') fail('Nama penerima tak boleh kosong.'); $set[] = 'r_name=?'; $P[] = $v; }
+  if (isset($body['r_phone'])) { $v = str_in($body['r_phone'], 60); if (strlen(digits($v)) < 9) fail('Nombor telefon penerima tidak sah.'); $set[] = 'r_phone=?'; $P[] = $v; }
+  if (isset($body['r_addr'])) { $v = str_in($body['r_addr'], 500); if ($v === '') fail('Alamat tak boleh kosong.'); $set[] = 'r_addr=?'; $P[] = $v; }
   if (array_key_exists('bill_to', $body)) { $b = str_in($body['bill_to'], 400); $set[] = 'bill_to=?'; $P[] = $b !== '' ? $b : null; }
   if (isset($body['del_date'])) { // customer may change the delivery date (no refunds policy)
     $d = DateTimeImmutable::createFromFormat('!Y-m-d', (string)$body['del_date']);
@@ -224,8 +227,9 @@ case 'aftermsg': // after-delivery / apology message: sent straight away through
   $m = need_login(); $o = load_order((int)($body['id'] ?? 0)); $who = (string)($body['who'] ?? '');
   if ($o['pay_status'] !== 'paid') fail('Order belum dibayar.');
   $now = date('Y-m-d H:i:s');
+  if ($who === 'rcp' && !rcp_reachable($o)) fail('Nombor penerima sama dengan nombor pembeli (atau tiada). Halaman hadiah dimasukkan dalam mesej terima kasih pembeli untuk di-forward.');
   if ($who === 'rcp') { rcp_voucher($o); $o = load_order((int)$o['id']); $phone = wa_num(first_phone((string)$o['r_phone'])); if (strlen($phone) < 10) fail('Nombor penerima tidak sah.'); $text = aftercare_msg($o, 'rcp'); $type = 'rcp_gift'; }
-  elseif ($who === 'buyer') { $phone = wa_num($o['b_phone']); $text = aftercare_msg($o, 'buyer'); $type = 'buyer_done'; }
+  elseif ($who === 'buyer') { if (!rcp_reachable($o)) { rcp_voucher($o); $o = load_order((int)$o['id']); } $phone = wa_num($o['b_phone']); $text = aftercare_msg($o, 'buyer'); $type = 'buyer_done'; }
   elseif ($who === 'issue') { if (!issue_of($o)) fail('Tiada masalah ditanda.'); $phone = wa_num($o['b_phone']); $text = issue_msg($o); $type = 'buyer_issue'; }
   else fail('Pilihan tidak sah.');
   $sent = false; $err = null;

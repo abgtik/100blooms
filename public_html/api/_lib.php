@@ -678,6 +678,8 @@ function review_url(): string { return (string)setting('review_url', REVIEW_URL)
 function first_phone(string $p): string { $p = trim(preg_split('#[/,;]|\bdan\b|\bor\b#i', $p)[0] ?? ''); return strlen(digits($p)) >= 9 ? $p : ''; }
 /** Recipient page key: separate from the buyer's token, so the recipient never gets the buyer's tracking page. */
 function rcp_key(array $o): string { return substr(hash_hmac('sha256', (string)$o['code'], (string)$o['token']), 0, 16); }
+/** The recipient has their own number (not the buyer's), so the recipient page can be sent to them directly. */
+function rcp_reachable(array $o): bool { $rp = first_phone((string)$o['r_phone']); return $rp !== '' && norm_phone($rp) !== norm_phone((string)$o['b_phone']); }
 function rcp_url(array $o): string { return SITE_URL . '/hadiah/?c=' . rawurlencode($o['code']) . '&r=' . rcp_key($o); }
 function aftercare(array $o): array { return jdec($o['aftercare'] ?? null); }
 function aftercare_save(int $id, array $a): void { q('UPDATE orders SET aftercare=? WHERE id=?', [json_encode($a, JSON_UNESCAPED_UNICODE), $id]); }
@@ -725,6 +727,7 @@ function aftercare_msg(array $o, string $who): string {
     $first = $first === 'awak' ? 'there' : $first;
     return "Hi $first 🌸\n\nThe gift for *{$o['r_name']}* has been delivered! 🎉\n\n" . (!empty($o['recipient_photo']) ? "📸 {$o['r_name']} receiving the gift:\n$track\n\n" : "📦 Order status:\n$track\n\n")
       . "🎁 As a thank you, there's a *special gift* waiting for your next order. Tap to claim it:\n$track#gift\n\n"
+      . (!rcp_reachable($o) && !empty(aftercare($o)['rcp_code']) ? "💌 We've made a keepsake page for *{$o['r_name']}* (card message, photo and a little gift). Please forward this link to them:\n" . rcp_url($o) . "\n\n" : '')
       . "⭐ If you have a moment, we'd love to hear about your experience on Google. It really helps our small business:\n" . review_url() . "\n\nThank you for choosing 100 Blooms 💕";
   }
   if ($who === 'rcp') {
@@ -734,6 +737,7 @@ function aftercare_msg(array $o, string $who): string {
   }
   return "Hai $first 🌸\n\nHadiah untuk *{$o['r_name']}* dah selamat sampai! 🎉\n\n" . (!empty($o['recipient_photo']) ? "📸 Gambar {$o['r_name']} masa terima hadiah:\n$track\n\n" : "📦 Status order:\n$track\n\n")
     . "🎁 Sebagai tanda terima kasih, ada *hadiah istimewa* untuk order awak yang seterusnya. Tekan untuk tuntut:\n$track#gift\n\n"
+    . (!rcp_reachable($o) && !empty(aftercare($o)['rcp_code']) ? "💌 Kami sediakan halaman kenangan untuk *{$o['r_name']}* (ayat kad, gambar dan hadiah kecil). Boleh forward link ni kepada dia ya:\n" . rcp_url($o) . "\n\n" : '')
     . "⭐ Kalau sudi, kongsikan pengalaman awak di Google. Ia sangat membantu bisnes kecil kami:\n" . review_url() . "\n\nTerima kasih kerana memilih 100 Blooms 💕";
 }
 /** Apology message the team sends by hand for a problem order (voucher and/or replacement are optional). */

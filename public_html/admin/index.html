@@ -353,6 +353,7 @@ function wfCards(o){
 }
 function afterCard(o){
   if(o.pay_status!=='paid'||o.status==='batal')return '';
+  let WL={};try{WL=JSON.parse(o.wa_log||'{}')||{}}catch(e){}
   const a=o.aftercare||{},i=o.issue,R=o.issue_reasons||{},dlv=['sampai','selesai'].includes(o.status),open=i&&!i.resolved;
   let st;
   if(open)st=`<div class="msg bad" style="margin:0 0 10px">⚠️ Ada masalah. Mesej automatik <b>tidak</b> dihantar. Team sales follow up secara manual di bawah.</div>`;
@@ -367,7 +368,8 @@ function afterCard(o){
   const chk=k=>i&&(i.reasons||[]).includes(k)?' checked':'';
   return `<div class="card" id="acard"><h2>🤝 Selepas hantar</h2>${st}
    ${info.length?`<div class="mini" style="margin:0 0 10px;line-height:1.7">${info.join('<br>')}</div>`:''}
-   ${dlv?`<div class="bar" style="margin:0 0 6px">${open?'':`<button class="btn ghost sm" data-am="buyer">${a.buyer_manual_at||a.auto_at?'↻ Hantar semula terima kasih':'💬 Hantar terima kasih ke pembeli'}</button>`}<button class="btn ghost sm" data-am="rcp">${a.rcp_manual_at||a.auto_at?'↻ Hantar semula ke penerima':'💌 Hantar halaman hadiah ke penerima'}</button><a class="btn ghost sm" href="${h(o.rcp_url)}" target="_blank" rel="noopener">Lihat halaman penerima</a></div>`:''}
+   ${o.rcp_ok===false?`<p class="mini" style="margin:0 0 10px">📵 Nombor penerima sama dengan nombor pembeli (atau tiada), jadi halaman hadiah tak dihantar terus kepada penerima. Link halaman hadiah dimasukkan dalam mesej terima kasih pembeli supaya pembeli boleh forward. Kalau dapat nombor penerima sebenar, kemas kini nombor tu dan butang penerima akan keluar.</p>`:''}
+   ${dlv?`<div class="bar" style="margin:0 0 6px">${open?'':`<button class="btn ghost sm" data-am="buyer">${WL.buyer_done?'↻ Hantar semula terima kasih':'💬 Hantar terima kasih ke pembeli'}</button>`}${o.rcp_ok===false?'':`<button class="btn ghost sm" data-am="rcp">${WL.rcp_gift?'↻ Hantar semula ke penerima':'💌 Hantar halaman hadiah ke penerima'}</button>`}<a class="btn ghost sm" href="${h(o.rcp_url)}" target="_blank" rel="noopener">Lihat halaman penerima</a></div>`:''}
    ${i?`<div class="iss${i.resolved?' ok':''}"><b>${i.resolved?'✅ Masalah selesai':'⚠️ Masalah'}</b>: ${(i.reasons||[]).map(k=>h(R[k]||k)).join(', ')||'-'}${i.note?`<br><span class="mini">${h(i.note)}</span>`:''}
      <span class="mini" style="display:block">Ditanda oleh ${h(i.by||'-')} · ${fmtDT(i.at)}${i.resolved?` · selesai oleh ${h(i.resolved.by)} ${fmtDT(i.resolved.at)}`:''}${i.msg_at?` · mesej maaf ${fmtDT(i.msg_at)} (${h(i.msg_by)})`:''}</span>
      ${i.voucher?`<div style="margin-top:6px">🎟️ Voucher maaf <b>${h(i.voucher)}</b> (RM30, sah hingga ${fmtD(i.voucher_ends)})</div>`:''}
@@ -400,6 +402,10 @@ async function openOrder(id,reload){
     <div class="rowx"><span>Telefon</span><span><a href="tel:${h(o.r_phone)}">${h(o.r_phone)}</a> · <a href="${wa(o.r_phone)}" target="_blank" rel="noopener">WhatsApp</a></span></div>
     <div class="rowx"><span>Alamat</span><span>${h(o.r_addr)}, ${h(o.r_post)}<br><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.r_addr+' '+o.r_post)}" target="_blank" rel="noopener">Buka di Google Maps</a></span></div>
     <div class="rowx"><span>Zon</span><span>${o.zone==='plus20'?'Merah (+RM20)':o.zone==='out'?'Luar kawasan (kes khas)':'Biru (percuma)'}</span></div>
+    <details style="margin-top:10px"><summary class="mini" style="cursor:pointer">✏️ Kemas kini penerima (nama, telefon, alamat)</summary>
+     <div class="fgrid" style="margin-top:8px"><label class="fl">Nama penerima<input id="rn_e" value="${h(o.r_name)}" maxlength="100"></label><label class="fl">Telefon penerima<input id="rp_e" value="${h(o.r_phone)}" maxlength="60" inputmode="tel"></label></div>
+     <label class="fl">Alamat<textarea id="ra_e" rows="2" style="width:100%">${h(o.r_addr)}</textarea></label><button class="btn sm" id="rsv" style="margin-top:6px">Simpan penerima</button>
+     <p class="mini" style="margin:4px 0 0">Poskod dan caj kawasan tak dikira semula.</p></details>
     <details style="margin-top:10px"><summary class="mini" style="cursor:pointer">Tukar tarikh delivery (permintaan customer)</summary>
      <div class="bar"><input type="date" id="nd" value="${o.del_date}" aria-label="Tarikh baru"><select id="nt" aria-label="Slot">${Object.entries(DEL).map(([k,t])=>`<option value="${k}" ${k===o.del_type?'selected':''}>${t}</option>`).join('')}</select>
      <input type="time" id="ntm" value="${h(o.del_time||'')}" aria-label="Masa khusus"><button class="btn sm" id="sd">Simpan</button></div>
@@ -479,6 +485,7 @@ async function openOrder(id,reload){
   if($('#ivc'))$('#ivc').onclick=()=>navigator.clipboard.writeText(o.invoice).then(()=>toast('Invoice disalin'));
   if($('#mp'))$('#mp').onclick=()=>{const r=prompt('Rujukan bayaran dari resit pembeli (contoh: no. transaksi)');if(r&&r.trim())done(api('update',{method:'POST',body:{id,mark_paid:1,pay_ref:r.trim()}}),'Ditanda dibayar')};
   if($('#cn'))$('#cn').onclick=()=>{if(confirm('Batalkan order '+o.code+'?'))done(api('update',{method:'POST',body:{id,status:'batal'}}),'Order dibatalkan')};
+  $('#rsv').onclick=()=>done(api('update',{method:'POST',body:{id,r_name:$('#rn_e').value,r_phone:$('#rp_e').value,r_addr:$('#ra_e').value}}),'Penerima dikemas kini');
   $('#sd').onclick=()=>done(api('update',{method:'POST',body:{id,del_date:$('#nd').value,del_type:$('#nt').value,del_time:$('#ntm').value}}),'Tarikh dikemas kini');
   $('#ct').onclick=e=>{e.preventDefault();navigator.clipboard.writeText(o.track_url).then(()=>toast('Link disalin'),()=>toast('Tak dapat salin'))};
   $('#sn').onclick=()=>done(api('update',{method:'POST',body:{id,notes:$('#nn').value}}),'Nota disimpan');
