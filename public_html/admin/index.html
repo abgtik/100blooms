@@ -287,6 +287,9 @@ function bindOl(root,reload){root.querySelectorAll('[data-lid]').forEach(b=>b.on
     const d=box.querySelector('[data-oldel]');if(d)d.onclick=async()=>{if(!confirm(`Padam order Orderla ${o.invoice_no||o.code_id} dari sistem ni? Sync automatik takkan bawa balik. (Data di Orderla tak terjejas.)`))return;
       try{await api('oldel',{method:'POST',body:{id:o.id}});toast('Order dipadam');reload&&reload()}catch(e){toast(e.message)}};
   }catch(e){toast(e.message)}})}
+/* textareas that grow with their text (long wishcards from WhatsApp), with a character count */
+function grow(t){if(!t)return;t.style.height='auto';t.style.height=(t.scrollHeight+4)+'px';let c=t.nextElementSibling;if(!c||!c.classList.contains('gcount')){c=document.createElement('span');c.className='mini gcount';c.style.cssText='display:block;text-align:right';t.after(c)}c.textContent=t.value.length+' aksara'}
+document.addEventListener('input',e=>{if(e.target.matches&&e.target.matches('textarea[data-grow]'))grow(e.target)});
 /* ---------- orders ---------- */
 async function Orders(el){
   const F=[['today','Hantar hari ini'],['paid','Perlu diuruskan'],['pending','Menunggu bayaran'],['delivered','Selesai'],['issue','⚠️ Perlu follow up'],['all','Semua']];
@@ -421,7 +424,7 @@ async function openOrder(id,reload){
     <div id="wv"><div class="wishbox" id="wb">${h(o.wish)}${o.sender?`\n\n— ${h(o.sender)}`:''}</div>
     ${+o.wish_edits?`<p class="mini" style="margin:6px 0 0">Pembeli dah edit ${+o.wish_edits} / 3 kali melalui halaman semak.</p>`:''}
     <div class="bar" style="margin-bottom:0"><button class="btn ghost sm" id="ew">Edit ayat</button><button class="btn ghost sm" id="cw">Salin ayat</button><button class="btn ghost sm" id="pw">Cetak kad</button></div></div>
-    <div id="we" hidden><textarea id="wt" rows="6" maxlength="2000" style="width:100%" aria-label="Ayat wishcard">${h(o.wish==='(Ayat wishcard belum diterima)'?'':o.wish)}</textarea>
+    <div id="we" hidden><textarea id="wt" rows="6" maxlength="2000" data-grow style="width:100%;min-height:140px" aria-label="Ayat wishcard">${h(o.wish==='(Ayat wishcard belum diterima)'?'':o.wish)}</textarea>
     <label class="fl" style="margin-top:6px">Daripada<input id="ws" maxlength="60" value="${h(o.sender||'')}"></label>
     <div class="bar" style="margin-bottom:0"><button class="btn sm" id="wsv">Simpan wishcard</button><button class="btn ghost sm" id="wcx">Batal</button></div></div></div>
    <div class="card"><h2>Pembeli</h2>
@@ -474,7 +477,7 @@ async function openOrder(id,reload){
   $('#sn').onclick=()=>done(api('update',{method:'POST',body:{id,notes:$('#nn').value}}),'Nota disimpan');
   $('#cw').onclick=()=>{navigator.clipboard.writeText($('#wb').innerText).then(()=>toast('Ayat disalin'),()=>toast('Tak dapat salin'))};
   $('#pw').onclick=()=>{const w=window.open('','_blank');w.document.write(`<!doctype html><title>Wishcard ${h(o.code)}</title><style>@page{size:A6;margin:12mm}body{font:${(n=>n>900?'9pt/1.4':n>600?'10.5pt/1.45':n>400?'12pt/1.5':n>300?'13.5pt/1.55':'15pt/1.6')($('#wb').innerText.length)} Georgia,serif;color:#3b2732;white-space:pre-wrap;display:flex;align-items:center;min-height:90vh}</style><body>${$('#wb').innerHTML}<script>print()<\/script>`);w.document.close()};
-  $('#ew').onclick=()=>{$('#wv').hidden=true;$('#we').hidden=false;$('#wt').focus()};$('#wcx').onclick=()=>{$('#we').hidden=true;$('#wv').hidden=false};
+  $('#ew').onclick=()=>{$('#wv').hidden=true;$('#we').hidden=false;grow($('#wt'));$('#wt').focus()};$('#wcx').onclick=()=>{$('#we').hidden=true;$('#wv').hidden=false};
   $('#wsv').onclick=()=>done(api('wish',{method:'POST',body:{id,wish:$('#wt').value,sender:$('#ws').value}}),'Wishcard disimpan');
   if($('#pau'))$('#pau').onclick=()=>{const fs=[...$('#paf').files];if(!fs.length)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fs.forEach(f=>fd.append('photo[]',f));done(api('padd',{method:'POST',body:fd}),'Polaroid dimuat naik')};
   document.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=()=>{if(confirm('Padam gambar polaroid ni?'))done(api('pdel',{method:'POST',body:{id,f:b.dataset.pdel}}),'Gambar dipadam')});
@@ -549,7 +552,7 @@ function NewOrder(el){
      ${['Bunga','Coklat'].map(g=>`<div class="adg"><span class="mini">${g}</span><div class="adl">${Object.entries(ADDONS).filter(([,a])=>a[3]===g).map(([id,[n,p,u]])=>`<label class="adi"><span>${h(n)}<small>RM${p}/${u}</small></span>
        <span class="stp"><button type="button" data-ad="-1" aria-label="Kurang ${h(n)}">−</button><input type="number" min="0" max="99" value="0" data-ao="${id}" aria-label="Bilangan ${h(n)}"><button type="button" data-ad="1" aria-label="Tambah ${h(n)}">+</button></span></label>`).join('')}</div></div>`).join('')}</div>
     <details class="fl full"><summary style="cursor:pointer">Kek tambahan (RM20 sepotong)</summary><div class="bar" style="margin:6px 0 0">${cakes.filter(c=>!/lain/.test(c)).map(c=>`<span class="mini" style="display:flex;align-items:center;gap:4px">${h(c)} <input type="number" min="0" max="10" value="0" data-xc="${h(c)}" style="width:62px" aria-label="Bilangan ${h(c)}"></span>`).join('')}</div></details>
-    <label class="fl full">Ayat wishcard (kosongkan jika belum terima)<textarea id="f_wish" rows="4" maxlength="2000"></textarea></label>
+    <label class="fl full">Ayat wishcard (kosongkan jika belum terima)<textarea id="f_wish" rows="4" maxlength="2000" data-grow></textarea></label>
     <label class="fl">Daripada<input id="f_sender"></label></div></div>
    <div class="card"><h2>Pembeli</h2><div class="fgrid">
     <label class="fl">Nama pembeli<input id="f_bname"></label>
@@ -602,7 +605,7 @@ function NewOrder(el){
     set('f_rpost',(F.rpost||'').replace(/\D/g,'').slice(0,5),'Poskod');
     if(F.date){const d=pasteDate(F.date);if(d)set('f_date',d,'Tarikh');else miss.push(`Tarikh: "${F.date}"`)}
     if(F.slot){const [k,t]=pasteSlot(F.slot);if(k){set('f_del',k,'Slot');if(t)set('f_time',t,'Masa')}else miss.push(`Slot: "${F.slot}"`)}
-    set('f_wish',F.wish,'Wishcard');set('f_sender',F.sender,'Daripada');
+    set('f_wish',F.wish,'Wishcard');grow($('#f_wish'));set('f_sender',F.sender,'Daripada');
     const empty=[['bq','Bouquet'],['bname','Nama pemberi'],['bphone','No. pemberi'],['rname','Nama penerima'],['rphone','No. penerima'],['raddr','Alamat'],['date','Tarikh hantar']].filter(([k])=>!F[k]).map(([,t])=>t);
     $('#pres').innerHTML=`<div class="msg ${miss.length||empty.length||chk.length?'warn':'ok'}" style="margin:8px 0 0">${got.length?`✅ Diisi: ${got.map(h).join(', ')}.`:'Tiada medan dikenal pasti. Pastikan format "Label : jawapan".'}
       ${chk.length?`<br>🔎 Semak pilihan ni: ${chk.map(h).join('; ')}.`:''}${miss.length?`<br>⚠️ Tak jumpa dalam senarai, pilih sendiri: ${miss.map(h).join('; ')}.`:''}${empty.length&&got.length?`<br>ℹ️ Customer belum isi: ${empty.map(h).join(', ')}.`:''}</div>`;
