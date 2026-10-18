@@ -556,27 +556,30 @@ const WA_TYPES = ['team_paid' => 'Team: order baru dibayar', 'team_unpaid' => 'T
 function wa_cfg(): array {
   static $c = null; if ($c !== null) return $c;
   $on = json_decode((string)setting('wa_on', ''), true);
-  return $c = ['key' => (string)setting('wa_key', ''), 'session' => (string)setting('wa_session', ''),
+  return $c = ['key' => (string)setting('wa_key', ''), 'session' => (string)setting('wa_session', ''), 'session2' => (string)setting('wa_session2', ''),
     'team' => array_values(array_filter(array_map(fn($x) => wa_num($x), explode(',', (string)setting('wa_team', WA_MAIN))))),
     'on' => array_merge(array_fill_keys(array_keys(WA_TYPES), true), is_array($on) ? $on : [])]; // new message types start switched on
 }
 function wa_num(string $p): string { $d = digits($p); if ($d === '') return ''; if (str_starts_with($d, '60')) return $d; return '60' . ltrim($d, '0'); }
-function wa_ready(string $type): bool { $c = wa_cfg(); return $c['key'] !== '' && $c['session'] !== '' && !empty($c['on'][$type]); }
+/** Which Murpati number sends this message type: team alerts use the main number; messages to buyers, recipients and agents
+ *  can go out from a second number (e.g. the same phone logged in by QR), since the official API only reaches people who chatted in the last 24h. */
+function wa_session_for(string $type): string { $c = wa_cfg(); return !str_starts_with($type, 'team_') && $c['session2'] !== '' ? $c['session2'] : $c['session']; }
+function wa_ready(string $type): bool { $c = wa_cfg(); return $c['key'] !== '' && wa_session_for($type) !== '' && !empty($c['on'][$type]); }
 $GLOBALS['WA_Q'] = [];
-function wa_queue(string $to, string $msg): void {
+function wa_queue(string $to, string $msg, string $type = 'team_'): void {
   $to = wa_num($to); if (strlen($to) < 10) return;
   if (!$GLOBALS['WA_Q']) register_shutdown_function('wa_flush');
-  $GLOBALS['WA_Q'][] = [$to, $msg];
+  $GLOBALS['WA_Q'][] = [$to, $msg, wa_session_for($type)];
 }
 function wa_flush(): void {
   $q = $GLOBALS['WA_Q']; $GLOBALS['WA_Q'] = []; if (!$q) return;
   if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
-  foreach ($q as [$to, $msg]) { try { wa_send($to, $msg); } catch (Throwable $e) { error_log('100blooms wa: ' . $e->getMessage()); } }
+  foreach ($q as [$to, $msg, $sess]) { try { wa_send($to, $msg, $sess); } catch (Throwable $e) { error_log('100blooms wa: ' . $e->getMessage()); } }
 }
 /** Sends one text now. Throws on failure; records the latest result for the admin screen. */
-function wa_send(string $to, string $msg): array {
-  $c = wa_cfg(); if ($c['key'] === '' || $c['session'] === '') throw new RuntimeException('WhatsApp belum disediakan.');
-  [$code, $j, $raw] = wa_http('POST', '/v1/messages/send', ['session_id' => $c['session'], 'to' => wa_num($to), 'message' => $msg]);
+function wa_send(string $to, string $msg, ?string $session = null): array {
+  $c = wa_cfg(); $session = $session ?: $c['session']; if ($c['key'] === '' || $session === '') throw new RuntimeException('WhatsApp belum disediakan.');
+  [$code, $j, $raw] = wa_http('POST', '/v1/messages/send', ['session_id' => $session, 'to' => wa_num($to), 'message' => $msg]);
   $ok = $code < 400 && !empty($j['success']);
   set_setting('wa_last', json_encode(['at' => date('Y-m-d H:i:s'), 'to' => substr(wa_num($to), 0, -4) . '****', 'ok' => $ok, 'error' => $ok ? null : ($j['error'] ?? "HTTP $code " . mb_substr($raw, 0, 120))], JSON_UNESCAPED_UNICODE));
   if (!$ok) throw new RuntimeException('Murpati: ' . ($j['error'] ?? "HTTP $code"));
@@ -607,7 +610,7 @@ function wa_order(array $o, string $event): void {
     $miss = (int)$o['photo_count'] - count(jdec($o['photos'])); if ($miss > 0) { $need[] = "upload $miss gambar polaroid"; $needE[] = "upload $miss polaroid photo" . ($miss > 1 ? 's' : ''); }
     $add = function (string $key, string $type, string $to, string $msg) use (&$log, &$sent) {
       if (isset($log[$key]) || !wa_ready($type)) return;
-      wa_queue($to, $msg); $log[$key] = date('Y-m-d H:i:s'); $sent[] = $key;
+      wa_queue($to, $msg, $type); $log[$key] = date('Y-m-d H:i:s'); $sent[] = $key;
     };
     if ($event === 'paid') {
       $bal = $C['bal'][$o['balloon']] ?? $o['balloon']; $bc = $M['bal'][$o['balloon']]['code'] ?? '';
@@ -779,7 +782,7 @@ function unpaid_sweep(): void {
     wa_order($o, 'unpaid');
   }
 }
-function wa_agent(array $ag, string $type, string $msg): void { if (wa_ready($type)) wa_queue($ag['phone'], $msg); }
+function wa_agent(array $ag, string $type, string $msg): void { if (wa_ready($type)) wa_queue($ag['phone'], $msg, $type); }
 function fmt_day_l(string $ymd, bool $en): string { return $en ? date('D, j M', strtotime($ymd)) : fmt_day($ymd); }
 function fmt_day(string $ymd): string {
   $t = strtotime($ymd); $D = ['Ahad', 'Isnin', 'Selasa', 'Rabu', 'Khamis', 'Jumaat', 'Sabtu']; $Mo = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogos', 'Sep', 'Okt', 'Nov', 'Dis'];

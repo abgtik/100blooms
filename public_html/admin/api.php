@@ -380,12 +380,13 @@ case 'waset': // owner: WhatsApp (Murpati) settings; the API key is never sent b
     if (isset($body['key']) && trim((string)$body['key']) !== '') set_setting('wa_key', trim((string)$body['key']));
     if (!empty($body['clear_key'])) { set_setting('wa_key', null); set_setting('wa_session', null); }
     if (isset($body['session'])) set_setting('wa_session', preg_replace('/[^A-Za-z0-9_:.-]/', '', (string)$body['session']) ?: null);
+    if (isset($body['session2'])) set_setting('wa_session2', preg_replace('/[^A-Za-z0-9_:.-]/', '', (string)$body['session2']) ?: null);
     if (isset($body['team'])) set_setting('wa_team', implode(',', array_filter(array_map('wa_num', explode(',', (string)$body['team'])))));
     if (isset($body['on']) && is_array($body['on'])) set_setting('wa_on', json_encode(array_map(fn($k) => !empty($body['on'][$k]), array_combine(array_keys(WA_TYPES), array_keys(WA_TYPES)))));
     json_out(['ok' => true]);
   }
   $k = (string)setting('wa_key', ''); $c = wa_cfg();
-  json_out(['has_key' => $k !== '', 'key_hint' => $k !== '' ? substr($k, 0, 3) . '…' . substr($k, -4) : '', 'session' => $c['session'], 'team' => implode(', ', $c['team']),
+  json_out(['has_key' => $k !== '', 'key_hint' => $k !== '' ? substr($k, 0, 3) . '…' . substr($k, -4) : '', 'session' => $c['session'], 'session2' => $c['session2'], 'team' => implode(', ', $c['team']),
     'on' => $c['on'], 'types' => WA_TYPES, 'last' => json_decode((string)setting('wa_last', ''), true)]);
 
 case 'wasess': // owner: numbers connected in Murpati, to pick the sending number
@@ -398,7 +399,8 @@ case 'wasess': // owner: numbers connected in Murpati, to pick the sending numbe
 
 case 'watest': // owner: send a test message now
   need_owner(); $to = wa_num((string)($body['to'] ?? '')); if (strlen($to) < 10) fail('Isi nombor WhatsApp yang sah.');
-  try { wa_send($to, "✅ Ujian notifikasi 100 Blooms.\nKalau awak terima mesej ni, notifikasi WhatsApp dah berfungsi."); }
+  try { $s2 = !empty($body['second']) && wa_cfg()['session2'] !== '' ? wa_cfg()['session2'] : null;
+    wa_send($to, "✅ Ujian notifikasi 100 Blooms" . ($s2 ? ' (nombor pelanggan)' : '') . ".\nKalau awak terima mesej ni, notifikasi WhatsApp dah berfungsi.", $s2); }
   catch (Throwable $e) { fail($e->getMessage(), 502); }
   json_out(['ok' => true]);
 

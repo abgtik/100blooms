@@ -975,12 +975,14 @@ async function Acc(el){
     <p class="mini" style="margin-top:0">Mesej automatik kepada team, pembeli dan agent. API key dari Murpati → Settings (pelan Pro ke atas).</p>
     <label class="fl">API key ${w.has_key?`<span class="mini">· disimpan (${h(w.key_hint)})</span>`:''}<input id="wak" type="password" autocomplete="off" placeholder="${w.has_key?'Biarkan kosong untuk kekalkan':'sk_...'}"></label>
     <div class="bar" style="margin:8px 0"><button class="btn ghost sm" id="was">Simpan key &amp; cari nombor</button>${w.has_key?'<button class="btn ghost sm" id="wax">Buang key</button>':''}</div>
-    <label class="fl">Nombor yang menghantar<select id="wan"><option value="${h(w.session)}">${w.session?h(w.session):'Simpan key dulu, kemudian pilih nombor'}</option></select></label>
+    <label class="fl">Nombor yang menghantar (notifikasi team)<select id="wan"><option value="${h(w.session)}">${w.session?h(w.session):'Simpan key dulu, kemudian pilih nombor'}</option></select></label>
+    <label class="fl" style="margin-top:8px">Nombor untuk mesej pembeli, penerima &amp; agent<select id="wan2"><option value="${h(w.session2||'')}">${w.session2?h(w.session2):'Sama seperti di atas'}</option></select></label>
+    <p class="mini" style="margin:4px 0 0">API rasmi hanya boleh hantar kepada orang yang chat dalam 24 jam terakhir. Pilih nombor log masuk QR (peranti biasa) di sini supaya mesej sampai kepada penerima.</p>
     <label class="fl" style="margin-top:8px">Nombor team yang terima notifikasi order (pisah dengan koma)<input id="wat" value="${h(w.team)}" placeholder="601165862584, 60143467099"></label>
     <div style="margin:10px 0 4px"><b class="mini" style="color:var(--ink)">Hantar mesej bila:</b></div>
     ${Object.entries(w.types).map(([k,t])=>`<label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" data-wa="${k}" ${w.on[k]?'checked':''} style="width:auto"> ${h(t)}</label>`).join('')}
     <button class="btn sm" id="wasv" style="margin-top:10px">Simpan tetapan</button>
-    <div class="bar" style="margin:14px 0 0"><input id="wtn" placeholder="No. untuk ujian, cth 0123456789" aria-label="Nombor ujian"><button class="btn ghost sm" id="wts">Hantar mesej ujian</button></div>
+    <div class="bar" style="margin:14px 0 0"><input id="wtn" placeholder="No. untuk ujian, cth 0123456789" aria-label="Nombor ujian"><button class="btn ghost sm" id="wts">Hantar mesej ujian</button><button class="btn ghost sm" id="wts2">Uji nombor pelanggan</button></div>
     <p class="mini" id="wal" style="margin:8px 0 0">${w.last?`Mesej terakhir ${fmtDT(w.last.at)} ke ${h(w.last.to)}: ${w.last.ok?'<b style="color:var(--ok)">berjaya</b>':`<b style="color:var(--bad)">gagal</b> (${h(w.last.error||'')})`}`:'Belum ada mesej dihantar.'}</p></div>`;}
   if(ME.role==='owner'){const bz=(await api('biz')).biz;users+=`<div class="card" id="bzc"><h2>🧾 Maklumat syarikat (invoice &amp; resit)</h2><p class="mini" style="margin-top:0">Dipapar di bahagian atas setiap invoice dan resit PDF.</p>
     <div class="grid2">${[['name','Nama syarikat'],['reg','No. pendaftaran (SSM)'],['phone','Telefon'],['email','Email (tak wajib)']].map(([k,t])=>`<label class="fl">${t}<input id="bz_${k}" value="${h(bz[k]||'')}"></label>`).join('')}</div>
@@ -1002,11 +1004,14 @@ async function Acc(el){
   if($('#qru'))$('#qru').onclick=async()=>{const f=$('#qrf').files[0];if(!f)return toast('Pilih gambar QR dulu');const fd=new FormData();fd.append('file',f);try{await api('qrup',{method:'POST',body:fd});const im=$('#qrp');im.src='../api/bankqr.php?t='+Date.now();im.style.display='block';toast('QR disimpan')}catch(e){toast(e.message)}};
   if($('#bks'))$('#bks').onclick=async()=>{try{await api('payset',{method:'POST',body:{bank_text:$('#bkt').value}});toast('Maklumat akaun disimpan')}catch(e){toast(e.message)}};
   if($('#wac')){
-    const sess=async()=>{try{const r=await api('wasess');const cur=$('#wan').value;$('#wan').innerHTML=r.rows.length?r.rows.map(x=>`<option value="${h(x.id)}" ${x.id===cur?'selected':''}>${h(x.phone||x.id)}${x.name?' · '+h(x.name):''} · ${x.pipeline==='official'?'API rasmi':'peranti biasa'}${x.status?' · '+h(x.status):''}</option>`).join(''):'<option value="">Tiada nombor disambung dalam Murpati</option>'}catch(e){toast(e.message)}};
+    const sess=async()=>{try{const r=await api('wasess');const cur=$('#wan').value,cur2=$('#wan2').value,opt=(x,c)=>`<option value="${h(x.id)}" ${x.id===c?'selected':''}>${h(x.phone||x.id)}${x.name?' · '+h(x.name):''} · ${x.pipeline==='official'?'API rasmi':'peranti biasa (QR)'}${x.status?' · '+h(x.status):''}</option>`;
+      $('#wan').innerHTML=r.rows.length?r.rows.map(x=>opt(x,cur)).join(''):'<option value="">Tiada nombor disambung dalam Murpati</option>';
+      $('#wan2').innerHTML='<option value="">Sama seperti di atas</option>'+r.rows.map(x=>opt(x,cur2)).join('')}catch(e){toast(e.message)}};
     $('#was').onclick=async()=>{const k=$('#wak').value.trim();try{if(k)await api('waset',{method:'POST',body:{key:k}});$('#wak').value='';await sess();toast('Pilih nombor, kemudian Simpan tetapan')}catch(e){toast(e.message)}};
     if($('#wax'))$('#wax').onclick=async()=>{if(!confirm('Buang API key? Notifikasi WhatsApp akan berhenti.'))return;await api('waset',{method:'POST',body:{clear_key:1}});Acc(el)};
     $('#wasv').onclick=async()=>{const on={};el.querySelectorAll('[data-wa]').forEach(c=>on[c.dataset.wa]=c.checked);
-      try{await api('waset',{method:'POST',body:{session:$('#wan').value,team:$('#wat').value,on}});toast('Tetapan WhatsApp disimpan')}catch(e){toast(e.message)}};
+      try{await api('waset',{method:'POST',body:{session:$('#wan').value,session2:$('#wan2').value,team:$('#wat').value,on}});toast('Tetapan WhatsApp disimpan')}catch(e){toast(e.message)}};
+    $('#wts2').onclick=async()=>{try{await api('watest',{method:'POST',body:{to:$('#wtn').value,second:1}});toast('Mesej ujian dihantar dari nombor pelanggan.')}catch(e){toast(e.message)}};
     $('#wts').onclick=async()=>{$('#wts').disabled=true;try{await api('watest',{method:'POST',body:{to:$('#wtn').value}});toast('Mesej ujian dihantar. Semak WhatsApp.')}catch(e){toast(e.message)}$('#wts').disabled=false;
       const w=await api('waset');if(w.last)$('#wal').innerHTML=`Mesej terakhir ${fmtDT(w.last.at)} ke ${h(w.last.to)}: ${w.last.ok?'<b style="color:var(--ok)">berjaya</b>':`<b style="color:var(--bad)">gagal</b> (${h(w.last.error||'')})`}`};
     if(/^sess_|^official:/.test($('#wan').value))sess();
