@@ -830,11 +830,14 @@ const SCR={
    <p class="sub">Kami dah sediakan 3 cadangan. Pilih satu dan edit, atau tulis sendiri dari kosong.</p>
    <div class="sugg">${ts.map((t,i)=>`<button class="sug" data-i="${i}" aria-pressed="${S.wishPick===i}"><em>Cadangan ${i+1}</em>${h(t)}</button>`).join('')}
     <button class="sug" data-i="blank" aria-pressed="${S.wishPick==='blank'}"><em>Tulis sendiri</em>Mula dari kosong</button></div>
-   <div class="field"><label for="wtext">Ayat kad (boleh edit)</label><textarea id="wtext" maxlength="320" placeholder="Tulis ucapan awak di sini…">${h(S.wish)}</textarea>
-    <span class="hint" id="wcount"></span></div>
+   <div class="field"><label for="wtext">Ayat kad (boleh edit)</label><textarea id="wtext" ${HQ?'maxlength="2000" ':''}placeholder="Tulis ucapan awak di sini…">${h(S.wish)}</textarea>
+    <span class="hint" id="wcount"></span><div id="wlong" style="scroll-margin-bottom:130px"></div></div>
    <div class="field"><label for="sender">Daripada</label><input id="sender" type="text" maxlength="40" placeholder="Nama awak, atau 'Secret admirer'" value="${h(S.sender)}"></div>`;
   const env=$('#env');requestAnimationFrame(()=>setTimeout(()=>env.classList.add('open'),opened?0:250));el.dataset.opened=1;
-  const ta=$('#wtext'),cnt=()=>{$('#wcount').textContent=ta.value.length+'/320 aksara';foot('Seterusnya',ta.value.trim().length>0)};
+  const WMAX=HQ?2000:320,ta=$('#wtext'),cnt=()=>{const n=ta.value.length,over=n>WMAX;$('#wcount').textContent=n+'/'+WMAX+' aksara';$('#wcount').style.color=over?'var(--bad)':'';
+    $('#wlong').innerHTML=over?`<div class="status bad" style="margin-top:6px">Ayat terlalu panjang (${n} aksara). Maksimum ${WMAX} aksara supaya muat dalam kad. Sila pendekkan ${n-WMAX} aksara lagi.</div>`:'';
+    foot('Seterusnya',ta.value.trim().length>0&&!over)};
+  ta.addEventListener('paste',()=>setTimeout(()=>{if(ta.value.length>WMAX)$("#wlong").scrollIntoView({block:"center",behavior:"smooth"})},0));
   el.querySelectorAll('.sug').forEach(b=>b.onclick=()=>{const i=b.dataset.i;S.wishPick=i==='blank'?'blank':+i;S.wish=i==='blank'?'':ts[+i];
     ta.value=S.wish;el.querySelectorAll('.sug').forEach(x=>x.setAttribute('aria-pressed',x===b));cnt();ta.focus();save();});
   ta.oninput=()=>{S.wish=ta.value;cnt();save()};$('#sender').oninput=e=>{S.sender=e.target.value;save()};cnt();

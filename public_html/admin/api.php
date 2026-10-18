@@ -292,7 +292,7 @@ case 'rphoto':
 
 case 'wish': // staff write / correct the wishcard (no edit limit)
   $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
-  $wish = str_in($body['wish'] ?? '', 320); if ($wish === '') $wish = WISH_NONE;
+  $wish = str_in($body['wish'] ?? '', WISH_MAX_STAFF); if ($wish === '') $wish = WISH_NONE;
   q('UPDATE orders SET wish=?, sender=?, updated_by=? WHERE id=?', [$wish, str_in($body['sender'] ?? '', 60) ?: null, $m['name'], $o['id']]);
   json_out(['ok' => true]);
 
@@ -826,7 +826,7 @@ case 'hqorder': // Sales HQ page (/sales/): customer order flow, saved under thi
   $m = need_login(); if (!$post) fail('POST sahaja.', 405);
   $d = json_decode((string)($_POST['data'] ?? ''), true); if (!is_array($d)) fail('Data order tidak lengkap.');
   $files = collect_photos();
-  $r = build_order($d, count($files));
+  $r = build_order($d, count($files), null, ['staff' => true]);
   if (isset($r['errors'])) fail(implode(' ', $r['errors']), 422);
   $o = $r['order'];
   $o['code'] = new_code(); $o['token'] = bin2hex(random_bytes(12)); $o['created_at'] = date('Y-m-d H:i:s');

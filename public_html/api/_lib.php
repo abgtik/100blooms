@@ -978,6 +978,8 @@ function voucher_apply(array $L, array $v, int $photoCount, float $setSubtotal) 
 
 // ---------- order validation + pricing (authoritative; the app only previews) ----------
 /** $opts (admin only): override → skip stock, closing-time, closed-date and zone checks; adjust → [amount, label] extra price line. */
+const WISH_MAX = 320;        // customers: what fits nicely on the card
+const WISH_MAX_STAFF = 2000; // team (admin, + Order, Sales HQ): no practical limit for long requests from WhatsApp
 function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null, array $opts = []): array {
   $ov = !empty($opts['override']);
   $now = $now ?? new DateTimeImmutable('now');
@@ -1015,7 +1017,7 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
   if ($extraN > MAX_EXTRA_CAKE) $E[] = 'Maksimum ' . MAX_EXTRA_CAKE . ' kek tambahan.';
   if ($photoCount > MAX_PHOTOS) $E[] = 'Maksimum ' . MAX_PHOTOS . ' gambar.';
 
-  $wish = str_in($in['wish'] ?? '', 320); if ($wish === '') $E[] = 'Ayat wishcard belum diisi.';
+  $wish = str_in($in['wish'] ?? '', !empty($opts['manual']) || !empty($opts['staff']) ? WISH_MAX_STAFF : WISH_MAX); if ($wish === '') $E[] = 'Ayat wishcard belum diisi.';
   $sender = str_in($in['sender'] ?? '', 40);
   $rname = str_in($in['rname'] ?? '', 80); if ($rname === '') $E[] = 'Nama penerima belum diisi.';
   $rphone = str_in($in['rphone'] ?? '', 20); if (strlen(digits($rphone)) < 9) $E[] = 'Nombor telefon penerima tidak sah.';

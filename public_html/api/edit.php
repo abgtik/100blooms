@@ -16,7 +16,7 @@ $a = (string)($in['a'] ?? '');
 
 if ($a === 'wish') {
   if (!$e['wish']) fail($e['wish_left'] <= 0 ? 'Had edit wishcard dah habis. WhatsApp kami jika perlu ubah lagi.' : 'Wishcard dah ditulis oleh team kami, jadi tak boleh diubah lagi. WhatsApp kami jika perlu.', 409);
-  $wish = str_in($in['wish'] ?? '', 320); $sender = str_in($in['sender'] ?? '', 60);
+  $wish = str_in($in['wish'] ?? '', WISH_MAX); $sender = str_in($in['sender'] ?? '', 60);
   if (mb_strlen($wish) < 2) fail('Tulis ayat wishcard dulu.');
   if ($wish === $o['wish'] && $sender === (string)$o['sender']) fail('Tiada perubahan.');
   q('UPDATE orders SET wish=?, sender=?, wish_edits=wish_edits+?, updated_by=? WHERE id=?', [$wish, $sender !== '' ? $sender : null, $e['wish_first'] ? 0 : 1, 'Pembeli', $o['id']]);
