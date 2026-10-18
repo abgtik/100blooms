@@ -222,6 +222,9 @@ html:not([data-nomascot]) .ranks{row-gap:26px}
 .iss{border:1.5px solid #f3b4b4;background:#fff5f5;border-radius:14px;padding:12px;margin-top:6px}.iss.ok{border-color:#b7dfc3;background:#f3fbf5}
 .ichk{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;margin:8px 0}.ichk label{display:flex;gap:6px;align-items:center;font-size:14px}
 .pg.pbad{background:#fde2e2;color:#b42318}.pg.pok{background:#e6f4ea;color:#1e7a3c}
+.askbg{position:fixed;inset:0;z-index:60;background:rgba(40,20,28,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.askc{background:var(--card,#fff);border-radius:22px;padding:22px 20px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 50px -20px rgba(0,0,0,.4)}
+.askc h2{font:600 19px var(--display);margin:8px 0 12px}.askl{display:grid;gap:8px;text-align:left}.askl div{background:var(--tint,#fff5f7);border-radius:12px;padding:10px 12px}.askl b{display:block}.askl span{font-size:13px;color:var(--soft)}
 </style>
 </head>
 <body>
@@ -463,6 +466,9 @@ async function openOrder(id,reload){
     if(st==='booked'&&$('#llm'))body.url=$('#llm').value.trim();
     if(b.dataset.force){if(!confirm('Penyediaan belum lengkap. Teruskan juga?'))return;body.force=1}
     if(st==='done'&&!(o.wa_on&&o.after_auto)&&!(o.aftercare||{}).buyer_manual_at&&!(o.issue&&!o.issue.resolved)){window.open(wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}! Hadiah untuk ${o.call_name} dah selamat sampai 🌸 Gambar penerima dan status order ada di sini: ${o.track_url}\n\nTerima kasih pilih 100 Blooms!`),'_blank','noopener')}
+    const A=o.aftercare||{},dig=x=>String(x||'').split(/[\/,]/)[0].replace(/\D/g,'').replace(/^60/,'0'),
+      ask=st==='done'&&o.wa_on&&!(o.issue&&!o.issue.resolved)?[!A.buyer_manual_at&&!A.auto_at&&'buyer',!A.rcp_manual_at&&!A.auto_at&&dig(o.r_phone).length>=9&&dig(o.r_phone)!==dig(o.b_phone)&&'rcp'].filter(Boolean):[];
+    if(ask.length)return(async()=>{try{await api('dstep',{method:'POST',body});toast('Dikemas kini');reload&&reload();await openOrder(id,reload);askAfter(id,ask,reload)}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}})();
     done(api('dstep',{method:'POST',body}),'Dikemas kini')});
   if($('#dundo'))$('#dundo').onclick=e=>{e.preventDefault();if(confirm('Undo langkah terakhir?'))done(api('dundo',{method:'POST',body:{id}}),'Langkah di-undo')};
   if($('#llsave'))$('#llsave').onclick=()=>done(api('lalamove',{method:'POST',body:{id,url:$('#lle').value.trim()}}),'Link disimpan');
@@ -501,6 +507,21 @@ async function openOrder(id,reload){
   if($('#rpu'))$('#rpu').onclick=()=>{const f=$('#rpf').files[0];if(!f)return toast('Pilih gambar dulu');const fd=new FormData();fd.append('id',id);fd.append('file',f);done(api('rphoto',{method:'POST',body:fd}),'Gambar dimuat naik')};
 }
 
+/* after "Order selesai": offer to send the after-delivery WhatsApp now instead of waiting 30 minutes */
+function askAfter(id,who,reload){
+  const L={buyer:['💬 Pembeli','terima kasih + gambar penerima + hadiah order seterusnya + link ulasan'],rcp:['💌 Penerima','halaman hadiah (ayat kad + gambar) + voucher RM10']};
+  const d=document.createElement('div');d.className='askbg';d.innerHTML=`<div class="askc" role="dialog" aria-modal="true" aria-labelledby="askt"><div style="font-size:34px;line-height:1">🌸</div>
+   <h2 id="askt">Order selesai! Hantar WhatsApp sekarang?</h2>
+   <div class="askl">${who.map(k=>`<div><b>${L[k][0]}</b><span>${L[k][1]}</span></div>`).join('')}</div>
+   <div id="askm"></div>
+   <div class="bar" style="margin:12px 0 0;justify-content:center"><button class="btn" id="asky">Ya, teruskan</button><button class="btn ghost" id="askn">Nak semak dulu!</button></div>
+   <p class="mini" style="margin:10px 0 0">Kalau semak dulu, mesej akan dihantar automatik 30 minit selepas sampai, kecuali awak tandakan ada masalah.</p></div>`;
+  document.body.appendChild(d);const close=()=>d.remove();$('#askn').onclick=close;d.onclick=e=>{if(e.target===d)close()};$('#asky').focus();
+  $('#asky').onclick=async()=>{const y=$('#asky');y.disabled=true;y.textContent='Menghantar…';const bad=[];
+    for(const w of who){try{const j=await api('aftermsg',{method:'POST',body:{id,who:w,send:1}});if(!j.sent)bad.push(L[w][0]+': '+(j.error||'gagal'))}catch(e){bad.push(L[w][0]+': '+e.message)}}
+    if(bad.length){$('#askm').innerHTML=`<div class="msg bad" style="text-align:left">${bad.map(h).join('<br>')}<br>Guna butang dalam kad "Selepas hantar" untuk cuba lagi atau hantar dari WhatsApp sendiri.</div>`;y.textContent='Tutup';y.disabled=false;y.onclick=()=>{close();reload&&reload();openOrder(id,reload)};return}
+    close();toast('✅ WhatsApp dihantar');reload&&reload();openOrder(id,reload)};
+}
 /* ---------- WhatsApp form paste helpers (+ Order) ---------- */
 const PASTE_KEYS=[[/^(occasion|momen|majlis|sempena)/,'occ'],[/^(bouquet|bunga|jambak)/,'bq'],[/^(wrap|balut)/,'bqn'],[/^(balloon|belon)/,'bal'],[/^(cake|kek)/,'cake'],
   [/^(nama\s*)?(pemberi|pembeli|pengirim)|^sender\s*name|^your\s*name/,'bname'],[/^(no\.?\s*)?(tel|telefon|phone|hp|whatsapp|wa)\.?\s*(no\.?\s*)?(pemberi|pembeli|pengirim)/,'bphone'],
