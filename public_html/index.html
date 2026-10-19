@@ -631,6 +631,7 @@ function render(){
     if(S.step>STEPS.indexOf(k)&&!ok()){S.step=STEPS.indexOf(k);break;}
   const k=STEPS[S.step];
   $('#back').disabled=S.step===0||k==='done';
+  {const h0=HS();if(!h0||h0.sheet||h0.hb!==S.step)hsSet(false);}
   const pct=Math.min(S.step,COUNTED)/COUNTED*100;
   $('#bar').style.width=pct+'%';
   $('#stepn').textContent=k==='done'?'':(Math.min(S.step+1,COUNTED+1))+'/'+(COUNTED+1);
@@ -647,9 +648,18 @@ function foot(label,ok,onClick,showTotal=true){
   $('#next').onclick=onClick||next;
   const cb=$('#cartb');if(cb)cb.onclick=showCart;
 }
-function next(){dir=1;S.step++;render()}
-function back(){if(S.step>0){dir=-1;S.step--;render()}}
+/* phone Back button / swipe-back: each step is a browser history entry, so Back goes to the previous step (or closes an open sheet) instead of leaving the site */
+const HS=()=>history.state&&typeof history.state.hb==='number'?history.state:null;
+function hsSet(push){try{const d=(HS()||{}).d||0,st={hb:S.step,sheet:false,d:push?d+1:d};push?history.pushState(st,''):history.replaceState(st,'')}catch(e){}}
+function next(){dir=1;S.step++;hsSet(true);render()}
+function back(){if(S.step>0){const h0=HS();if(h0&&h0.hb===S.step&&!h0.sheet&&h0.d>0){history.back();return}dir=-1;S.step--;hsSet(false);render()}}
 $('#back').onclick=back;
+window.addEventListener('popstate',e=>{
+  const L=$('#layer');if(L&&L.querySelector('.scrim')){L.innerHTML='';const st=e.state;if(st&&typeof st.hb==='number'&&st.hb===S.step)return;}
+  const st=e.state;if(!st||typeof st.hb!=='number')return;
+  if(['pay','done'].includes(STEPS[S.step])){hsSet(false);return}
+  if(st.hb!==S.step){dir=st.hb<S.step?-1:1;S.step=Math.max(0,Math.min(st.hb,STEPS.indexOf('sum')));render()}
+});
 
 const SCR={
  intro(el){
@@ -1008,9 +1018,9 @@ function bqArt(b){
 function balArt(c){return `<svg viewBox="0 0 100 100" aria-hidden="true"><ellipse cx="50" cy="40" rx="24" ry="28" fill="${c}"/><ellipse cx="42" cy="30" rx="6" ry="9" fill="rgba(255,255,255,.4)"/><path d="M47 68h6l-3 4z" fill="${c}"/><path d="M50 72 q-6 10 2 18" stroke="#999" fill="none"/></svg>`}
 function balCard(b){const u=(window.IMG&&IMG.bal&&IMG.bal[b.id])||'assets/img/balloon/'+b.id+'.webp';return `<button class="card" data-id="${b.id}" aria-pressed="${S.bal===b.id}"><div class="art photo" style="background:#fff">${u?`<img src="${u}" alt="Balloon ${h(b.t)}" loading="lazy">`:balArt(b.c||'#ddd')}</div><b style="font-size:14px">${h(b.t)}</b></button>`}
 function bindBal(scope){scope.querySelectorAll('.card[data-id]').forEach(c=>c.onclick=()=>{S.bal=c.dataset.id;save();closeSheet();render();});}
-function sheet(html){const L=$('#layer');L.innerHTML=`<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div></div>`;
+function sheet(html){const L=$('#layer');if(!L.querySelector('.scrim'))try{history.pushState({hb:S.step,sheet:true,d:((HS()||{}).d||0)+1},'')}catch(e){}L.innerHTML=`<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div></div>`;
   $('#scrim').onclick=e=>{if(e.target.id==='scrim')closeSheet()};return L;}
-function closeSheet(){$('#layer').innerHTML=''}
+function closeSheet(){const L=$('#layer'),had=!!L.querySelector('.scrim');L.innerHTML='';if(had&&history.state&&history.state.sheet)history.back()}
 function allBalloons(){
   const L=sheet(`<h2>Semua balloon</h2><p class="sub">Disusun ikut tema. Tekan untuk pilih.</p>`+BAL_GRP.map(g=>{const items=BALLOON.filter(b=>b.grp===g&&!isOff('bal',b.id));if(!items.length)return '';
     return `<div class="grouph">${g}</div><div class="grid">${items.map(balCard).join('')}</div>`}).join(''));
