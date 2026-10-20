@@ -180,7 +180,7 @@ async function show(o){await useLang(o.lang||'ms');
     <div id="wv">${o.wish?`<div class="wish">${h(o.wish)}${o.sender?`<span class="ws">— ${h(o.sender)}</span>`:''}</div>`:`<div class="msg warn">Ayat wishcard belum diisi. ${ed.wish?'Tulis di bawah supaya kami boleh siapkan kad.':''}</div>`}
      ${ed.wish?`<button class="btn ${o.wish?'ghost':''}" id="we">${o.wish?'Edit wishcard':'Tulis wishcard'}</button><p class="hint" style="text-align:center;margin:8px 0 0">${ed.wish_first?'Selepas disimpan, awak boleh edit 3 kali lagi.':`Baki edit: ${ed.wish_left} kali.`}</p>`
        :o.wish&&o.status!=='batal'?`<p class="hint" style="margin:8px 0 0">${ed.wish_left<=0?'Had edit wishcard dah habis.':'Wishcard dah ditulis oleh team kami.'} WhatsApp kami jika perlu ubah.</p>`:''}</div>
-    <form id="wf" hidden><label for="wt">Ayat wishcard</label><textarea id="wt" rows="6">${h(o.wish)}</textarea><p class="hint" style="margin:4px 0 0;text-align:right"><span id="wn">0</span>/320</p><div id="wlong"></div>
+    <form id="wf" hidden><label for="wt">Ayat wishcard</label><textarea id="wt" rows="6">${h(o.wish)}</textarea><p class="hint" style="margin:4px 0 0;text-align:right"><span id="wn">0</span>/600 aksara (huruf)</p><div id="wlong"></div>
      <label for="wsd">Daripada</label><input id="wsd" maxlength="60" value="${h(o.sender||'')}" placeholder="Contoh: Abang Long">
      <div id="wm"></div><button class="btn" id="wsv">Simpan wishcard</button><button class="btn ghost" type="button" id="wcx" style="margin-top:8px">Batal</button>
      ${!ed.wish_first?`<p class="hint" style="text-align:center;margin:8px 0 0">Simpan akan guna 1 daripada ${ed.wish_left} baki edit.</p>`:''}</form></section>
@@ -200,8 +200,8 @@ async function show(o){await useLang(o.lang||'ms');
     catch(x){$('#paymsg').innerHTML=`<div class="msg bad">${h(x.message)}</div>`;b.disabled=false;b.textContent='💳 Bayar sekarang · DuitNow / FPX / Kad'}};
   const reload=async()=>{const r=await fetch('/api/track.php?c='+encodeURIComponent(o.code)+'&k='+encodeURIComponent(o.k));if(r.ok)show(await r.json())};
   if($('#we')){$('#we').onclick=()=>{$('#wv').hidden=true;$('#wf').hidden=false;$('#wt').focus();$('#wt').oninput()};
-    $('#wt').oninput=()=>{const n=$('#wt').value.length,over=n>320;$('#wn').textContent=n;$('#wn').style.color=over?'var(--bad)':'';$('#wsv').disabled=over;
-      $('#wlong').innerHTML=over?`<div class="msg bad" style="margin-top:6px">Ayat terlalu panjang (${n} aksara). Maksimum 320 aksara supaya muat dalam kad. Sila pendekkan ${n-320} aksara lagi.</div>`:''};$('#wcx').onclick=()=>{$('#wf').hidden=true;$('#wv').hidden=false};
+    $('#wt').oninput=()=>{const n=[...$('#wt').value].length,over=n>600;$('#wn').textContent=n;$('#wn').style.color=over?'var(--bad)':'';$('#wsv').disabled=over;
+      $('#wlong').innerHTML=over?`<div class="msg bad" style="margin-top:6px">Ayat terlalu panjang (${n} aksara). Maksimum 600 aksara supaya muat dalam kad. Sila pendekkan ${n-600} aksara lagi.</div>`:''};$('#wcx').onclick=()=>{$('#wf').hidden=true;$('#wv').hidden=false};
     $('#wf').onsubmit=async e=>{e.preventDefault();$('#wsv').disabled=true;$('#wsv').textContent='Menyimpan…';
       try{await post({c:o.code,k:o.k,a:'wish',wish:$('#wt').value,sender:$('#wsd').value});await reload()}catch(x){$('#wm').innerHTML=`<div class="msg bad" role="alert">${h(x.message)}</div>`;$('#wsv').disabled=false;$('#wsv').textContent='Simpan wishcard'}}}
   if($('#pf'))$('#pf').onchange=async()=>{const fs=[...$('#pf').files];if(!fs.length)return;if(fs.length>o.photo_count-o.photos.length){$('#pm').innerHTML=`<div class="msg bad">Pilih ${o.photo_count-o.photos.length} gambar sahaja.</div>`;return}

@@ -173,6 +173,7 @@ R=[
 [r"^Ayat kad untuk (.+)$","Card message for %1"],
 [r"^Cadangan (\d)$","Suggestion %1"],
 [r"^(\d+)/320 aksara$","%1/320 characters"],
+[r"^(\d+) patah perkataan · (\d+)/(\d+) aksara \(huruf\)$","%1 words · %2/%3 characters"],
 [r"^(.+) dah penuh atau ditutup\. Pilih tarikh lain\.$","%1 is fully booked or closed. Please choose another date."],
 [r"^Hadiah untuk (.+) dah siap disusun$","The gift for %1 is all set"],
 [r"^(\d+) gambar$","%1 photo(s)"],

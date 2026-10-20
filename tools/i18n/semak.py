@@ -73,6 +73,8 @@ R=[
 [r"^1 polaroid percuma$","1 free polaroid"],
 [r"^Maksimum (\d+) gambar\.$","Maximum %1 photos."],
 ]
+X.update({"aksara (huruf)":"characters"})
 X.update({"Pilih satu":"Pick one","Ada hadiah untuk awak!":"There's a gift for you!","Tekan untuk pilih hadiah order seterusnya":"Tap to choose a gift for your next order"})
 R.insert(0,[r"^Ayat terlalu panjang \((\d+) aksara\)\. Maksimum (\d+) aksara supaya muat dalam kad\. Sila pendekkan (\d+) aksara lagi\.$","Message too long (%1 characters). Maximum %2 characters so it fits on the card. Please shorten it by %3 more characters."])
 R.insert(0,[r"^(\d+)/(\d+) aksara$","%1/%2 characters"])
+X.update({"/600 aksara (huruf)":"/600 characters"})

@@ -980,7 +980,7 @@ function voucher_apply(array $L, array $v, int $photoCount, float $setSubtotal) 
 
 // ---------- order validation + pricing (authoritative; the app only previews) ----------
 /** $opts (admin only): override → skip stock, closing-time, closed-date and zone checks; adjust → [amount, label] extra price line. */
-const WISH_MAX = 320;        // customers: what fits nicely on the card
+const WISH_MAX = 600;        // customers: about 100 words; the printed card shrinks its font for long messages
 const WISH_MAX_STAFF = 2000; // team (admin, + Order, Sales HQ): no practical limit for long requests from WhatsApp
 function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null, array $opts = []): array {
   $ov = !empty($opts['override']);
