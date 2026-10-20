@@ -475,7 +475,11 @@ case 'olset': // owner: Orderla API credentials (orderla.my/admin/manage-api); t
   }
   $agg = q('SELECT COUNT(*) n, MIN(created_at) a, MAX(created_at) b, COALESCE(SUM(CASE WHEN ' . OL_PAID . ' THEN total END),0) s FROM legacy_orders')->fetch();
   json_out(['email' => (string)setting('ol_email', ''), 'has_token' => (string)setting('ol_token', '') !== '', 'count' => (int)$agg['n'], 'first' => $agg['a'], 'last' => $agg['b'], 'sales' => (float)$agg['s'],
-    'synced' => setting('ol_synced')]);
+    'synced' => setting('ol_synced')] + (function () { // unique Orderla customers by phone number (all orders, and paid ones)
+      $all = []; $paid = [];
+      foreach (q('SELECT phone, (' . OL_PAID . ') AS p FROM legacy_orders WHERE phone IS NOT NULL') as $r) { $k = norm_phone((string)$r['phone']); if (strlen($k) < 8) continue;
+        $all[$k] = true; if ($r['p']) $paid[$k] = ($paid[$k] ?? 0) + 1; }
+      return ['cust' => count($all), 'cust_paid' => count($paid), 'cust_repeat' => count(array_filter($paid, fn($n) => $n > 1))]; })());
 
 case 'olreparse': // re-read delivery date / receiver from orders already imported (after the detection improves)
   need_owner(); $n = 0;
