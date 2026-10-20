@@ -185,8 +185,8 @@ const STATUS_LABEL = ['menunggu_bayaran' => 'Menunggu bayaran', 'baru' => 'Baru 
   'dalam_penghantaran' => 'Dalam penghantaran', 'sampai' => 'Dah sampai', 'selesai' => 'Selesai', 'batal' => 'Batal'];
 /** Checklist items for this order: [key => label]. Polaroid only if photos were sent, gift only if a gift voucher was used. */
 function prep_items(array $o): array {
-  $C = catalog();
-  $it = ['bouquet' => 'Bouquet ' . ($C['bq'][$o['bouquet']] ?? $o['bouquet']), 'balloon' => 'Balloon ' . ($C['bal'][$o['balloon']] ?? $o['balloon']),
+  $C = catalog(); $M = product_meta(); $code = fn($t, $id) => ($c = $M[$t][$id]['code'] ?? '') !== '' ? $c . ' - ' : ''; // product code first, so the team picks the right item
+  $it = ['bouquet' => 'Bouquet ' . $code('bq', $o['bouquet']) . ($C['bq'][$o['bouquet']] ?? $o['bouquet']), 'balloon' => 'Balloon ' . $code('bal', $o['balloon']) . ($C['bal'][$o['balloon']] ?? $o['balloon']),
     'cake' => 'Kek dibeli (' . $o['cake'] . ')'];
   if ((int)$o['photo_count'] > 0) $it['polaroid'] = 'Polaroid dicetak (' . (int)$o['photo_count'] . ' keping)';
   $it['wishcard'] = 'Wishcard ditulis';

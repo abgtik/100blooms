@@ -423,7 +423,7 @@ async function openOrder(id,reload){
      <p class="mini" style="margin:6px 0 0">Kek upgrade (Chocolate Indulgence / Chocolate Chip Walnut / Red Velvet / pilihan lain) +RM10. Kalau order dah dibayar, jumlah tak berubah dan beza harga dicatat dalam nota. Tick penyediaan untuk item yang ditukar akan dibuang.</p>
      <div class="bar" style="margin:8px 0 0"><button class="btn sm" id="tis">Simpan perubahan</button><button class="btn ghost sm" id="tic">Batal</button></div></div>
     ${o.created_by?'':`<div class="rowx"><span>Momen</span><span>${h(OCC_T()[o.occasion]||o.occasion)} · ${h(REL_T()[o.relation]||o.relation)} (${o.gender==='l'?'L':'P'}) · panggil "${h(o.call_name)}"</span></div>`}
-    <div class="rowx"><span>Bouquet</span><span><b>${h(CAT.bq[o.bouquet]||o.bouquet)}</b></span></div>
+    <div class="rowx"><span>Bouquet</span><span>${(PM.bq||{})[o.bouquet]?.code?`<b>${h(PM.bq[o.bouquet].code)}</b> - `:''}<b>${h(CAT.bq[o.bouquet]||o.bouquet)}</b></span></div>
     <div class="rowx"><span>Balloon</span><span>${(PM.bal||{})[o.balloon]?.code?`<b>${h(PM.bal[o.balloon].code)}</b> - `:''}${h(CAT.bal[o.balloon]||o.balloon)}</span></div>
     <div class="rowx"><span>Kek</span><span>${h(cakeTxt)}</span></div>
     <div class="rowx"><span>Kek tambahan</span><span>${h(ext)}</span></div>
@@ -599,7 +599,7 @@ function NewOrder(el){
     <label class="fl">Telefon penerima<input id="f_rphone" type="tel" inputmode="tel"></label>
     <label class="fl full">Alamat penuh<textarea id="f_raddr" rows="3"></textarea></label>
     <label class="fl">Poskod<input id="f_rpost" inputmode="numeric" maxlength="5"></label>
-    <label class="fl">Tarikh hantar<input id="f_date" type="date" value="${ymd(tom)}"></label>
+    <label class="fl">Tarikh hantar<input id="f_date" type="date" value="${TODAY||ymd(new Date())}"></label>
     <label class="fl">Slot<select id="f_del">${Object.entries(DEL).map(([k,t])=>`<option value="${k}">${t}</option>`).join('')}</select></label>
     <label class="fl" id="w_time" hidden>Masa khusus<input id="f_time" type="time" min="09:00" max="22:00"></label></div></div>
    <div class="card"><h2>Harga & bayaran</h2>
