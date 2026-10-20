@@ -1124,10 +1124,10 @@ function hqLogin(then){
     <div style="font-size:34px;line-height:1">🧑‍💼</div><h2 id="hqlt">Log masuk Sales HQ</h2><p class="hint" style="margin:0 0 6px">Guna akaun admin awak sendiri. Setiap order disimpan atas nama awak.</p>
     <div class="field"><label for="hqe">Email</label><input id="hqe" type="email" autocomplete="username" required></div>
     <div class="field"><label for="hqp">Password</label><div class="hqpw"><input id="hqp" type="password" autocomplete="current-password" required><button type="button" id="hqeye" aria-label="Tunjuk password" aria-pressed="false">👁</button></div></div>
-    <div id="hqerr"></div><button class="btn" type="submit" style="flex:none;width:100%">Log masuk</button></form></div>`;
+    <label class="rmb" style="display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:500;cursor:pointer"><input type="checkbox" id="hqrm" checked style="width:18px;height:18px;margin:0;flex:none"> Ingat saya di peranti ini (60 hari)</label><div id="hqerr"></div><button class="btn" type="submit" style="flex:none;width:100%">Log masuk</button></form></div>`;
   $('#hqeye').onclick=()=>{const i=$('#hqp'),on=i.type==='password';i.type=on?'text':'password';$('#hqeye').setAttribute('aria-pressed',on);$('#hqeye').setAttribute('aria-label',on?'Sembunyi password':'Tunjuk password')};
   $('#hqf').onsubmit=async e=>{e.preventDefault();$('#hqerr').innerHTML='';
-    try{const r=await fetch('admin/api.php?a=login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({email:$('#hqe').value,pw:$('#hqp').value})});const j=await r.json().catch(()=>({}));
+    try{const r=await fetch('admin/api.php?a=login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({email:$('#hqe').value,pw:$('#hqp').value,remember:$('#hqrm').checked})});const j=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(j.error||'Log masuk gagal.');await hqMe();L.innerHTML='';then&&then();}
     catch(x){$('#hqerr').innerHTML=`<div class="status bad">${h(x.message)}</div>`}};
   setTimeout(()=>$('#hqe').focus(),50);

@@ -160,6 +160,7 @@ async function auth(mode){
    <form class="card" id="f" novalidate>
     <label for="l">Email atau no. telefon</label><input id="l" autocomplete="username">
     <label for="w">Password</label><input id="w" type="password" autocomplete="current-password">
+    <label class="rmb" style="display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:500;cursor:pointer"><input type="checkbox" id="rm" checked style="width:18px;height:18px;margin:0;flex:none"> Ingat saya di peranti ini (60 hari)</label>
     <div id="err"></div>
     <button class="btn" id="go">Log masuk</button>
     <p class="hint" style="margin:12px 0 0">Lupa password? WhatsApp 100 Blooms untuk set semula.</p></form>
@@ -168,7 +169,7 @@ async function auth(mode){
   if(reg)startLanding();
   $('#f').onsubmit=async e=>{e.preventDefault();$('#go').disabled=true;
     try{if(reg)await api('register',{method:'POST',body:{name:$('#n').value,phone:$('#p').value,email:$('#e').value,pw:$('#w').value,terms:$('#t').checked}});
-      else await api('login',{method:'POST',body:{login:$('#l').value,pw:$('#w').value}});
+      else await api('login',{method:'POST',body:{login:$('#l').value,pw:$('#w').value,remember:$('#rm').checked}});
       document.body.classList.remove('wide');boot(reg)}catch(x){$('#err').innerHTML=`<div class="msg bad" role="alert">${h(x.message)}</div>`;$('#go').disabled=false}};
 }
 

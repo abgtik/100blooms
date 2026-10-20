@@ -258,8 +258,9 @@ function login(err){
    ${err?`<div class="msg bad">${h(err)}</div>`:''}
    <label for="le">Email</label><input id="le" type="email" autocomplete="username" required>
    <label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password" required>
+   <label class="rmb" style="display:flex;align-items:center;gap:8px;margin-top:12px;font-weight:500;cursor:pointer"><input type="checkbox" id="lr" checked style="width:18px;height:18px;margin:0;flex:none"> Ingat saya di peranti ini (60 hari)</label>
    <button class="btn" style="width:100%;margin-top:16px">Log masuk</button></form>`;
-  $('#lf').onsubmit=async e=>{e.preventDefault();try{await api('login',{method:'POST',body:{email:$('#le').value,pw:$('#lp').value}});boot()}catch(x){login(x.message)}};
+  $('#lf').onsubmit=async e=>{e.preventDefault();try{await api('login',{method:'POST',body:{email:$('#le').value,pw:$('#lp').value,remember:$('#lr').checked}});boot()}catch(x){login(x.message)}};
   $('#le').focus();
 }
 async function boot(){

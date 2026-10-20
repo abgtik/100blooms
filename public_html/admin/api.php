@@ -18,6 +18,11 @@ $post = $_SERVER['REQUEST_METHOD'] === 'POST';
 $body = $post ? (json_decode(file_get_contents('php://input') ?: '', true) ?: $_POST) : [];
 $me = null;
 if (!empty($_SESSION['uid'])) $me = q('SELECT id,email,name,role FROM admins WHERE id=?', [$_SESSION['uid']])->fetch() ?: null;
+elseif ($a !== 'login' && ($rid = remember_uid('admin'))) { // "Ingat saya": quietly sign back in after the PHP session ended
+  $me = q('SELECT id,email,name,role FROM admins WHERE id=?', [$rid])->fetch() ?: null;
+  if ($me) { session_regenerate_id(true); $_SESSION['uid'] = $me['id']; $_SESSION['csrf'] = bin2hex(random_bytes(16)); }
+  else remember_clear('admin');
+}
 
 function need_login(): array { global $me; if (!$me) fail('Sila log masuk.', 401); return $me; }
 function need_owner(): void { $m = need_login(); if ($m['role'] !== 'owner') fail('Hanya Owner boleh buat ini.', 403); }
@@ -56,10 +61,11 @@ case 'login':
   session_regenerate_id(true);
   $_SESSION['uid'] = $u['id']; $_SESSION['csrf'] = bin2hex(random_bytes(16));
   q('DELETE FROM login_attempts WHERE ip=?', [ip()]);
+  if (!empty($body['remember'])) remember_set('admin', (int)$u['id']);
   json_out(['ok' => true]);
 
 case 'logout':
-  $_SESSION = []; session_destroy(); json_out(['ok' => true]);
+  remember_clear('admin'); $_SESSION = []; session_destroy(); json_out(['ok' => true]);
 
 case 'orders':
   need_login();
@@ -348,6 +354,7 @@ case 'agent_pw': // owner: reset a forgotten password; the temporary password is
   need_owner(); $id = (int)($body['id'] ?? 0);
   $tmp = substr(str_replace(['+', '/', '='], '', base64_encode(random_bytes(9))), 0, 10);
   if (!q('UPDATE agents SET pass_hash=? WHERE id=?', [password_hash($tmp, PASSWORD_DEFAULT), $id])->rowCount()) fail('Agent tidak dijumpai.', 404);
+  q("DELETE FROM remember_tokens WHERE kind='agent' AND uid=?", [$id]);
   json_out(['ok' => true, 'pw' => $tmp]);
 
 case 'agent_qr':
@@ -916,7 +923,9 @@ case 'passwd':
   $m = need_login(); $u = q('SELECT pass_hash FROM admins WHERE id=?', [$m['id']])->fetch();
   if (!password_verify((string)($body['old'] ?? ''), $u['pass_hash'])) fail('Password lama salah.');
   if (strlen((string)($body['new'] ?? '')) < 8) fail('Password baru mesti sekurang-kurangnya 8 aksara.');
-  q('UPDATE admins SET pass_hash=? WHERE id=?', [password_hash($body['new'], PASSWORD_DEFAULT), $m['id']]); json_out(['ok' => true]);
+  q('UPDATE admins SET pass_hash=? WHERE id=?', [password_hash($body['new'], PASSWORD_DEFAULT), $m['id']]);
+  $had = !empty($_COOKIE[remember_cookie('admin')]); remember_clear('admin', (int)$m['id']); if ($had) remember_set('admin', (int)$m['id']); // other devices sign in again
+  json_out(['ok' => true]);
 
 default: fail('Tindakan tidak dikenali.', 404);
 }

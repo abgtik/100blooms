@@ -74,10 +74,35 @@ function db(): PDO {
   register_shutdown_function('cron_tick'); // light background jobs after each response (throttled)
   return $pdo;
 }
+/** "Ingat saya": a random token in an httponly cookie; only its sha256 is stored. Valid 60 days, cleared on log out. */
+const REMEMBER_DAYS = 60;
+function remember_cookie(string $kind): string { return 'hb_rm_' . $kind; }
+function remember_https(): bool { return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'); }
+function remember_set(string $kind, int $uid): void {
+  $t = bin2hex(random_bytes(32)); $exp = time() + REMEMBER_DAYS * 86400;
+  q('DELETE FROM remember_tokens WHERE expires_at<?', [date('Y-m-d H:i:s')]);
+  q('INSERT INTO remember_tokens (hash,kind,uid,expires_at,created_at) VALUES (?,?,?,?,?)', [hash('sha256', $t), $kind, $uid, date('Y-m-d H:i:s', $exp), date('Y-m-d H:i:s')]);
+  setcookie(remember_cookie($kind), $t, ['expires' => $exp, 'path' => '/', 'secure' => remember_https(), 'httponly' => true, 'samesite' => 'Lax']);
+}
+/** User id from a valid remember cookie, or null (a bad or expired cookie is cleared). */
+function remember_uid(string $kind): ?int {
+  $t = (string)($_COOKIE[remember_cookie($kind)] ?? '');
+  if (!preg_match('/^[a-f0-9]{64}$/', $t)) return null;
+  $r = q('SELECT uid FROM remember_tokens WHERE hash=? AND kind=? AND expires_at>?', [hash('sha256', $t), $kind, date('Y-m-d H:i:s')])->fetch();
+  if (!$r) { remember_clear($kind); return null; }
+  return (int)$r['uid'];
+}
+function remember_clear(string $kind, ?int $uidAll = null): void {
+  $t = (string)($_COOKIE[remember_cookie($kind)] ?? '');
+  if ($t !== '') q('DELETE FROM remember_tokens WHERE hash=?', [hash('sha256', $t)]);
+  if ($uidAll) q('DELETE FROM remember_tokens WHERE kind=? AND uid=?', [$kind, $uidAll]);
+  setcookie(remember_cookie($kind), '', ['expires' => time() - 3600, 'path' => '/', 'secure' => remember_https(), 'httponly' => true, 'samesite' => 'Lax']);
+}
+
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 18) return;
+  if ($v >= 19) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -122,6 +147,8 @@ function migrate(PDO $pdo): void {
   if ($v < 17) { $pdo->exec("DELETE FROM settings WHERE k='aftercare_since'"); $pdo->prepare("INSERT INTO settings (k,v) VALUES ('aftercare_since',?)")->execute([date('Y-m-d H:i:s')]); }
   // v18: language the customer ordered in (ms / en) for messages, Semak, the recipient page and documents
   $run("ALTER TABLE orders ADD COLUMN lang VARCHAR(2) NOT NULL DEFAULT 'ms'");
+  // v19: "Ingat saya" sign-ins (admin / Sales HQ and agent portal) that outlive the PHP session
+  $run("CREATE TABLE IF NOT EXISTS remember_tokens (hash CHAR(64) PRIMARY KEY, kind VARCHAR(8) NOT NULL, uid INT NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME NOT NULL)$tail");
   // v14/v15: new catalogue items (e.g. Congrats Grad Polkadot balloon) get a row in Stok
   // v16: cake menu change (New York Cheese added) - cakes get their Stok rows too
   $ins = $my ? 'INSERT IGNORE' : 'INSERT OR IGNORE'; $C = catalog();
@@ -133,7 +160,7 @@ function migrate(PDO $pdo): void {
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','18')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','19')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';

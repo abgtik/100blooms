@@ -20,6 +20,11 @@ $body = $post ? (json_decode(file_get_contents('php://input') ?: '', true) ?: $_
 $ip = 'a' . substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 44);
 $me = null;
 if (!empty($_SESSION['aid'])) $me = q('SELECT * FROM agents WHERE id=?', [$_SESSION['aid']])->fetch() ?: null;
+elseif (!in_array($a, ['login', 'register'], true) && ($rid = remember_uid('agent'))) { // "Ingat saya"
+  $me = q('SELECT * FROM agents WHERE id=?', [$rid])->fetch() ?: null;
+  if ($me && (int)$me['active']) { session_regenerate_id(true); $_SESSION['aid'] = (int)$me['id']; $_SESSION['csrf'] = bin2hex(random_bytes(16)); }
+  else { remember_clear('agent'); $me = null; }
+}
 if ($me && !(int)$me['active']) { $_SESSION = []; $me = null; }
 
 function need_agent(): array { global $me; if (!$me) fail('Sila log masuk.', 401); return $me; }
@@ -90,10 +95,11 @@ case 'login':
   if (!(int)$ag['active']) fail('Akaun agent ini tidak aktif. Hubungi 100 Blooms.', 403);
   q('DELETE FROM login_attempts WHERE ip=?', [$ip]);
   start_session((int)$ag['id']);
+  if (!empty($body['remember'])) remember_set('agent', (int)$ag['id']);
   json_out(['ok' => true]);
 
 case 'logout':
-  $_SESSION = []; session_destroy(); json_out(['ok' => true]);
+  remember_clear('agent'); $_SESSION = []; session_destroy(); json_out(['ok' => true]);
 
 case 'orders': // month view by delivery date
   $m = need_agent();
@@ -156,7 +162,9 @@ case 'passwd':
   $m = need_agent();
   if (!password_verify((string)($body['old'] ?? ''), $m['pass_hash'])) fail('Password lama salah.');
   if (strlen((string)($body['new'] ?? '')) < 8) fail('Password baru mesti sekurang-kurangnya 8 aksara.');
-  q('UPDATE agents SET pass_hash=? WHERE id=?', [password_hash($body['new'], PASSWORD_DEFAULT), $m['id']]); json_out(['ok' => true]);
+  q('UPDATE agents SET pass_hash=? WHERE id=?', [password_hash($body['new'], PASSWORD_DEFAULT), $m['id']]);
+  $had = !empty($_COOKIE[remember_cookie('agent')]); remember_clear('agent', (int)$m['id']); if ($had) remember_set('agent', (int)$m['id']); // other devices sign in again
+  json_out(['ok' => true]);
 
 default: fail('Tindakan tidak dikenali.', 404);
 }
