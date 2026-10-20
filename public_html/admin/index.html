@@ -114,6 +114,16 @@ a{color:var(--accent)}
 .hbar .n{color:var(--soft);font-size:12.5px}
 .ranks{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
 .rt{width:100%;border-collapse:collapse;font-size:13.5px}.rt td{padding:5px 0;border-bottom:1px dashed var(--line)}.rt td+td{text-align:right;font-variant-numeric:tabular-nums;color:var(--soft);white-space:nowrap;padding-left:8px}
+.prod{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
+.prod .pg{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
+.prod .pg h3{margin:0 0 6px;font-size:14px;display:flex;justify-content:space-between;align-items:baseline}
+.prod .pg h3 b{font-size:22px;color:var(--accent)}
+.prod .pr{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px dashed var(--line)}
+.prod .pr:first-of-type{border-top:0}
+.prod .pn{min-width:34px;text-align:center;font-weight:800;font-size:18px;line-height:1.2;color:var(--ink)}
+.prod .pr.ok .pn,.prod .pr.ok .pl{color:var(--soft);text-decoration:line-through}
+.prod .pl{font-weight:600;font-size:13.5px}
+.prod .pm{font-size:11.5px;color:var(--soft)}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--line)}
 .cal .hd{font-size:11.5px;color:var(--soft);text-align:center;font-weight:700;padding:6px 0;background:var(--bg);border-bottom:1px solid var(--line)}
 .cal>*:not(:nth-child(7n)){box-shadow:inset -1px 0 0 var(--line)}
@@ -797,6 +807,23 @@ async function Report(el){
 
 /* ---------- calendar ---------- */
 let cal={m:'',by:'del',sel:''};
+/* Production summary: how many bouquets to arrange, balloons to pump, cakes to buy, for one or more delivery days */
+const PRODG=[['bq','💐 Gubah bouquet'],['bal','🎈 Pump balloon'],['cake','🎂 Beli kek'],['etc','➕ Lain-lain']];
+async function prodBox(box,d){
+  const n=cal.pd||1;
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0;flex:1">🧺 Production</h2>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="seg" role="group" aria-label="Berapa hari" style="white-space:nowrap">${[[1,'Hari ni'],[2,'2 hari'],[3,'3 hari'],[7,'7 hari']].map(([k,t])=>`<button data-pd="${k}" aria-pressed="${n===k}">${k===1?fmtD(d).replace(/^\S+,\s*/,''):t}</button>`).join('')}</div>
+    <button class="btn ghost sm" id="pdcp" style="white-space:nowrap">📋 Salin</button></div></div><div id="pdb"><p class="mini">Memuatkan…</p></div>`;
+  box.querySelectorAll('[data-pd]').forEach(b=>b.onclick=()=>{cal.pd=+b.dataset.pd;prodBox(box,d)});
+  let j;try{j=await api('production',{params:{from:d,days:n}})}catch(e){$('#pdb').innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  const G=j.groups,sum=k=>(G[k]||[]).reduce((a,r)=>a+r.n,0),left=k=>(G[k]||[]).reduce((a,r)=>a+r.n-r.done,0);
+  const range=j.days>1?`${fmtD(j.from)} – ${fmtD(j.to)}`:fmtD(j.from);
+  if(!j.orders){$('#pdb').innerHTML=`<p class="mini" style="margin:10px 0 0">Tiada order untuk ${h(range)}.</p>`;$('#pdcp').onclick=()=>toast('Tiada apa nak disalin');return}
+  $('#pdb').innerHTML=`<p class="mini" style="margin:8px 0 0">${h(range)} · <b>${j.orders} order</b> (termasuk Orderla). Item yang dah ditanda siap dalam checklist dipotong.</p><div class="prod">${PRODG.filter(([k])=>(G[k]||[]).length).map(([k,t])=>`<div class="pg"><h3><span>${t}</span><span>${sum(k)-left(k)?`<span class="mini">${sum(k)-left(k)} siap · </span>`:''}<b>${sum(k)}</b></span></h3>
+    ${G[k].map(r=>`<div class="pr${r.done>=r.n?' ok':''}"><div class="pn">${r.n}</div><div style="flex:1;min-width:0"><div class="pl">${h(r.label)}</div><div class="pm">${r.done?`✅ ${r.done} siap · `:''}${r.unpaid?`<span style="color:var(--warn,#b26b00)">${r.unpaid} belum bayar</span> · `:''}<details style="display:inline"><summary style="display:inline;cursor:pointer">${r.orders.length} order</summary> ${r.orders.map(h).join(', ')}</details></div></div></div>`).join('')}</div>`).join('')}</div>`;
+  $('#pdcp').onclick=()=>{const txt=`*Production ${range}* (${j.orders} order)\n`+PRODG.filter(([k])=>(G[k]||[]).length).map(([k,t])=>`\n*${t}: ${sum(k)}*\n`+G[k].map(r=>`${r.n} × ${r.label}${r.unpaid?` (${r.unpaid} belum bayar)`:''}${r.done?` ✅${r.done}`:''}`).join('\n')).join('\n');
+    navigator.clipboard.writeText(txt).then(()=>toast('Senarai production disalin. Paste dalam group WhatsApp.'),()=>toast('Tak dapat salin'))};
+}
 async function Cal(el){
   if(!cal.m)cal.m=TODAY.slice(0,7);
   const [Y,M]=cal.m.split('-').map(Number),first=new Date(Y,M-1,1),days=new Date(Y,M,0).getDate(),lead=(first.getDay()+6)%7;
@@ -819,9 +846,10 @@ async function Cal(el){
     Array.from({length:days},(_,i)=>{const d=`${cal.m}-${String(i+1).padStart(2,'0')}`,L=D[d]||[],paid=L.filter(o=>o.pay_status==='paid').length,pend=L.length-paid;
       return `<button data-d="${d}" class="${d===TODAY?'today':''}" aria-pressed="${cal.sel===d}" aria-label="${d}: ${paid} order dibayar${pend?', '+pend+' belum bayar':''}"><span class="d">${i+1}</span>${paid?`<span class="c">${paid}</span>`:''}${pend?`<span class="c pend">${pend}<span class="lbl"> belum bayar</span></span>`:''}</button>`}).join('')+Array.from({length:(7-(lead+days)%7)%7},()=>'<button class="out" tabindex="-1" aria-hidden="true"></button>').join('');
   const show=d=>{cal.sel=d;el.querySelectorAll('[data-d]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.d===d));const L=D[d]||[];
-    $('#cday').innerHTML=`<div class="card"><h2>${fmtD(d)} · ${cal.by==='del'?'dihantar':'diorder'}</h2>${L.length?`<div class="list">${L.map(o=>o.src==='orderla'
+    $('#cday').innerHTML=(cal.by==='del'?`<div class="card" id="prodc"></div>`:'')+`<div class="card"><h2>${fmtD(d)} · ${cal.by==='del'?'dihantar':'diorder'}</h2>${L.length?`<div class="list">${L.map(o=>o.src==='orderla'
       ?olRow(o,o.no_del&&cal.by==='del'?' · <i>tarikh hantar tak dijumpai, ikut tarikh order</i>':'')
       :`<button class="ord" data-id="${o.id}"><div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">${h(delTxt(o))} · untuk ${h(o.r_name)} · ${h(CAT.bq[o.bouquet]||o.bouquet)}</div></div><div class="r"><div class="t">${rm(o.total)}</div></div></button>`).join('')}</div>`:'<p class="mini">Tiada order.</p>'}</div>`;
+    if(cal.by==='del')prodBox($('#prodc'),d);
     bindOl($('#cday'),()=>Cal(el));
     $('#cday').querySelectorAll('.ord[data-id]').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,()=>Cal(el)));};
   el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>show(b.dataset.d));

@@ -782,6 +782,52 @@ case 'calendar':
   } catch (Throwable $e) {}
   json_out(['m' => $m, 'by' => $by, 'days' => $days]);
 
+case 'production': // what the team must make for a delivery date range: bouquets to arrange, balloons to pump, cakes to buy, add-ons
+  need_login();
+  $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['from'] ?? '')) ? $_GET['from'] : date('Y-m-d');
+  $days = max(1, min(14, (int)($_GET['days'] ?? 1))); $to = date('Y-m-d', strtotime("$from +" . ($days - 1) . ' days'));
+  $C = catalog(); $M = product_meta(); $G = ['bq' => [], 'bal' => [], 'cake' => [], 'etc' => []];
+  $add = function (string $cat, string $label, int $n, bool $done, bool $unpaid, string $code, string $day) use (&$G) {
+    if ($n < 1) return; // same item from both systems: ignore the product code and word order ("FB02 - Happy Birthday Floral" = "Happy Birthday Floral", "Moist Chocolate" = "Chocolate Moist")
+    $w = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(preg_replace('/^[A-Z]{1,4}\d{1,4}\s*-\s*/', '', trim($label))), -1, PREG_SPLIT_NO_EMPTY); sort($w); $k = implode(' ', $w);
+    $r = &$G[$cat][$k]; $r ??= ['label' => trim($label), 'n' => 0, 'done' => 0, 'unpaid' => 0, 'orders' => []];
+    if (preg_match('/^[A-Z]{1,4}\d{1,4}\s*-/', $label) && !preg_match('/^[A-Z]{1,4}\d{1,4}\s*-/', $r['label'])) $r['label'] = trim($label); // prefer the label with the code
+    $r['n'] += $n; if ($done) $r['done'] += $n; if ($unpaid) $r['unpaid'] += $n; $r['orders'][] = $code . ($n > 1 ? " ×$n" : '');
+  };
+  $lbl = fn($t, $id, $name) => (($c = $M[$t][$id]['code'] ?? '') !== '' ? "$c - " : '') . $name;
+  $count = 0;
+  foreach (q("SELECT * FROM orders WHERE del_date BETWEEN ? AND ? AND status<>'batal' ORDER BY del_date", [$from, $to])->fetchAll() as $o) {
+    $count++; $p = jdec($o['prep']); $sent = in_array($o['status'], ['dalam_penghantaran', 'sampai', 'selesai'], true);
+    $un = $o['pay_status'] !== 'paid'; $cd = $o['code']; $dd = $o['del_date'];
+    $add('bq', $lbl('bq', $o['bouquet'], $C['bq'][$o['bouquet']] ?? $o['bouquet']) . ($o['bq_note'] ? ' (' . $o['bq_note'] . ')' : ''), 1, $sent || isset($p['bouquet']), $un, $cd, $dd);
+    $add('bal', $lbl('bal', $o['balloon'], $C['bal'][$o['balloon']] ?? $o['balloon']), 1, $sent || isset($p['balloon']), $un, $cd, $dd);
+    $cake = $o['cake'] === OTHER_CAKE ? 'Ikut stok: ' . (implode(' / ', jdec($o['cake_flavours'])) ?: 'apa-apa') : $o['cake'];
+    $add('cake', $cake, 1, $sent || isset($p['cake']), $un, $cd, $dd);
+    foreach (jdec($o['extra_cakes']) as $k => $n) $add('cake', $k, (int)$n, $sent || isset($p['cake']), $un, $cd, $dd);
+    if ((int)$o['photo_count'] > 0) $add('etc', 'Polaroid (keping)', (int)$o['photo_count'], $sent || isset($p['polaroid']), $un, $cd, $dd);
+    foreach (jdec($o['price_lines']) as $i => $l) if (preg_match('/^Add-on: (.+) × (\d+)$/u', (string)$l[0], $m)) $add('etc', $m[1], (int)$m[2], $sent || isset($p['addon' . $i]), $un, $cd, $dd);
+  }
+  try { // Orderla orders: items are text like "1x Jessie Bouquet; 1x Secret Recipe Slice Cake (Chocolate Fudge); 1x Balloon Foil (FB02 - Happy Birthday Floral)"
+    $bqNames = array_map('mb_strtolower', $C['bq']);
+    foreach (q("SELECT * FROM legacy_orders WHERE del_date BETWEEN ? AND ? AND (status IS NULL OR status<>'cancelled')", [$from, $to])->fetchAll() as $o) {
+      $count++; $done = in_array((string)$o['status'], ['completed', 'delivered', 'shipped'], true); $un = $o['pay_status'] !== 'paid'; $cd = (string)($o['invoice_no'] ?: $o['code_id']);
+      foreach (preg_split('/\s*;\s*/', (string)$o['items']) as $it) {
+        if (!preg_match('/^(\d+)\s*x\s*(.+)$/iu', trim($it), $m)) { if (trim($it) !== '') $add('etc', trim($it), 1, $done, $un, $cd, ''); continue; }
+        $n = (int)$m[1]; $name = trim($m[2]); $in = preg_match('/\(([^)]+)\)\s*$/', $name, $x) ? trim($x[1]) : '';
+        if (preg_match('/balloon|belon/i', $name)) $add('bal', $in ?: $name, $n, $done, $un, $cd, '');
+        elseif (preg_match('/cake|kek/i', $name)) $add('cake', $in ?: $name, $n, $done, $un, $cd, '');
+        else {
+          $base = trim(preg_replace('/\s*bouquet\s*/i', ' ', $name));
+          $isBq = preg_match('/bouquet|\((S|M|L|XL)\)$/i', $name) || in_array(mb_strtolower(preg_replace('/\s*\(.*$/', '', $base)), $bqNames, true);
+          if ($isBq) { $key = array_search(mb_strtolower($base), $bqNames, true); $add('bq', $key !== false ? $lbl('bq', $key, $C['bq'][$key]) : $base, $n, $done, $un, $cd, ''); }
+          else $add('etc', $name, $n, $done, $un, $cd, '');
+        }
+      }
+    }
+  } catch (Throwable $e) {}
+  $out = []; foreach ($G as $k => $rows) { usort($rows, fn($a, $b) => $b['n'] <=> $a['n'] ?: strcmp($a['label'], $b['label'])); $out[$k] = $rows; }
+  json_out(['from' => $from, 'to' => $to, 'days' => $days, 'orders' => $count, 'groups' => $out]);
+
 case 'upcoming': // deliveries from today to the end of next month, both systems
   need_login();
   $a = date('Y-m-d'); $b = date('Y-m-t', strtotime('first day of next month'));
