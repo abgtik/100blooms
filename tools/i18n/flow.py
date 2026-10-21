@@ -97,7 +97,7 @@ X={
 "Masa khusus perlu ditempah sekurang-kurangnya 5 jam awal. Pilih masa lebih lewat.":"Specific time must be booked at least 5 hours ahead. Please choose a later time.",
 # summary
 "Semak sebelum bayar":"Review before paying","Item":"Items","Momen":"Occasion","Penerima":"Recipient","Nama":"Name","Telefon":"Phone","Alamat":"Address","Tarikh":"Date",
-"Kod voucher":"Voucher code","Buang":"Remove","Masukkan kod (jika ada)":"Enter code (if any)","Guna":"Apply","Harga":"Price","Polisi tempahan:":"Booking policy:",
+"Kod voucher":"Voucher code","Buang":"Remove","Masukkan kod (jika ada)":"Enter code (if any)","Guna":"Apply","Harga":"Price","Polisi tempahan:":"Booking policy:","Baca polisi penuh":"Read full policy","Polisi refund, penghantaran & privasi":"Refund, delivery & privacy policy",
 "order yang dah dibayar tak boleh dibatalkan atau di-refund. Kalau ada perubahan, awak boleh tukar tarikh delivery dengan WhatsApp kami.":"paid orders can't be cancelled or refunded. If plans change, you can reschedule the delivery date by WhatsApping us.",
 "Maklumat awak":"Your details","Nama awak":"Your name","Nombor WhatsApp awak":"Your WhatsApp number","Kami hantar resit dan gambar penerima ke nombor ni.":"We'll send the receipt and the recipient's photo to this number.",
 "Bayar dengan DuitNow QR atau FPX (online banking) melalui halaman bayaran yang selamat.":"Pay with DuitNow QR or FPX (online banking) on a secure payment page.",

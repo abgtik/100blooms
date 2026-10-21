@@ -11,7 +11,7 @@ DirectoryIndex index.html index.php
   RewriteEngine On
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{REQUEST_URI} !^/(api|admin|assets|uploads|semak|hadiah|sales|agent|mcp|en|\.well-known)(/|$)
+  RewriteCond %{REQUEST_URI} !^/(api|admin|assets|uploads|semak|hadiah|sales|agent|mcp|en|polisi|\.well-known)(/|$)
   RewriteCond %{REQUEST_URI} !^/(robots\.txt|sitemap\.xml|favicon\.ico)$
   RewriteRule ^ / [R=301,L]
 </IfModule>
