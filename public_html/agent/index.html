@@ -41,6 +41,9 @@ input:focus-visible,button:focus-visible,a:focus-visible,select:focus-visible{ou
 .sw span{position:absolute;inset:0;background:#cdbfc4;border-radius:99px;transition:.2s;cursor:pointer}.sw span:before{content:"";position:absolute;width:24px;height:24px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
 .sw input:checked+span{background:var(--ok)}.sw input:checked+span:before{transform:translateX(20px)}.sw input:focus-visible+span{outline:3px solid var(--accent);outline-offset:2px}
 nav button{min-width:0}
+.pk{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.pkv{width:88px;height:88px;border-radius:16px;background:var(--bg);display:grid;place-items:center;overflow:hidden;font-size:28px;flex:none}.pkv img{width:100%;height:100%;object-fit:cover}
+.pkb{display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:1;min-width:180px}.pkb .hint{width:100%}
+.camw{position:fixed;inset:0;background:rgba(30,15,22,.75);z-index:50;display:grid;place-items:center;padding:16px}.camb{background:#fff;border-radius:20px;padding:14px;max-width:520px;width:100%}.camb video{width:100%;border-radius:14px;background:#000;max-height:60vh}
 /* bottom nav */
 nav[hidden]{display:none!important}
 nav{position:fixed;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));background:#4a2330;border-radius:22px;display:flex;justify-content:center;gap:4px;padding:7px;z-index:5;box-shadow:0 10px 28px -8px rgba(74,35,48,.55);max-width:520px;margin:0 auto}
@@ -255,17 +258,39 @@ function render(fresh){
 /* ---------- runner mode ---------- */
 let RUNT=0;
 const RSTEP={otw_pickup:'🛵 Saya OTW ambil barang',picked:'📦 Dah ambil barang, mula hantar',delivered:'✅ Dah sampai kepada penerima'};
+/* photo picker: camera (phone camera, or webcam on a computer) or gallery, with a preview; photos are shrunk before upload */
+const RF={};
+const picker=(k,label,facing,has)=>`<label>${label}</label><div class="pk"><div class="pkv" id="pv_${k}">${has?`<img src="api.php?a=r_pic&k=${k}&t=${Date.now()}" alt="${label}">`:'<span aria-hidden="true">📷</span>'}</div>
+  <div class="pkb"><button type="button" class="btn sm" data-cam="${k}" data-facing="${facing}">📷 Ambil gambar</button><button type="button" class="btn ghost sm" data-gal="${k}">🖼️ Pilih dari galeri</button>
+  <span class="hint" id="ph_${k}">${has?'Dah ada. Ambil gambar baru untuk tukar.':'Belum ada gambar.'}</span></div>
+  <input type="file" accept="image/*" capture="${facing}" hidden id="pc_${k}"><input type="file" accept="image/*" hidden id="pg_${k}"></div>`;
+function shrink(file,max=1600){return new Promise(res=>{const u=URL.createObjectURL(file),i=new Image();i.onload=()=>{const s=Math.min(1,max/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=Math.round(i.width*s);c.height=Math.round(i.height*s);c.getContext('2d').drawImage(i,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>res(b||file),'image/jpeg',.85)};i.onerror=()=>{URL.revokeObjectURL(u);res(file)};i.src=u})}
+function setPick(k,blob){RF[k]=blob;$('#pv_'+k).innerHTML=`<img src="${URL.createObjectURL(blob)}" alt="">`;$('#ph_'+k).textContent='✅ Gambar baru dipilih. Tekan Simpan.'}
+function webcam(k,facing){
+  const d=document.createElement('div');d.className='camw';d.innerHTML=`<div class="camb"><video autoplay playsinline muted></video><div class="acts" style="justify-content:center"><button type="button" class="btn sm" id="camt">📸 Ambil</button><button type="button" class="btn ghost sm" id="camx">Batal</button></div><p class="hint" id="camm"></p></div>`;document.body.appendChild(d);
+  let st=null;const stop=()=>{st&&st.getTracks().forEach(t=>t.stop());d.remove()};
+  navigator.mediaDevices.getUserMedia({video:{facingMode:facing}}).then(s=>{st=s;d.querySelector('video').srcObject=s}).catch(()=>{d.querySelector('#camm').textContent='Kamera tak dapat dibuka. Benarkan akses kamera di browser, atau guna "Pilih dari galeri".'});
+  d.querySelector('#camx').onclick=stop;
+  d.querySelector('#camt').onclick=()=>{const v=d.querySelector('video');if(!v.videoWidth)return;const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);c.toBlob(b=>{setPick(k,b);stop()},'image/jpeg',.88)};
+}
+function bindPickers(root){
+  const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Mac/.test(navigator.platform));
+  root.querySelectorAll('[data-cam]').forEach(b=>b.onclick=()=>{const k=b.dataset.cam;if(!mobile&&navigator.mediaDevices?.getUserMedia)webcam(k,b.dataset.facing);else $('#pc_'+k).click()});
+  root.querySelectorAll('[data-gal]').forEach(b=>b.onclick=()=>$('#pg_'+b.dataset.gal).click());
+  root.querySelectorAll('input[id^=pc_],input[id^=pg_]').forEach(i=>i.onchange=async()=>{if(i.files[0])setPick(i.id.slice(3),await shrink(i.files[0]));i.value=''});
+}
 function runnerForm(r,again){
   return `<form id="raf"><label for="rplate">No. plat motor</label><input id="rplate" value="${h(r.plate||'')}" placeholder="Contoh: WXY 1234" autocapitalize="characters" required>
    <label for="rarea">Kawasan asal / kawasan biasa awak</label><input id="rarea" value="${h(r.area||'')}" placeholder="Contoh: Jenjarom, Banting, Klang" required>
-   <label for="rface">Gambar muka awak ${r.face?'<span class="hint">(dah ada, pilih untuk tukar)</span>':''}</label><input id="rface" type="file" accept="image/*" capture="user">
-   <label for="rbike">Gambar motor bersama box ${r.bike?'<span class="hint">(dah ada, pilih untuk tukar)</span>':''}</label><input id="rbike" type="file" accept="image/*">
+   ${picker('face','Gambar muka awak','user',r.face)}
+   ${picker('bike','Gambar motor bersama box','environment',r.bike)}
    <p class="hint" style="margin:10px 0 0">Gambar hanya untuk HQ kenal pasti runner dan tak dipaparkan kepada pelanggan.</p>
    <div id="rerr"></div><button class="btn" id="rgo">${again?'Simpan':'Hantar permohonan runner'}</button></form>`;
 }
 function bindRunnerForm(el){
+  delete RF.face;delete RF.bike;bindPickers($('#raf'));
   $('#raf').onsubmit=async e=>{e.preventDefault();const fd=new FormData();fd.append('plate',$('#rplate').value);fd.append('area',$('#rarea').value);
-    if($('#rface').files[0])fd.append('face',$('#rface').files[0]);if($('#rbike').files[0])fd.append('bike',$('#rbike').files[0]);
+    if(RF.face)fd.append('face',RF.face,'face.jpg');if(RF.bike)fd.append('bike',RF.bike,'bike.jpg');
     $('#rgo').disabled=true;try{await api('r_apply',{method:'POST',body:fd});const j=await api('me');ME=j;toast('Disimpan');Runner(el)}catch(x){$('#rerr').innerHTML=`<div class="msg bad">${h(x.message)}</div>`;$('#rgo').disabled=false}};
 }
 async function Runner(el){
@@ -322,7 +347,7 @@ async function Runner(el){
   el.querySelectorAll('[data-take]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('r_take',{method:'POST',body:{id:+b.dataset.take}});toast('Job dah jadi milik awak 🎉');re()}catch(x){toast(x.message);re()}});
   el.querySelectorAll('[data-rel]').forEach(b=>b.onclick=async()=>{if(!confirm('Lepaskan job ni? Job akan dibuka semula untuk runner lain.'))return;try{await api('r_release',{method:'POST',body:{id:+b.dataset.rel}});re()}catch(x){toast(x.message)}});
   el.querySelectorAll('[data-prob]').forEach(b=>b.onclick=async()=>{const t=prompt('Apa masalahnya? (contoh: penerima tak angkat call, alamat tak jumpa)');if(!t)return;try{await api('r_problem',{method:'POST',body:{id:+b.dataset.prob,text:t}});toast('HQ dah dimaklumkan')}catch(x){toast(x.message)}});
-  el.querySelectorAll('[data-ph]').forEach(i=>i.onchange=async()=>{if(!i.files[0])return;const fd=new FormData();fd.append('id',i.dataset.ph);fd.append('file',i.files[0]);toast('Memuat naik…');try{await api('r_photo',{method:'POST',body:fd});toast('Gambar diupload');re()}catch(x){toast(x.message)}});
+  el.querySelectorAll('[data-ph]').forEach(i=>i.onchange=async()=>{if(!i.files[0])return;const fd=new FormData();fd.append('id',i.dataset.ph);fd.append('file',await shrink(i.files[0]),'penerima.jpg');toast('Memuat naik…');try{await api('r_photo',{method:'POST',body:fd});toast('Gambar diupload');re()}catch(x){toast(x.message)}});
   el.querySelectorAll('[data-step]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('r_step',{method:'POST',body:{id:+b.dataset.id,step:b.dataset.step}});toast(b.dataset.step==='delivered'?'Tahniah! Job selesai 🎉':'Dikemas kini');re()}catch(x){toast(x.message);b.disabled=false}});
   RUNT=setInterval(()=>{if(tab==='runner'&&!document.hidden&&!document.activeElement?.matches('input,textarea'))re()},60000);
 }
