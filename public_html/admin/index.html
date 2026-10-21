@@ -879,7 +879,25 @@ async function Dash(el){
   el.querySelectorAll('[data-by]').forEach(b=>b.onclick=()=>{dashBy=b.dataset.by;try{localStorage.setItem('hb_dash_by',dashBy)}catch(e){}Dash(el)});
   $('#fu').onclick=e=>{e.preventDefault();tab='orders';f='pending';render()};
   $('#goToday').onclick=()=>{tab='orders';f='today';render()};
+  el.insertAdjacentHTML('beforeend',linksCard());bindLinks(el);
 }
+/* ---------- reference links (Dashboard) ---------- */
+function linksCard(){
+  const S=(ME.site||location.origin).replace(/\/$/,'');
+  const G=[
+   ['🌸 Untuk pelanggan',[[S+'/','Page order (Bahasa Melayu)'],[S+'/en/','Page order (English)'],[S+'/?ref=101','Link agent (contoh agent #101, tukar nombor)'],
+     [S+'/semak/?c=KOD&k=…','Semak order: link unik setiap order, dihantar automatik dalam invoice WhatsApp',1],[S+'/hadiah/?c=KOD&r=…','Page hadiah penerima: link unik, dihantar automatik selepas sampai',1]]],
+   ['📜 Polisi (Billplz / gateway)',[[S+'/polisi/','Semua polisi (BM)'],[S+'/polisi/?lang=en','Semua polisi (English)'],[S+'/polisi/#refund','Refund & pembatalan'],[S+'/polisi/#terma','Terma & syarat'],
+     [S+'/polisi/#privasi','Privasi'],[S+'/polisi/#penghantaran','Penghantaran'],[S+'/polisi/#hubungi','Hubungi kami']]],
+   ['🧑‍💼 Team',[[S+'/admin/','Admin dashboard (owner & staff)'],[S+'/sales/','Sales HQ: page order untuk team'],[S+'/api/bankqr.php','Gambar QR bank (untuk hantar pada pembeli)']]],
+   ['🤝 Agent & runner',[[S+'/agent/','Portal agent & runner (log masuk)'],[S+'/agent/?daftar','Daftar agent baru'],[S+'/agent/?daftar&runner','Daftar runner (rider)']]],
+   ['⭐ Google',[['https://search.google.com/local/writereview?placeid=ChIJb2My-yevzTERo7zkLHpu3Xs','Tulis ulasan Google (link ulasan)'],['https://www.google.com/maps/place//data=!4m4!3m3!1s0x31cdaf27fb32636f:0x7bdd6e7a2ce4bca3!9m1!1b1','100 Blooms di Google Maps (ulasan)']]],
+   ['⚙️ Teknikal',[[S+'/sitemap.xml','Sitemap (Google Search Console)'],[S+'/robots.txt','Robots.txt'],[S+'/mcp/','MCP: maklumat awam 100 Blooms untuk AI'],['https://webmail.'+S.replace(/^https?:\/\/(www\.)?/,''),'Webmail email domain']]]];
+  return `<div class="card" id="lnk"><h2>🔗 Link rujukan</h2><p class="mini" style="margin-top:0">Semua link penting sistem 100 Blooms. Tekan Salin untuk kongsi.</p>
+   ${G.map(([t,L])=>`<h3 style="font-size:14px;margin:14px 0 4px">${t}</h3>${L.map(([u,d,tpl])=>`<div class="rowx" style="align-items:center"><span><b style="color:var(--ink)">${h(d)}</b><br><span class="mini" style="word-break:break-all">${h(u)}</span></span>
+     <span style="white-space:nowrap">${tpl?'<span class="mini">contoh</span>':`<a class="btn ghost sm" href="${h(u)}" target="_blank" rel="noopener">Buka</a> <button class="btn ghost sm" data-cpl="${h(u)}">Salin</button>`}</span></div>`).join('')}`).join('')}</div>`;
+}
+function bindLinks(el){el.querySelectorAll('[data-cpl]').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(b.dataset.cpl).then(()=>toast('Link disalin'),()=>toast('Tak dapat salin')))}
 
 /* ---------- report ---------- */
 let rp={preset:'month',from:'',to:'',by:'paid'};
