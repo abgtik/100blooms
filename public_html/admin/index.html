@@ -164,6 +164,13 @@ a{color:var(--accent)}
 .lock{font-size:13px;color:var(--warn);background:var(--warnb);border-radius:10px;padding:8px 10px}
 .ord .pg{display:inline-block;margin-top:3px;font-size:12px;font-weight:600;color:var(--ink);background:var(--bg);border-radius:8px;padding:1px 8px}
 
+[hidden]{display:none!important}
+.fline{display:grid;grid-template-columns:150px minmax(180px,1.4fr) minmax(160px,1.2fr) auto 30px;gap:8px;align-items:center;padding:8px 0;border-top:1px dashed var(--line)}
+.fline:first-child{border-top:0}.fline .lw>*{width:100%}.fline .lq{display:flex;align-items:center;gap:4px}.fline .lqty{width:58px!important}.fline .lp{width:88px!important}
+.fline .lx{position:static;width:28px;height:28px}
+@media(max-width:760px){.fline{grid-template-columns:1fr 1fr;}.fline .lw,.fline .ld{grid-column:1/-1}.fline .lx{justify-self:end}}
+.fcat{display:grid;grid-template-columns:150px 1fr 100px auto 30px;gap:6px;align-items:center;margin:4px 0}
+@media(max-width:640px){.fcat{grid-template-columns:1fr 90px auto 30px}.fcat select{grid-column:1/-1}}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 12px}
 .fl{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--soft)}
 .fl input,.fl select,.fl textarea{font-weight:400;color:var(--ink);width:100%}
@@ -258,7 +265,7 @@ async function api(a,{method='GET',body,params}={}){
 }
 const fmtD=s=>s?new Date(s+'T00:00').toLocaleDateString('ms-MY',{weekday:'short',day:'numeric',month:'short'}):'-';
 const fmtDT=s=>s?new Date(s.replace(' ','T')).toLocaleString('ms-MY',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'-';
-const delTxt=o=>DEL[o.del_type]+(o.del_type==='spec'&&o.del_time?' '+o.del_time:'');
+const delTxt=o=>(o.kind==='full'?String(DEL[o.del_type]).replace('Percuma ',''):DEL[o.del_type])+(o.del_type==='spec'&&o.del_time?' '+o.del_time:'');
 const pill=o=>o.pay_status!=='paid'?`<span class="pill p-${o.pay_status==='failed'?'failed':'pending'}">${o.pay_status==='failed'?'Bayaran gagal':'Menunggu bayaran'}</span>`:`<span class="pill p-${o.status}">${ST[o.status]||o.status}</span>`;
 
 /* ---------- login ---------- */
@@ -325,7 +332,7 @@ async function Orders(el){
     const LG=j.legacy||[];
     $('#ol').innerHTML=(j.rows.length||LG.length)?j.rows.map(o=>`<button class="ord" data-id="${o.id}">
       <div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">Hantar <b style="color:var(--ink)">${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</div>
-       ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}${(o.need||[]).map(t=>`<span class="pg" style="background:var(--warnb);color:var(--warn)">${h(t)}</span>`).join(' ')}${o.issue?`<span class="pg ${o.issue==='open'?'pbad':'pok'}">${o.issue==='open'?'⚠️ Masalah':'✅ Masalah selesai'}</span>`:''}<div class="m">${srcChip(o.src)}${o.lang==='en'?' 🇬🇧':''} Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${h(CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
+       ${o.progress?`<span class="pg">${h(o.progress)}</span>`:''}${(o.need||[]).map(t=>`<span class="pg" style="background:var(--warnb);color:var(--warn)">${h(t)}</span>`).join(' ')}${o.issue?`<span class="pg ${o.issue==='open'?'pbad':'pok'}">${o.issue==='open'?'⚠️ Masalah':'✅ Masalah selesai'}</span>`:''}<div class="m">${srcChip(o.src)}${o.lang==='en'?' 🇬🇧':''} Untuk ${h(o.r_name)} (${h(o.r_post)}) · ${o.kind==='full'?'🛍️ ':''}${h(o.summary||CAT.bq[o.bouquet]||o.bouquet)}${o.voucher?' · 🎟️ '+h(o.voucher):''}${o.notes?' · 📝':''}</div></div>
       <div class="r"><div class="t">${rm(o.total)}</div><div class="m">Order ${fmtDT(o.created_at)}</div></div></button>`).join('')+LG.map(o=>olRow(o)).join('')
       :`<div class="empty">Tiada order${f==='today'?' untuk dihantar hari ini':''}.</div>`;
     $('#ol').querySelectorAll('.ord[data-id]').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,load));bindOl($('#ol'),load);
@@ -408,7 +415,7 @@ async function openOrder(id,reload){
    ${wfCards(o)}
    ${afterCard(o)}
    <div class="card"><h2>Butiran penghantaran</h2>
-    <div class="rowx"><span>Tarikh</span><span><b>${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</span></div>
+    ${o.pickup?'<div class="msg warn" style="margin:0 0 8px">🏪 <b>Pickup di kedai</b>, tiada penghantaran.</div>':''}<div class="rowx"><span>Tarikh</span><span><b>${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</span></div>
     <div class="rowx"><span>Penerima</span><span>${h(o.r_name)}</span></div>
     <div class="rowx"><span>Telefon</span><span><a href="tel:${h(o.r_phone)}">${h(o.r_phone)}</a> · <a href="${wa(o.r_phone)}" target="_blank" rel="noopener">WhatsApp</a></span></div>
     <div class="rowx"><span>Alamat</span><span>${h(o.r_addr)}, ${h(o.r_post)}<br><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.r_addr+' '+o.r_post)}" target="_blank" rel="noopener">Buka di Google Maps</a></span></div>
@@ -423,7 +430,7 @@ async function openOrder(id,reload){
      <p class="mini" style="margin:0">Caj tidak dikira semula. Kutip beza harga (jika ada) secara manual.</p></details></div>
    <div class="card" style="background:var(--warnb)"><h2>📝 Nota dalaman <span class="mini" style="font-weight:400">(team sahaja, customer tak nampak)</span></h2><textarea id="nn" rows="3" style="width:100%" placeholder="Contoh: perisa kek ditukar, customer minta call dulu">${h(o.notes||'')}</textarea>
     <button class="btn ghost sm" id="sn" style="margin-top:8px">Simpan nota</button></div>
-   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">Isi hadiah</h2>${o.status!=='batal'&&!(o.del_steps||{}).otw_pickup?'<button class="btn ghost sm" id="tie">✏️ Tukar item</button>':''}</div>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">Isi hadiah</h2>${o.kind!=='full'&&o.status!=='batal'&&!(o.del_steps||{}).otw_pickup?'<button class="btn ghost sm" id="tie">✏️ Tukar item</button>':''}${o.kind==='full'?'<span class="pg">🛍️ Katalog penuh</span>':''}</div>
     <div id="tiw" hidden class="tiw"><div class="fgrid">
      <label class="fl">Occasion<select id="ti_occ">${Object.entries(CAT.occ||{}).map(([k,n])=>`<option value="${k}"${k===o.occasion?' selected':''}>${h(n)}</option>`).join('')}</select></label>
      <label class="fl">Bouquet<select id="ti_bq">${Object.entries(CAT.bq).map(([k,n])=>`<option value="${k}"${k===o.bouquet?' selected':''}>${h(((PM.bq||{})[k]?.code?PM.bq[k].code+' - ':'')+n)}</option>`).join('')}</select></label>
@@ -434,10 +441,11 @@ async function openOrder(id,reload){
      <p class="mini" style="margin:6px 0 0">Kek upgrade (Chocolate Indulgence / Chocolate Chip Walnut / Red Velvet / pilihan lain) +RM10. Kalau order dah dibayar, jumlah tak berubah dan beza harga dicatat dalam nota. Tick penyediaan untuk item yang ditukar akan dibuang.</p>
      <div class="bar" style="margin:8px 0 0"><button class="btn sm" id="tis">Simpan perubahan</button><button class="btn ghost sm" id="tic">Batal</button></div></div>
     ${o.created_by?'':`<div class="rowx"><span>Momen</span><span>${h(OCC_T()[o.occasion]||o.occasion)} · ${h(REL_T()[o.relation]||o.relation)} (${o.gender==='l'?'L':'P'}) · panggil "${h(o.call_name)}"</span></div>`}
-    <div class="rowx"><span>Bouquet</span><span>${(PM.bq||{})[o.bouquet]?.code?`<b>${h(PM.bq[o.bouquet].code)}</b> - `:''}<b>${h(CAT.bq[o.bouquet]||o.bouquet)}</b></span></div>
+    ${o.kind==='full'?(o.items||[]).map(l=>`<div class="rowx"><span>${h(l.cat_label||'Item')}</span><span><b>${+l.qty} × ${h(l.name)}</b>${l.design?`<br><span class="mini">${h(l.design)}</span>`:''}</span></div>`).join('')
+    :`<div class="rowx"><span>Bouquet</span><span>${(PM.bq||{})[o.bouquet]?.code?`<b>${h(PM.bq[o.bouquet].code)}</b> - `:''}<b>${h(CAT.bq[o.bouquet]||o.bouquet)}</b></span></div>
     <div class="rowx"><span>Balloon</span><span>${(PM.bal||{})[o.balloon]?.code?`<b>${h(PM.bal[o.balloon].code)}</b> - `:''}${h(CAT.bal[o.balloon]||o.balloon)}</span></div>
     <div class="rowx"><span>Kek</span><span>${h(cakeTxt)}</span></div>
-    <div class="rowx"><span>Kek tambahan</span><span>${h(ext)}</span></div>
+    <div class="rowx"><span>Kek tambahan</span><span>${h(ext)}</span></div>`}
     <div class="rowx"><span>Polaroid</span><span>${o.photos.length} / ${+o.photo_count} gambar${o.photos.length<+o.photo_count?' <b style="color:var(--warn)">· belum cukup</b>':''}</span></div>
     ${o.photos.length?`<div class="thumbs" style="margin:8px 0">${o.photos.map(n=>`<span class="tw"><a href="${ph(n,1)}" title="Muat turun ${h(n)}"><img src="${ph(n)}" alt="Polaroid ${h(n)}" loading="lazy"></a><button class="tx" data-pdel="${h(n)}" aria-label="Padam gambar ${h(n)}">×</button></span>`).join('')}</div><p class="mini" style="margin:0">Tekan gambar untuk muat turun dan cetak.</p>`:''}
     ${o.photos.length<+o.photo_count?`<div class="bar" style="margin:8px 0 0"><input type="file" id="paf" accept="image/*" multiple aria-label="Pilih gambar polaroid"><button class="btn ghost sm" id="pau">Upload polaroid</button></div>`:''}
@@ -578,11 +586,15 @@ function pasteSlot(v){const t=v.toLowerCase().replace(/\s+/g,' ');let x;
     if(hh>=8&&hh<=21)return ['spec',String(hh).padStart(2,'0')+':'+mm]}
   return [null]}
 /* ---------- manual order (sales team, WhatsApp orders) ---------- */
+let NO_TAB='combo',FCAT=null;
+const noTabs=()=>`<div class="seg" role="group" aria-label="Jenis order" style="margin:0 0 12px"><button type="button" data-not="combo" aria-pressed="${NO_TAB==='combo'}">🎁 Set Combo</button><button type="button" data-not="full" aria-pressed="${NO_TAB==='full'}">🛍️ Katalog penuh</button></div>`;
+const bindNoTabs=el=>el.querySelectorAll('[data-not]').forEach(b=>b.onclick=()=>{NO_TAB=b.dataset.not;NewOrder(el)});
 function NewOrder(el){
+  if(NO_TAB==='full')return FullOrder(el);
   const C=CAT,lab=(t,k,n)=>{const c=(PM[t]||{})[k];return (c&&c.code?c.code+' - ':'')+n};
   const optc=(t,o)=>Object.entries(o).map(([k,n])=>[k,lab(t,k,n)]).sort((a,b)=>{const ca=(PM[t]||{})[a[0]]?.code||'',cb=(PM[t]||{})[b[0]]?.code||'';return (!ca-!cb)||(ca||a[1]).localeCompare(cb||b[1],undefined,{numeric:true})}).map(([k,n])=>`<option value="${h(k)}">${h(n)}</option>`).join('');
   const cakes=[...C.cake_free,...C.cake_up],tom=new Date(Date.now()+864e5);
-  el.innerHTML=`<div class="msg ok" style="margin:0 0 12px">🧑‍💼 <b>Page order Sales HQ</b>: sama macam page customer, order disimpan atas nama awak dan diakhiri invoice WhatsApp ke pembeli. <a href="../sales/" target="_blank" rel="noopener">Buka page Sales HQ ↗</a> <span class="mini">(link: ${h((ME.site||location.origin)+"/sales/")})</span></div><form id="nf" novalidate>
+  el.innerHTML=`<div class="msg ok" style="margin:0 0 12px">🧑‍💼 <b>Page order Sales HQ</b>: sama macam page customer, order disimpan atas nama awak dan diakhiri invoice WhatsApp ke pembeli. <a href="../sales/" target="_blank" rel="noopener">Buka page Sales HQ ↗</a> <span class="mini">(link: ${h((ME.site||location.origin)+"/sales/")})</span></div>${noTabs()}<form id="nf" novalidate>
    <div class="card paste"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">📋 Tampal borang WhatsApp</h2><button type="button" class="btn ghost sm" id="ptpl">Salin template untuk customer</button></div>
     <p class="mini" style="margin:6px 0 8px">Tampal jawapan customer (Bouquet : … Nama Pemberi : … ) di bawah, kemudian tekan <b>Isi borang</b>. Semak semula sebelum cipta order.</p>
     <textarea id="f_paste" rows="5" style="width:100%" placeholder="Bouquet : Glam&#10;Balloon : FB02&#10;Cake : Carrot Cake&#10;&#10;Nama Pemberi : Ahmad&#10;No Tel Pemberi : 012-345 6789&#10;…"></textarea>
@@ -630,6 +642,7 @@ function NewOrder(el){
     <label class="fl" id="w_pref" hidden style="margin-top:10px">Rujukan bayaran (no. transaksi)<input id="f_pref"></label></div>
    <div class="qbox" aria-live="polite"><div id="qv" class="mini">Isi borang untuk tengok harga.</div>
     <button class="btn" id="go" type="submit" style="width:100%;margin-top:10px" disabled>Cipta order</button></div></form>`;
+  bindNoTabs(el);
   const V=id=>$('#'+id).value,photos=()=>$('#f_photos').files.length;
   const data=()=>{const xc={},ao={};el.querySelectorAll('[data-xc]').forEach(i=>{if(+i.value>0)xc[i.dataset.xc]=+i.value});el.querySelectorAll('[data-ao]').forEach(i=>{if(+i.value>0)ao[i.dataset.ao]=+i.value});
     return{occ:V('f_occ'),bq:V('f_bq'),bq_note:V('f_bqn'),bal:V('f_bal'),cake:V('f_cake'),otherFl:V('f_ofl').split(',').map(x=>x.trim()).filter(Boolean).slice(0,5),photo_count:+V('f_pc')||1,
@@ -676,6 +689,96 @@ function NewOrder(el){
   $('#nf').onsubmit=async e=>{e.preventDefault();if(!ok)return;const d=data(),fd=new FormData();fd.append('data',JSON.stringify(d));[...$('#f_photos').files].forEach(f=>fd.append('photo[]',f));
     $('#go').disabled=true;$('#go').textContent='Menyimpan…';
     let j;try{j=await api('manual',{method:'POST',body:fd})}catch(x){toast(x.message);$('#go').disabled=false;quote();return}
+    showInvoice(el,j,d.bphone,()=>NewOrder(el));};
+}
+/* ---------- + Order: full catalogue (Admin HQ only; customers & Sales HQ page still see Combo Jimat only) ---------- */
+async function FullOrder(el){
+  el.innerHTML='<div class="empty">Memuatkan katalog…</div>';
+  try{FCAT=await api('fullcat')}catch(e){el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  const CATS=FCAT.cats,IT=FCAT.items.filter(i=>+i.on),byId=Object.fromEntries(FCAT.items.map(i=>[i.id,i]));
+  const catOpts=sel=>Object.entries(CATS).filter(([k])=>k==='lain'||IT.some(i=>i.cat===k)).map(([k,n])=>`<option value="${k}"${k===sel?' selected':''}>${h(n)}</option>`).join('');
+  const itemOpts=(cat,sel)=>IT.filter(i=>i.cat===cat).map(i=>`<option value="${h(i.id)}"${i.id===sel?' selected':''}>${h(i.name)} · RM${+i.price}</option>`).join('');
+  const lineHtml=(cat='bq')=>`<div class="fline"><select class="lc" aria-label="Kategori">${catOpts(cat)}</select>
+    <span class="lw">${cat==='lain'?'<input class="ln" placeholder="Nama item" maxlength="80" aria-label="Nama item">':`<select class="li" aria-label="Item">${itemOpts(cat)}</select>`}</span>
+    <input class="ld" placeholder="Design / warna / nota (ikut katalog)" maxlength="120" aria-label="Design">
+    <span class="lq"><input class="lqty" type="number" min="1" max="999" value="1" aria-label="Kuantiti"><span class="mini">×</span><input class="lp" type="number" min="0" step="0.01" aria-label="Harga seunit (RM)"></span>
+    <button type="button" class="tx lx" aria-label="Buang item">×</button></div>`;
+  el.innerHTML=`<div class="msg ok" style="margin:0 0 12px">🛍️ <b>Order katalog penuh</b>: untuk item luar Combo Jimat (bouquet M/L/XL, flower box, vase, fruit basket, kek sebiji…). Hanya admin HQ boleh cipta. Page customer &amp; Sales HQ kekal Combo Jimat.</div>${noTabs()}<form id="gf" novalidate>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">Item katalog</h2>${ME.role==='owner'?'<a href="#" class="mini" id="gcat">✏️ Ubah senarai & harga katalog (tab Stok)</a>':''}</div>
+    <p class="mini" style="margin:6px 0 10px">Pilih kategori dan saiz, tulis design ikut katalog (contoh "m/s 12 · Pinky Love"). Harga boleh diubah untuk order ni sahaja.</p>
+    <div id="glines">${lineHtml('bq')}</div>
+    <div class="bar" style="margin:8px 0 0"><button type="button" class="btn ghost sm" id="gadd">＋ Tambah item</button></div>
+    <div class="fgrid" style="margin-top:12px">
+     <label class="fl">Occasion / momen<select id="g_occ"><option value="">— Pilih —</option>${Object.entries(CAT.occ||{}).map(([k,n])=>`<option value="${k}">${h(n)}</option>`).join('')}</select></label>
+     <label class="fl">Polaroid (RM${10}/keping, 0 = tiada)<input id="g_pc" type="number" min="0" max="10" value="0"></label>
+     <label class="fl">Gambar polaroid (jika dah terima)<input id="g_photos" type="file" accept="image/*" multiple></label>
+     <label class="fl full">Ayat wishcard (percuma; kosongkan jika belum terima)<textarea id="g_wish" rows="4" maxlength="2000" data-grow></textarea></label>
+     <label class="fl">Daripada<input id="g_sender"></label></div></div>
+   <div class="card"><h2>Pembeli</h2><div class="fgrid">
+    <label class="fl">Nama pembeli<input id="g_bname"></label>
+    <label class="fl">No. WhatsApp pembeli<input id="g_bphone" type="tel" inputmode="tel" placeholder="01X-XXX XXXX"></label></div></div>
+   <div class="card"><h2>Penerima & penghantaran</h2>
+    <div class="seg" role="group" aria-label="Cara terima" style="margin-bottom:10px"><button type="button" data-gp="0" aria-pressed="true">🚚 Hantar</button><button type="button" data-gp="1" aria-pressed="false">🏪 Pickup di kedai</button></div>
+    <div class="fgrid">
+    <label class="fl"><span id="g_rnl">Nama penerima</span><input id="g_rname"></label>
+    <label class="fl">Telefon penerima<input id="g_rphone" type="tel" inputmode="tel"></label>
+    <label class="fl full gdel">Alamat penuh<textarea id="g_raddr" rows="3"></textarea></label>
+    <label class="fl gdel">Poskod<input id="g_rpost" inputmode="numeric" maxlength="5"></label>
+    <label class="fl">Tarikh <span id="g_dl">hantar</span><input id="g_date" type="date" value="${TODAY||ymd(new Date())}"></label>
+    <label class="fl">Slot<select id="g_del">${Object.entries(DEL).map(([k,t])=>`<option value="${k}">${t.replace('Percuma ','')}</option>`).join('')}</select></label>
+    <label class="fl" id="g_wt" hidden>Masa khusus<input id="g_time" type="time" min="09:00" max="22:00"></label>
+    <label class="fl">Caj penghantaran RM <span class="mini" style="font-weight:400">(kosong = auto)</span><input id="g_fee" type="number" min="0" step="1" placeholder="Auto"></label></div>
+    <p class="mini" id="g_feeh" style="margin:8px 0 0">Auto: RM${FCAT.del.fee} (Jenjarom &amp; Telok Panglima Garang RM${FCAT.del.local}). Slot A/B/C +RM10, masa khusus +RM50. Zon merah +RM20.</p></div>
+   <div class="card"><h2>Harga & bayaran</h2>
+    <div class="disc"><label class="fl">Diskaun<span class="dsr"><select id="g_dt" aria-label="Jenis diskaun"><option value="rm">RM</option><option value="pct">%</option></select><input id="g_dv" type="number" min="0" step="0.01" placeholder="0" aria-label="Nilai diskaun"></span></label>
+     <label class="fl">Sebab diskaun (tak wajib, keluar dalam invoice)<input id="g_dl2" maxlength="60" placeholder="Contoh: order korporat"></label></div>
+    <details><summary class="mini" style="cursor:pointer">Voucher, pelarasan harga, kes khas</summary><div class="fgrid" style="margin-top:8px">
+     <label class="fl">Kod voucher<input id="g_voucher"></label>
+     <label class="fl">Pelarasan harga RM (+/−)<input id="g_adj" type="number" step="1" placeholder="Contoh: -10 atau 15"></label>
+     <label class="fl">Sebab pelarasan<input id="g_adjl"></label>
+     <label class="fl full" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-weight:500"><input type="checkbox" id="g_ov" style="width:auto"> Abaikan had waktu tutup, tarikh ditutup dan kawasan</label>
+     <label class="fl full">Nota dalaman<input id="g_notes"></label></div></details>
+    <h2 style="margin-top:14px">Cara bayar</h2><div class="opt2">
+     <label><input type="radio" name="gpm" value="invoice" checked> Invoice + QR bank (sahkan bila pembeli hantar resit)</label>
+     <label><input type="radio" name="gpm" value="link"> Link bayaran online (DuitNow / FPX, automatik)</label>
+     <label><input type="radio" name="gpm" value="paid"> Pembeli dah bayar</label></div>
+    <label class="fl" id="g_wpref" hidden style="margin-top:10px">Rujukan bayaran (no. transaksi)<input id="g_pref"></label></div>
+   <div class="qbox" aria-live="polite"><div id="gqv" class="mini">Isi borang untuk tengok harga.</div>
+    <button class="btn" id="ggo" type="submit" style="width:100%;margin-top:10px" disabled>Cipta order</button></div></form>`;
+  bindNoTabs(el);
+  if($('#gcat'))$('#gcat').onclick=e=>{e.preventDefault();tab='stock';render();setTimeout(()=>$('#fcatc')?.scrollIntoView({behavior:'smooth'}),400)};
+  let pickup=false,tm,ok=false;
+  const V=id=>$('#'+id).value,sched=()=>{clearTimeout(tm);tm=setTimeout(quote,350)};
+  const fillPrice=row=>{const s=row.querySelector('.li');if(s&&byId[s.value])row.querySelector('.lp').value=+byId[s.value].price};
+  const bindLine=row=>{
+    row.querySelector('.lc').onchange=e=>{const c=e.target.value;row.querySelector('.lw').innerHTML=c==='lain'?'<input class="ln" placeholder="Nama item" maxlength="80" aria-label="Nama item">':`<select class="li" aria-label="Item">${itemOpts(c)}</select>`;
+      if(c==='lain')row.querySelector('.lp').value='';else{row.querySelector('.li').onchange=()=>{fillPrice(row);sched()};fillPrice(row)}row.querySelectorAll('input').forEach(i=>i.oninput=sched);sched()};
+    if(row.querySelector('.li'))row.querySelector('.li').onchange=()=>{fillPrice(row);sched()};
+    row.querySelector('.lx').onclick=()=>{row.remove();if(!$('#glines').children.length)addLine();sched()};
+    row.querySelectorAll('input').forEach(i=>i.oninput=sched);fillPrice(row)};
+  const addLine=()=>{$('#glines').insertAdjacentHTML('beforeend',lineHtml($('#glines').lastElementChild?.querySelector('.lc')?.value||'bq'));bindLine($('#glines').lastElementChild)};
+  $('#gadd').onclick=()=>{addLine();sched()};
+  bindLine($('#glines').firstElementChild);
+  el.querySelectorAll('[data-gp]').forEach(b=>b.onclick=()=>{pickup=b.dataset.gp==='1';el.querySelectorAll('[data-gp]').forEach(x=>x.setAttribute('aria-pressed',x===b));
+    el.querySelectorAll('.gdel').forEach(x=>x.hidden=pickup);$('#g_rnl').textContent=pickup?'Nama yang ambil (kosong = pembeli)':'Nama penerima';$('#g_dl').textContent=pickup?'pickup':'hantar';sched()});
+  const lines=()=>[...$('#glines').children].map(r=>{const c=r.querySelector('.lc').value,li=r.querySelector('.li');
+    return{cat:c,id:c==='lain'?'':(li?li.value:''),name:c==='lain'?(r.querySelector('.ln')?.value||''):'',design:r.querySelector('.ld').value,qty:+r.querySelector('.lqty').value||0,price:r.querySelector('.lp').value}});
+  const data=()=>({kind:'full',lines:lines(),pickup,del_fee:V('g_fee'),occ:V('g_occ'),photo_count:+V('g_pc')||0,wish:V('g_wish'),sender:V('g_sender'),
+    bname:V('g_bname'),bphone:V('g_bphone'),rname:V('g_rname'),rphone:V('g_rphone'),raddr:V('g_raddr'),rpost:V('g_rpost').replace(/\D/g,''),date:V('g_date'),del:V('g_del'),time:V('g_time'),
+    disc_type:V('g_dt'),disc_val:V('g_dv'),disc_label:V('g_dl2'),voucher:V('g_voucher').trim(),adj_amt:V('g_adj'),adj_label:V('g_adjl'),override:$('#g_ov').checked,notes:V('g_notes'),
+    pay_mode:el.querySelector('[name=gpm]:checked').value,pay_ref:V('g_pref')});
+  async function quote(){const d=data();$('#g_wt').hidden=d.del!=='spec';$('#g_wpref').hidden=d.pay_mode!=='paid';
+    try{const j=await api('quote',{method:'POST',body:{data:d,photos:$('#g_photos').files.length}});
+      const L=j.lines||[],sub=L.filter(([,p])=>p>0).reduce((a,[,p])=>a+ +p,0),off=-L.filter(([,p])=>p<0).reduce((a,[,p])=>a+ +p,0);
+      const rows=L.map(([l,p])=>`<div class="rowx"><span>${h(String(l).replace(/^Item: /,''))}</span><span${p<0?' style="color:var(--ok);font-weight:600"':''}>${p<0?'−'+rm(-p):p?rm(p):'Percuma'}</span></div>`).join('')
+        +(off?`<div class="rowx"><span>Subtotal</span><span>${rm(sub)}</span></div>`:'')+(j.total!=null?`<div class="rowx qtot"><span>Jumlah perlu dibayar</span><span>${rm(j.total)}</span></div>`:'');
+      ok=!j.errors;$('#gqv').innerHTML=rows+(j.errors?`<div class="msg warn" style="margin:8px 0 0"><b>Belum lengkap:</b><br>${j.errors.map(h).join('<br>')}</div>`:j.zone==='out'&&!pickup?'<div class="msg warn" style="margin:6px 0 0">Poskod di luar kawasan. Tambah caj melalui pelarasan harga jika perlu.</div>':'');
+      $('#ggo').disabled=!ok;$('#ggo').textContent={paid:'Cipta order (dah bayar)',link:'Cipta order & link bayaran',invoice:'Cipta order & invoice'}[d.pay_mode];}catch(e){}}
+  el.querySelectorAll('#gf input:not(.lqty):not(.lp):not(.ld):not(.ln),#gf select:not(.lc):not(.li),#gf textarea').forEach(i=>i.addEventListener(i.type==='file'||i.tagName==='SELECT'||i.type==='radio'||i.type==='checkbox'?'change':'input',sched));
+  quote();
+  $('#gf').onsubmit=async e=>{e.preventDefault();if(!ok)return;const d=data(),fd=new FormData();fd.append('data',JSON.stringify(d));[...$('#g_photos').files].forEach(f=>fd.append('photo[]',f));
+    $('#ggo').disabled=true;$('#ggo').textContent='Menyimpan…';
+    let j;try{j=await api('manual',{method:'POST',body:fd})}catch(x){toast(x.message);$('#ggo').disabled=false;quote();return}
     showInvoice(el,j,d.bphone,()=>NewOrder(el));};
 }
 function waLink(phone,text){return 'https://api.whatsapp.com/send?phone='+String(phone).replace(/\D/g,'').replace(/^0/,'60')+'&text='+encodeURIComponent(text)}
@@ -794,7 +897,7 @@ async function Report(el){
     <div class="kpi"><small>Kadar bayar</small><b>${j.pay_rate}%</b><div class="mini">${j.created} order masuk dalam tempoh ni</div></div>
     ${+j.discount?`<div class="kpi"><small>Diskaun voucher</small><b>${rm(j.discount)}</b></div>`:''}</div>
    <div class="card"><h2>Jualan harian (${rp.by==='del'?'ikut tarikh hantar':'ikut tarikh bayar'})</h2><div class="chartbox"><div id="ch2" style="height:260px"></div></div></div>
-   <div class="ranks">${tbl('Bouquet',R.bouquet)}${tbl('Momen',R.occasion)}${tbl('Balloon',R.balloon)}${tbl('Kek',R.cake)}${tbl('Jenis penghantaran',R.del)}${tbl('Zon',R.zone)}${tbl('Kawasan (poskod)',R.area)}${tbl('Sumber order',R.source)}${tbl('Voucher',R.voucher)}</div>
+   <div class="ranks">${tbl('Bouquet',R.bouquet)}${R.full&&R.full.length?tbl('Katalog penuh (unit)',R.full):''}${tbl('Momen',R.occasion)}${tbl('Balloon',R.balloon)}${tbl('Kek',R.cake)}${tbl('Jenis penghantaran',R.del)}${tbl('Zon',R.zone)}${tbl('Kawasan (poskod)',R.area)}${tbl('Sumber order',R.source)}${tbl('Voucher',R.voucher)}</div>
    <p class="mini">Order batal tak dikira. "Kadar bayar" = order masuk dalam tempoh ni yang dah dibayar.${j.orderla&&j.orderla.n?` Termasuk <b>${j.orderla.n} order Orderla</b> (${rm(j.orderla.s)}): tarikh bayar dikira ikut tarikh order, bouquet/balloon/kek dibaca dari nama item, dan Orderla tiada data momen kecuali ada soalan "occasion" dalam borang.`:''}</p>`;
   const A=j.after;if(A){const bx=document.createElement('div');bx.className='card';
     bx.innerHTML=`<h2>🤝 Selepas hantar</h2><div class="grid4" style="margin-bottom:10px"><div class="kpi"><small>Order bermasalah</small><b>${A.issues}</b></div><div class="kpi"><small>Mesej terima kasih automatik</small><b>${A.auto}</b></div><div class="kpi"><small>Penerima buka halaman hadiah</small><b>${A.rcp_views}</b></div></div>
@@ -848,7 +951,7 @@ async function Cal(el){
   const show=d=>{cal.sel=d;el.querySelectorAll('[data-d]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.d===d));const L=D[d]||[];
     $('#cday').innerHTML=(cal.by==='del'?`<div class="card" id="prodc"></div>`:'')+`<div class="card"><h2>${fmtD(d)} · ${cal.by==='del'?'dihantar':'diorder'}</h2>${L.length?`<div class="list">${L.map(o=>o.src==='orderla'
       ?olRow(o,o.no_del&&cal.by==='del'?' · <i>tarikh hantar tak dijumpai, ikut tarikh order</i>':'')
-      :`<button class="ord" data-id="${o.id}"><div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">${h(delTxt(o))} · untuk ${h(o.r_name)} · ${h(CAT.bq[o.bouquet]||o.bouquet)}</div></div><div class="r"><div class="t">${rm(o.total)}</div></div></button>`).join('')}</div>`:'<p class="mini">Tiada order.</p>'}</div>`;
+      :`<button class="ord" data-id="${o.id}"><div><span class="c">${h(o.code)}</span> ${pill(o)}<div class="m">${h(delTxt(o))} · untuk ${h(o.r_name)} · ${o.kind==='full'?'🛍️ ':''}${h(o.summary||CAT.bq[o.bouquet]||o.bouquet)}</div></div><div class="r"><div class="t">${rm(o.total)}</div></div></button>`).join('')}</div>`:'<p class="mini">Tiada order.</p>'}</div>`;
     if(cal.by==='del')prodBox($('#prodc'),d);
     bindOl($('#cday'),()=>Cal(el));
     $('#cday').querySelectorAll('.ord[data-id]').forEach(b=>b.onclick=()=>openOrder(+b.dataset.id,()=>Cal(el)));};
@@ -1017,6 +1120,20 @@ async function Stock(el){
   const saveMeta=async k=>{const [t,i]=k.split('|'),code=el.querySelector(`[data-code="${CSS.escape(k)}"]`),pr=el.querySelector(`[data-price="${CSS.escape(k)}"]`);
     try{await api('pmeta',{method:'POST',body:{type:t,item_id:i,code:code?code.value:'',price:pr?pr.value:''}});PM[t]=PM[t]||{};PM[t][i]={code:(code?code.value:'').toUpperCase()||null,price:pr&&pr.value!==''?+pr.value:null};toast('Disimpan')}catch(e){toast(e.message)}};
   el.querySelectorAll('[data-code],[data-price]').forEach(i=>i.onchange=()=>saveMeta(i.dataset.code||i.dataset.price));
+  if(own)fullCatEditor(el);
+}
+async function fullCatEditor(el){
+  let j;try{j=await api('fullcat')}catch(e){return}
+  const box=document.createElement('div');box.className='card';box.id='fcatc';el.appendChild(box);
+  const row=c=>`<div class="fcat" data-id="${h(c.id||'')}"><select class="fc" aria-label="Kategori">${Object.entries(j.cats).map(([k,n])=>`<option value="${k}"${k===c.cat?' selected':''}>${h(n)}</option>`).join('')}</select>
+    <input class="fn" value="${h(c.name||'')}" placeholder="Nama item / saiz" maxlength="80" aria-label="Nama item"><input class="fp" type="number" min="0" step="0.01" value="${c.price??''}" placeholder="RM" aria-label="Harga">
+    <label class="sw" title="Papar dalam borang order"><input type="checkbox" class="fo" ${+c.on||c.on===undefined?'checked':''} aria-label="Aktif"><span></span></label><button type="button" class="tx fx" style="position:static" aria-label="Buang">×</button></div>`;
+  box.innerHTML=`<h2>🛍️ Katalog penuh (untuk + Order → Katalog penuh)</h2><p class="mini" style="margin:0 0 8px">Senarai harga katalog 2026. Design (gambar dalam katalog PDF) ditulis dalam setiap order. Tutup suis untuk sembunyikan item tanpa memadam.</p>
+    <div id="fcl">${j.items.map(row).join('')}</div><div class="bar" style="margin:10px 0 0"><button type="button" class="btn ghost sm" id="fca">＋ Tambah item</button><button type="button" class="btn sm" id="fcs">Simpan katalog</button></div>`;
+  const bind=()=>box.querySelectorAll('.fx').forEach(b=>b.onclick=()=>b.closest('.fcat').remove());bind();
+  $('#fca').onclick=()=>{$('#fcl').insertAdjacentHTML('beforeend',row({cat:'lain',on:1}));bind();$('#fcl').lastElementChild.querySelector('.fn').focus()};
+  $('#fcs').onclick=async()=>{const items=[...box.querySelectorAll('.fcat')].map(r=>({id:r.dataset.id,cat:r.querySelector('.fc').value,name:r.querySelector('.fn').value.trim(),price:r.querySelector('.fp').value,on:r.querySelector('.fo').checked?1:0})).filter(x=>x.name);
+    try{await api('fullcat',{method:'POST',body:{items}});toast('Katalog disimpan')}catch(e){toast(e.message)}};
 }
 /* ---------- blocked dates ---------- */
 async function Dates(el){

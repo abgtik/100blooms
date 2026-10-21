@@ -92,6 +92,7 @@ textarea{width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(
 .gch{display:grid;grid-template-columns:1fr 1fr;gap:10px}.gch button{border:1.5px solid var(--accent);background:transparent;border-radius:16px;padding:14px 8px;cursor:pointer;color:inherit;font:inherit}.gch button b{display:block;font:700 18px var(--display);color:var(--accent)}.gch button span{font-size:13px}.gch button:disabled{opacity:.5}
 .docs{display:flex;gap:8px}.docs .btn{flex:1;text-align:center;text-decoration:none}.bill{margin-top:12px}.bill summary{cursor:pointer;font-weight:600;color:var(--accent)}.bill textarea{width:100%}.bill .btn{margin-top:8px}
 .bankalt{margin-top:12px}.bankalt summary{cursor:pointer;font-weight:600;color:var(--accent);padding:6px 0}
+.flist{display:grid;gap:8px}.fli{padding:10px 12px;border:1px solid var(--line,#eadde2);border-radius:12px;background:#fff}.fli b{display:block}.fli small{color:var(--soft,#7d6370)}
 </style>
 </head>
 <body>
@@ -147,6 +148,7 @@ async function show(o){await useLang(o.lang||'ms');
   const steps=[['Order diterima',fmtDT(o.created_at)],['Bayaran diterima',fmtDT(o.paid_at)],['Hadiah sedang disiapkan',o.status==='siap'?'Hadiah dah siap dan menunggu runner':'Team kami sedang susun bouquet, kek dan balloon'],['Dalam penghantaran','Runner dalam perjalanan ke penerima'],['Hadiah dah sampai','Terima kasih kerana memilih 100 Blooms']];
   const idx=o.status==='batal'?-1:!o.paid?0:({baru:1,disiapkan:2,siap:2,dalam_penghantaran:3,sampai:4,selesai:4}[o.status]??1);
   const ph=f=>`/api/photo.php?c=${encodeURIComponent(o.code)}&k=${encodeURIComponent(o.k)}&f=${encodeURIComponent(f)}`;
+  const FULL=o.full&&o.full.length?`<div class="flist">${o.full.map(l=>`<div class="fli"><b>${l.qty>1?l.qty+'× ':''}${h(l.name)}</b>${l.design?`<small>${h(l.design)}</small>`:''}</div>`).join('')}</div>`:'';
   const bq=(I[o.bouquet.id]||{}).bq, bal=(I.bal||{})[o.balloon.id]||'assets/img/balloon/'+o.balloon.id+'.webp', cake=(I.cake||{})[o.cake];
   const cakeTxt=o.cake_flavours.length?'Pilihan: '+o.cake_flavours.join(' / '):o.cake;
   const ext=Object.entries(o.extra_cakes||{}).map(([k,n])=>`${k} × ${n}`).join(', ');
@@ -165,11 +167,11 @@ async function show(o){await useLang(o.lang||'ms');
    ${o.recipient_photo?`<section class="card rp" aria-labelledby="t4"><h2 id="t4">Saat hadiah sampai 🌸</h2><img src="${ph(o.recipient_photo)}" alt="Gambar penerima dengan hadiah" data-z><p class="hint" style="margin:8px 0 0">Tekan gambar untuk besarkan, kemudian tekan lama untuk simpan.</p></section>`:''}
    ${afterCards(o)}
    <section class="card" aria-labelledby="t2"><h2 id="t2">Isi hadiah awak</h2>
-    <div class="items">
+    ${FULL||`<div class="items">
      <div class="item"><div class="pic">${bq?`<img src="${img(bq)}" alt="Bouquet ${h(o.bouquet.name)}">`:''}</div><small>Bouquet</small><b>${h(o.bouquet.name)}</b></div>
      <div class="item"><div class="pic">${bal?`<img src="${img(bal)}" alt="Balloon ${h(o.balloon.name)}">`:''}</div><small>Balloon</small><b>${h(o.balloon.name)}</b></div>
      <div class="item" style="grid-column:1/-1"><div class="pic" style="aspect-ratio:3/2">${cake?`<img src="${img(cake)}" alt="Kek ${h(o.cake)}" style="object-fit:cover">`:'<span class="hint">Kek Secret Recipe</span>'}</div><small>Kek Secret Recipe</small><b>${h(cakeTxt)}</b>${ext?`<span class="x">+ ${h(ext)}</span>`:''}</div>
-    </div>
+    </div>`}
     ${o.photo_count?`<h2 style="margin-top:18px">Polaroid (${o.photos.length}/${o.photo_count})</h2>
      ${o.photos.length?`<div class="polas">${o.photos.map((f,i)=>`<div class="pola"><img src="${ph(f)}" alt="Polaroid ${i+1}" loading="lazy" data-z>${ed.photo?`<button class="px" data-pdel="${h(f)}" aria-label="Buang gambar ${i+1}">×</button>`:''}</div>`).join('')}</div>`:''}
      ${ed.photo&&o.photos.length<o.photo_count?`<div class="up"><p class="hint" style="margin:0 0 8px">${o.photos.length?`Boleh tambah ${o.photo_count-o.photos.length} gambar lagi.`:`Belum ada gambar. Upload ${o.photo_count} gambar untuk dicetak jadi polaroid.`}</p>

@@ -102,7 +102,7 @@ function remember_clear(string $kind, ?int $uidAll = null): void {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 19) return;
+  if ($v >= 20) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -149,6 +149,9 @@ function migrate(PDO $pdo): void {
   $run("ALTER TABLE orders ADD COLUMN lang VARCHAR(2) NOT NULL DEFAULT 'ms'");
   // v19: "Ingat saya" sign-ins (admin / Sales HQ and agent portal) that outlive the PHP session
   $run("CREATE TABLE IF NOT EXISTS remember_tokens (hash CHAR(64) PRIMARY KEY, kind VARCHAR(8) NOT NULL, uid INT NOT NULL, expires_at DATETIME NOT NULL, created_at DATETIME NOT NULL)$tail");
+  // v20: full-catalogue orders (Admin HQ only): kind='full' and the item lines as JSON
+  $run("ALTER TABLE orders ADD COLUMN kind VARCHAR(6) NOT NULL DEFAULT 'combo'");
+  $run('ALTER TABLE orders ADD COLUMN items TEXT NULL');
   // v14/v15: new catalogue items (e.g. Congrats Grad Polkadot balloon) get a row in Stok
   // v16: cake menu change (New York Cheese added) - cakes get their Stok rows too
   $ins = $my ? 'INSERT IGNORE' : 'INSERT OR IGNORE'; $C = catalog();
@@ -160,7 +163,7 @@ function migrate(PDO $pdo): void {
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','19')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','20')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
@@ -212,6 +215,12 @@ const STATUS_LABEL = ['menunggu_bayaran' => 'Menunggu bayaran', 'baru' => 'Baru 
   'dalam_penghantaran' => 'Dalam penghantaran', 'sampai' => 'Dah sampai', 'selesai' => 'Selesai', 'batal' => 'Batal'];
 /** Checklist items for this order: [key => label]. Polaroid only if photos were sent, gift only if a gift voucher was used. */
 function prep_items(array $o): array {
+  if (is_full($o)) { // one checklist line per catalogue item
+    $it = []; foreach (full_items($o) as $i => $l) $it['it' . $i] = (FULL_CATS[$l['cat']][0] ?? 'Item') . ': ' . full_line_name($l) . ' × ' . (int)$l['qty'];
+    if ((int)$o['photo_count'] > 0) $it['polaroid'] = 'Polaroid dicetak (' . (int)$o['photo_count'] . ' keping)';
+    $it['wishcard'] = 'Wishcard ditulis';
+    return $it;
+  }
   $C = catalog(); $M = product_meta(); $code = fn($t, $id) => ($c = $M[$t][$id]['code'] ?? '') !== '' ? $c . ' - ' : ''; // product code first, so the team picks the right item
   $it = ['bouquet' => 'Bouquet ' . $code('bq', $o['bouquet']) . ($C['bq'][$o['bouquet']] ?? $o['bouquet']), 'balloon' => 'Balloon ' . $code('bal', $o['balloon']) . ($C['bal'][$o['balloon']] ?? $o['balloon']),
     'cake' => 'Kek dibeli (' . $o['cake'] . ')'];
@@ -652,7 +661,8 @@ function wa_order(array $o, string $event): void {
       $bal = $C['bal'][$o['balloon']] ?? $o['balloon']; $bc = $M['bal'][$o['balloon']]['code'] ?? '';
       $ag = $o['agent_ref'] ? q('SELECT id,name,phone FROM agents WHERE id=?', [(int)$o['agent_ref']])->fetch() : null;
       $team = "🛎️ *Order dibayar* · {$o['code']}\n💰 RM" . number_format((float)$o['total'], 2) . ' · ' . ($o['pay_channel'] ?: '-')
-        . "\n🚚 $day · $slot\n💐 " . ($C['bq'][$o['bouquet']] ?? $o['bouquet']) . ($o['bq_note'] ? " ({$o['bq_note']})" : '') . "\n🎈 " . ($bc ? "$bc - " : '') . $bal . "\n🍰 {$o['cake']}"
+        . "\n🚚 $day · $slot\n" . (is_full($o) ? '🛍️ Katalog penuh:' . implode('', array_map(fn($l) => "\n• " . (int)$l['qty'] . '× ' . full_line_name($l), full_items($o)))
+          : '💐 ' . ($C['bq'][$o['bouquet']] ?? $o['bouquet']) . ($o['bq_note'] ? " ({$o['bq_note']})" : '') . "\n🎈 " . ($bc ? "$bc - " : '') . $bal . "\n🍰 {$o['cake']}")
         . "\n👤 Untuk {$o['r_name']} ({$o['r_post']})\n🧾 Pembeli {$o['b_name']} · " . wa_num($o['b_phone'])
         . ($ag ? "\n🤝 Agent #{$ag['id']} {$ag['name']}" : '') . ($o['voucher'] ? "\n🎟️ Voucher {$o['voucher']}" : '')
         . ($need ? "\n⚠️ Belum: " . implode(', ', $need) : '') . "\n\n" . SITE_URL . '/admin/';
@@ -672,7 +682,7 @@ function wa_order(array $o, string $event): void {
             . "\n\nKomisen dibayar setiap Jumaat bila baki RM" . number_format(payout_min(), 0) . " ke atas.\n" . SITE_URL . '/agent/'); }
       }
     } elseif ($event === 'unpaid') {
-      $bw = wa_num($o['b_phone']); $C2 = $C['bq'][$o['bouquet']] ?? $o['bouquet'];
+      $bw = wa_num($o['b_phone']); $C2 = order_summary($o);
       $ag = $o['agent_ref'] ? q('SELECT id,name FROM agents WHERE id=?', [(int)$o['agent_ref']])->fetch() : null;
       $team = "⏳ *Order belum dibayar* · {$o['code']}\n(" . UNPAID_MIN . " minit selepas submit)\n💰 RM" . number_format((float)$o['total'], 2)
         . "\n🧾 {$o['b_name']} · $bw\n🚚 $day · $slot\n💐 $C2 untuk {$o['r_name']} ({$o['r_post']})" . ($ag ? "\n🤝 Agent #{$ag['id']} {$ag['name']}" : '')
@@ -870,6 +880,24 @@ const SLOT_EN = ['free' => '10:00 AM – 6:00 PM', 'A' => '9:00 AM – 12:00 PM'
 function invoice_rows(array $o): array {
   $C = catalog(); $M = product_meta();
   $lines = json_decode((string)$o['price_lines'], true) ?: [];
+  if (is_full($o)) {
+    $items = []; $sub = 0.0; $fees = 0.0; $extra = []; $discNames = []; $delName = '';
+    foreach (full_items($o) as $l) { $amt = round($l['price'] * $l['qty'], 2); $items[] = ['name' => full_line_name($l), 'subs' => [], 'qty' => (int)$l['qty'], 'price' => (float)$l['price'], 'amount' => $amt]; $sub += $amt; }
+    $items[] = ['name' => 'Wishcard', 'subs' => [], 'qty' => 1, 'price' => 0.0, 'amount' => 0.0, 'free' => true];
+    foreach ($lines as [$label, $amt]) { $amt = (float)$amt;
+      if (str_starts_with($label, 'Item: ')) continue;
+      if ($amt < 0 && str_starts_with($label, 'Diskaun')) $discNames[] = trim(str_replace(['(', ')'], '', preg_replace('/^Diskaun\s*/u', '', $label)));
+      if (str_starts_with($label, 'Polaroid × ')) { $n = (int)preg_replace('/\D/', '', $label) ?: 1; $items[] = ['name' => 'Polaroid', 'subs' => [], 'qty' => $n, 'price' => (float)EXTRA_PHOTO, 'amount' => $amt]; $sub += $amt; }
+      elseif (str_starts_with($label, 'Caj penghantaran') || str_starts_with($label, 'Pickup di kedai')) { $fees += $amt; $delName = preg_replace('/^Caj penghantaran \((.*)\)$/u', 'Delivery $1', $label); }
+      elseif (str_starts_with($label, 'Caj kawasan')) { $fees += $amt; $extra[] = [$label, $amt]; }
+      elseif (str_starts_with($label, '🎁')) $items[] = ['name' => $label, 'subs' => [], 'qty' => 1, 'price' => 0.0, 'amount' => 0.0, 'free' => true];
+      elseif ($amt > 0) { $items[] = ['name' => $label, 'subs' => [], 'qty' => 1, 'price' => $amt, 'amount' => $amt]; $sub += $amt; }
+    }
+    $areaFee = array_sum(array_column($extra, 1));
+    $date = date('l, j F Y', strtotime($o['del_date'])) . ' (' . ($o['del_type'] === 'spec' ? $o['del_time'] : (SLOT_EN[$o['del_type']] ?? '')) . ')';
+    return ['items' => $items, 'sub' => round($sub, 2), 'fees' => round($fees, 2), 'del_fee' => round($fees - $areaFee, 2), 'extra' => $extra, 'del_name' => $delName,
+      'disc' => round($sub + $fees - (float)$o['total'], 2), 'disc_label' => implode(', ', array_filter($discNames)), 'date' => $date];
+  }
   $bqName = $C['bq'][$o['bouquet']] ?? $o['bouquet']; $balName = $C['bal'][$o['balloon']] ?? $o['balloon'];
   $balCode = $M['bal'][$o['balloon']]['code'] ?? ''; $bqCode = $M['bq'][$o['bouquet']]['code'] ?? '';
   $cakeTxt = $o['cake'] === OTHER_CAKE ? implode(' / ', json_decode((string)$o['cake_flavours'], true) ?: []) . ' (ikut stok)' : $o['cake'];
@@ -1005,6 +1033,46 @@ function voucher_apply(array $L, array $v, int $photoCount, float $setSubtotal) 
   }
 }
 
+// ---------- full catalogue (Admin HQ orders beyond Combo Jimat) ----------
+/** Categories: label, production group (bq = arrange, bal = pump, cake = buy, etc). */
+const FULL_CATS = ['bq' => ['Bouquet', 'bq'], 'hab' => ['Hot Air Balloon', 'bq'], 'box' => ['Flower Box', 'bq'], 'vase' => ['Vase', 'bq'], 'fruit' => ['Fruit Basket', 'bq'],
+  'bubble' => ['Bubble Balloon', 'bal'], 'foil' => ['Foil Balloon', 'bal'], 'cake' => ['Kek', 'cake'], 'dessert' => ['Brownies & dessert', 'etc'],
+  'bear' => ['Teddy bear', 'etc'], 'addon' => ['Add-on bunga & coklat', 'etc'], 'svc' => ['Servis', 'etc'], 'lain' => ['Lain-lain', 'etc']];
+/** Catalogue 2026 price list (owner can edit in admin → Stok). The design itself goes in each order line's note. */
+function full_catalog_seed(): array {
+  $r = []; $add = function ($id, $c, $n, $p) use (&$r) { $r[] = ['id' => $id, 'cat' => $c, 'name' => $n, 'price' => (float)$p, 'on' => 1]; };
+  foreach (['bq' => 'Bouquet', 'hab' => 'Hot Air Balloon', 'box' => 'Flower Box'] as $k => $nm) foreach (['M' => 130, 'L' => 150, 'XL' => 200] as $s => $p) $add("$k-" . strtolower($s), $k, "$nm ($s)", $p);
+  $add('fruit', 'fruit', 'Fruit Basket (RM130–RM200 ikut design)', 130);
+  foreach ([12 => 135, 25 => 220, 36 => 280] as $n => $p) $add("vase-rr$n", 'vase', "Vase Red Roses $n kuntum", $p);
+  foreach (['Varient' => 'var', 'Soft Pastel' => 'sp', 'Victoria' => 'vic'] as $nm => $k) foreach ([20 => 180, 25 => 220, 36 => 280] as $n => $p) $add("vase-$k$n", 'vase', "Vase $nm $n kuntum", $p);
+  foreach ([1 => 200, 2 => 250, 3 => 320] as $n => $p) $add("vase-pre$n", 'vase', "Vase Preciosa (RM$p)", $p);
+  $add('bubble-s', 'bubble', 'Bubble Balloon (S)', 25); $add('bubble-xl', 'bubble', 'Bubble Balloon (XL)', 35);
+  $add('foil', 'foil', 'Foil Balloon tambahan', 10);
+  $add('cake-sel', 'cake', 'Cake Selection 8"', 90); $add('cake-plat', 'cake', 'Platinum Collection 8"', 140);
+  $add('sr-slice', 'cake', 'Secret Recipe sepotong', 20); $add('sr-whole', 'cake', 'Secret Recipe sebiji (1.5–2kg)', 190);
+  $add('brownies', 'dessert', 'Brownies (RM45–RM80)', 45);
+  $add('bear-grad', 'bear', 'Graduation Bear 13cm', 25);
+  foreach (ADDONS as $id => [$n, $p]) $add("ad-$id", 'addon', $n, $p);
+  $add('money', 'svc', 'Servis gubahan money bouquet (tak termasuk duit)', 30);
+  return $r;
+}
+function full_catalog(): array {
+  $j = json_decode((string)setting('full_catalog', ''), true);
+  return is_array($j) && $j ? $j : full_catalog_seed();
+}
+/** Delivery for full-catalogue items: RM30, Jenjarom & Telok Panglima Garang RM20, pickup free. Slot / specific time still add their usual charge. */
+const FULL_DEL_FEE = 30; const FULL_DEL_LOCAL = 20; const FULL_LOCAL_POST = ['42500', '42507', '42509', '42600'];
+function is_full(array $o): bool { return ($o['kind'] ?? 'combo') === 'full'; }
+/** Item lines of a full-catalogue order: [['id','cat','name','design','qty','price'], …] */
+function full_items(array $o): array { $j = jdec($o['items'] ?? null); return array_values(array_filter($j['lines'] ?? [], 'is_array')); }
+function full_line_name(array $l): string { return $l['name'] . (($l['design'] ?? '') !== '' ? ' – ' . $l['design'] : ''); }
+/** One-line summary of what's in the order (lists, calendar, team messages). */
+function order_summary(array $o, int $max = 3): string {
+  if (!is_full($o)) { $C = catalog(); return $C['bq'][$o['bouquet']] ?? (string)$o['bouquet']; }
+  $L = full_items($o); $t = array_map(fn($l) => ((int)$l['qty'] > 1 ? (int)$l['qty'] . '× ' : '') . full_line_name($l), array_slice($L, 0, $max));
+  return implode(', ', $t) . (count($L) > $max ? ' +' . (count($L) - $max) . ' lagi' : '');
+}
+
 // ---------- order validation + pricing (authoritative; the app only previews) ----------
 /** $opts (admin only): override → skip stock, closing-time, closed-date and zone checks; adjust → [amount, label] extra price line. */
 const WISH_MAX = 600;        // customers: about 100 words; the printed card shrinks its font for long messages
@@ -1027,11 +1095,31 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
   if ($gender === '') $E[] = 'Jantina penerima belum dipilih.';
   $call = str_in($in['call'] ?? '', 24); if ($call === '') $E[] = 'Panggilan belum diisi.';
 
-  $bq = (string)($in['bq'] ?? ''); if (!isset($C['bq'][$bq]) || (!$ov && in_array($bq, $off['bq'], true))) $E[] = 'Bouquet tidak tersedia.';
-  $bal = (string)($in['bal'] ?? ''); if (!isset($C['bal'][$bal]) || (!$ov && in_array($bal, $off['bal'], true))) $E[] = 'Balloon tidak tersedia.';
+  $full = !empty($opts['manual']) && ($in['kind'] ?? '') === 'full'; // full catalogue: Admin HQ only
+  $FL = []; $pickup = $full && !empty($in['pickup']);
+  if ($full) {
+    $cat = []; foreach (full_catalog() as $c) $cat[$c['id']] = $c;
+    foreach (array_slice((array)($in['lines'] ?? []), 0, 40) as $l) {
+      if (!is_array($l)) continue; $id = (string)($l['id'] ?? ''); $qty = max(0, min(999, (int)($l['qty'] ?? 0))); if (!$qty) continue;
+      $c = $cat[$id] ?? null; $name = $c ? $c['name'] : str_in($l['name'] ?? '', 80);
+      if ($name === '') { $E[] = 'Nama item lain belum diisi.'; continue; }
+      $price = isset($l['price']) && $l['price'] !== '' ? round((float)$l['price'], 2) : (float)($c['price'] ?? 0);
+      if ($price < 0) { $E[] = 'Harga item tak boleh negatif.'; continue; }
+      $FL[] = ['id' => $c ? $id : 'lain', 'cat' => $c ? $c['cat'] : (isset(FULL_CATS[$l['cat'] ?? '']) ? $l['cat'] : 'lain'), 'name' => $name, 'design' => str_in($l['design'] ?? '', 120), 'qty' => $qty, 'price' => $price];
+    }
+    if (!$FL) $E[] = 'Pilih sekurang-kurangnya satu item katalog.';
+    if ($pickup) { // collected at the shop: the recipient fields describe who collects
+      if (trim((string)($in['rname'] ?? '')) === '') $in['rname'] = $in['bname'] ?? '';
+      if (strlen(digits((string)($in['rphone'] ?? ''))) < 9) $in['rphone'] = $in['bphone'] ?? '';
+      $in['raddr'] = 'Pickup di kedai 100 Blooms, Jenjarom'; $in['rpost'] = '42600';
+    }
+    $in['bq'] = $in['bal'] = $in['cake'] = ''; $in['extraCakes'] = [];
+  }
+  $bq = (string)($in['bq'] ?? ''); if (!$full && (!isset($C['bq'][$bq]) || (!$ov && in_array($bq, $off['bq'], true)))) $E[] = 'Bouquet tidak tersedia.';
+  $bal = (string)($in['bal'] ?? ''); if (!$full && (!isset($C['bal'][$bal]) || (!$ov && in_array($bal, $off['bal'], true)))) $E[] = 'Balloon tidak tersedia.';
   $cakes = array_merge($C['cake_free'], $C['cake_up']);
   $cake = (string)($in['cake'] ?? '');
-  if (!in_array($cake, $cakes, true) || (!$ov && in_array($cake, $off['cake'], true))) $E[] = 'Perisa kek tidak tersedia.';
+  if (!$full && (!in_array($cake, $cakes, true) || (!$ov && in_array($cake, $off['cake'], true)))) $E[] = 'Perisa kek tidak tersedia.';
   $otherFl = [];
   if ($cake === OTHER_CAKE) {
     foreach (array_slice((array)($in['otherFl'] ?? []), 0, 5) as $f) { $f = str_in($f, 40); if ($f !== '') $otherFl[] = $f; }
@@ -1080,13 +1168,23 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
   if ($E) return ['errors' => $E];
 
   // price lines
+  if ($full) {
+    $L = []; foreach ($FL as $l) $L[] = ['Item: ' . full_line_name($l) . ' × ' . $l['qty'], round($l['price'] * $l['qty'], 2)];
+    if ($photoCount > 0) $L[] = ['Polaroid × ' . $photoCount, $photoCount * EXTRA_PHOTO];
+    $base = $pickup ? 0 : (in_array($rpost, FULL_LOCAL_POST, true) ? FULL_DEL_LOCAL : FULL_DEL_FEE);
+    $fee = isset($in['del_fee']) && $in['del_fee'] !== '' && $in['del_fee'] !== null ? max(0, round((float)$in['del_fee'], 2)) : $base + DELIVERY[$del]['fee'];
+    $slotTxt = ['free' => '10am–6pm', 'A' => 'Slot A 9am–12pm', 'B' => 'Slot B 1pm–4pm', 'C' => 'Slot C 5pm–8pm', 'spec' => 'masa khusus ' . $time][$del];
+    $L[] = [($pickup ? 'Pickup di kedai (' : 'Caj penghantaran (') . $slotTxt . ')', $fee];
+    if ($zone === 'plus20' && !$pickup) $L[] = ['Caj kawasan (Rawang / Kuang / Selayang / Sg Buloh)', 20];
+  } else {
   $L = [['Combo Jimat (bouquet ' . $C['bq'][$bq] . ')', BASE_PRICE]];
   if (in_array($cake, $C['cake_up'], true)) $L[] = ['Upgrade kek: ' . $cake, CAKE_UPGRADE];
   if ($extraN) $L[] = ['Kek tambahan × ' . $extraN . ' (' . implode(', ', array_map(fn($k, $n) => "$k × $n", array_keys($extra), $extra)) . ')', $extraN * EXTRA_CAKE];
   if ($photoCount > 1) $L[] = ['Polaroid tambahan × ' . ($photoCount - 1), ($photoCount - 1) * EXTRA_PHOTO];
   $L[] = [DELIVERY[$del]['label'] . ($del === 'spec' ? ' ' . $time : ''), DELIVERY[$del]['fee']];
   if ($zone === 'plus20') $L[] = ['Caj kawasan (Rawang / Kuang / Selayang / Sg Buloh)', 20];
-  $setSub = array_sum(array_column(array_slice($L, 0, count($L) - ($zone === 'plus20' ? 2 : 1)), 1)); // everything before delivery
+  }
+  $setSub = array_sum(array_column(array_slice($L, 0, count($L) - ($zone === 'plus20' && !$pickup ? 2 : 1)), 1)); // everything before delivery
   $vcode = null; $discount = 0.0;
   if (trim((string)($in['voucher'] ?? '')) !== '') {
     $v = voucher_find((string)$in['voucher']);
@@ -1101,7 +1199,7 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
     $n = max(0, min(99, (int)($in['addons'][$id] ?? 0))); if ($n) $L[] = ["Add-on: $an × $n", $ap * $n];
   }
   if (!empty($opts['disc']) && (float)$opts['disc'][1] > 0) { // team discount (RM or %), on everything except delivery charges
-    $base = 0.0; foreach ($L as [$lab, $amt]) if (!str_starts_with($lab, DELIVERY[$del]['label']) && !str_starts_with($lab, 'Caj kawasan')) $base += (float)$amt;
+    $base = 0.0; foreach ($L as [$lab, $amt]) if (!str_starts_with($lab, DELIVERY[$del]['label']) && !str_starts_with($lab, 'Caj kawasan') && !str_starts_with($lab, 'Caj penghantaran') && !str_starts_with($lab, 'Pickup di kedai')) $base += (float)$amt;
     [$dt, $dv, $dl] = $opts['disc']; $off = round(min(max(0, $base), $dt === 'pct' ? $base * min(100, $dv) / 100 : $dv), 2);
     if ($off > 0) { $L[] = ['Diskaun' . ($dt === 'pct' ? ' ' . rtrim(rtrim(number_format($dv, 2, '.', ''), '0'), '.') . '%' : '') . (trim($dl) !== '' ? ' (' . str_in($dl, 60) . ')' : ''), -$off]; $discount += $off; }
   }
@@ -1121,7 +1219,7 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
     'voucher' => $vcode, 'discount' => $discount,
     'bq_note' => !empty($opts['manual']) ? (str_in($in['bq_note'] ?? '', 100) ?: null) : null,
     'lang' => ($in['lang'] ?? '') === 'en' ? 'en' : 'ms',
-  ]];
+  ] + ($full ? ['kind' => 'full', 'items' => json_encode(['lines' => $FL, 'pickup' => $pickup], JSON_UNESCAPED_UNICODE)] : [])];
 }
 
 /** Validates uploaded photo[] files. Returns [[tmp, ext], …] or fails the request. */
@@ -1277,7 +1375,7 @@ function notify_paid(array $o): void {
   if (!defined('NOTIFY_EMAIL') || !NOTIFY_EMAIL) return;
   $C = catalog();
   $body = "Order baru DIBAYAR: {$o['code']}\nJumlah: RM{$o['total']}\nTarikh hantar: {$o['del_date']} ({$o['del_type']}" . ($o['del_time'] ? " {$o['del_time']}" : '') . ")\n"
-    . "Bouquet: " . ($C['bq'][$o['bouquet']] ?? $o['bouquet']) . "\nPenerima: {$o['r_name']}, {$o['r_post']}\nPembeli: {$o['b_name']} {$o['b_phone']}\n\nLihat di " . SITE_URL . "/admin/";
+    . (is_full($o) ? 'Item: ' : 'Bouquet: ') . order_summary($o, 10) . "\nPenerima: {$o['r_name']}, {$o['r_post']}\nPembeli: {$o['b_name']} {$o['b_phone']}\n\nLihat di " . SITE_URL . "/admin/";
   $from = defined('MAIL_FROM') && MAIL_FROM ? MAIL_FROM : NOTIFY_EMAIL;
   if (!@mail(NOTIFY_EMAIL, "[100 Blooms] Order dibayar {$o['code']} RM{$o['total']}", $body, "From: 100 Blooms <$from>\r\nContent-Type: text/plain; charset=utf-8", '-f' . $from))
     error_log("100blooms: notify mail failed for {$o['code']}");

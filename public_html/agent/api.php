@@ -105,12 +105,12 @@ case 'orders': // month view by delivery date
   $m = need_agent();
   $mon = preg_match('/^\d{4}-\d{2}$/', (string)($_GET['m'] ?? '')) ? $_GET['m'] : date('Y-m');
   $from = "$mon-01"; $to = date('Y-m-t', strtotime($from));
-  $rows = q("SELECT o.id,o.code,o.created_at,o.del_date,o.del_type,o.del_time,o.bouquet,o.r_name,o.r_phone,o.r_addr,o.r_post,o.b_name,o.pay_status,o.status,o.total,c.amount AS comm,c.payout_id
+  $rows = q("SELECT o.id,o.code,o.created_at,o.del_date,o.del_type,o.del_time,o.bouquet,o.kind,o.items,o.r_name,o.r_phone,o.r_addr,o.r_post,o.b_name,o.pay_status,o.status,o.total,c.amount AS comm,c.payout_id
     FROM orders o LEFT JOIN commissions c ON c.order_id=o.id WHERE o.agent_ref=? AND o.del_date BETWEEN ? AND ? ORDER BY o.del_date, o.created_at", [(string)$m['id'], $from, $to])->fetchAll();
   $C = catalog();
   json_out(['month' => $mon, 'rows' => array_map(fn($o) => [
     'code' => $o['code'], 'created_at' => $o['created_at'], 'del_date' => $o['del_date'], 'del' => $o['del_type'] === 'spec' ? 'Masa khusus ' . $o['del_time'] : (DELIVERY[$o['del_type']]['label'] ?? ''),
-    'bouquet' => $C['bq'][$o['bouquet']] ?? $o['bouquet'], 'r_name' => $o['r_name'], 'r_phone' => mask_phone($o['r_phone']), 'area' => area_of($o['r_addr'], $o['r_post']),
+    'bouquet' => order_summary($o), 'r_name' => $o['r_name'], 'r_phone' => mask_phone($o['r_phone']), 'area' => area_of($o['r_addr'], $o['r_post']),
     'buyer' => explode(' ', trim($o['b_name']))[0], 'paid' => $o['pay_status'] === 'paid', 'status' => $o['status'], 'status_label' => AG_STATUS[$o['status']] ?? $o['status'],
     'total' => (float)$o['total'], 'comm' => $o['comm'] !== null ? (float)$o['comm'] : null, 'comm_paid' => $o['payout_id'] !== null,
   ], $rows)]);

@@ -83,8 +83,8 @@ case 'orders':
   $where = $W ? 'WHERE ' . implode(' AND ', $W) : '';
   $order = $f === 'pending' || $by === 'created_at' ? 'created_at DESC' : "del_date ASC, CASE del_type WHEN 'A' THEN 1 WHEN 'spec' THEN 2 WHEN 'free' THEN 3 WHEN 'B' THEN 4 ELSE 5 END, created_at";
   if ($f === 'all' || $f === 'delivered' || $f === 'issue') $order = 'created_at DESC';
-  $rows = q("SELECT id,code,lang,created_at,pay_status,status,bouquet,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher,wish,photos,created_by,agent_ref,issue FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
-  foreach ($rows as &$r) { $r['src'] = order_source($r); $ii = issue_of($r); $r['issue'] = $ii ? (empty($ii['resolved']) ? 'open' : 'done') : null; unset($r['created_by'], $r['agent_ref']); $r['progress'] = progress_text($r); $r['need'] = array_values(array_filter([$r['wish'] === WISH_NONE ? 'Wishcard belum' : null, count(jdec($r['photos'])) < (int)$r['photo_count'] ? 'Polaroid ' . count(jdec($r['photos'])) . '/' . (int)$r['photo_count'] : null])); unset($r['price_lines'], $r['prep'], $r['del_steps'], $r['wish'], $r['photos']); } unset($r);
+  $rows = q("SELECT id,code,lang,kind,items,created_at,pay_status,status,bouquet,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher,wish,photos,created_by,agent_ref,issue FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
+  foreach ($rows as &$r) { $r['summary'] = order_summary($r); $r['src'] = order_source($r); $ii = issue_of($r); $r['issue'] = $ii ? (empty($ii['resolved']) ? 'open' : 'done') : null; unset($r['created_by'], $r['agent_ref']); $r['progress'] = progress_text($r); $r['need'] = array_values(array_filter([$r['wish'] === WISH_NONE ? 'Wishcard belum' : null, count(jdec($r['photos'])) < (int)$r['photo_count'] ? 'Polaroid ' . count(jdec($r['photos'])) . '/' . (int)$r['photo_count'] : null])); unset($r['price_lines'], $r['prep'], $r['del_steps'], $r['wish'], $r['photos']); } unset($r);
   $t = date('Y-m-d');
   $legacy = []; $olToday = 0; $olLeft = 0;
   try { // Orderla orders for today's deliveries sit beside the new ones
@@ -120,6 +120,7 @@ case 'order':
   $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS; $o['invoice'] = invoice_msg($o, $o['pay_status'] !== 'paid' && $o['bill_code'] ? pay_url($o['bill_code']) : null);
   $o['agent'] = $o['agent_ref'] ? (q('SELECT a.id,a.name,c.amount,c.payout_id FROM agents a LEFT JOIN commissions c ON c.order_id=? AND c.agent_id=a.id WHERE a.id=?', [$o['id'], (int)$o['agent_ref']])->fetch() ?: null) : null;
   foreach (['cake_flavours', 'extra_cakes', 'photos', 'price_lines', 'prep', 'del_steps'] as $k) $o[$k] = json_decode((string)$o[$k], true) ?: [];
+  if (is_full($o)) { $j = jdec($o['items']); $o['items'] = full_items($o); $o['pickup'] = !empty($j['pickup']); foreach ($o['items'] as &$l) $l['cat_label'] = FULL_CATS[$l['cat']][0] ?? $l['cat']; unset($l); }
   json_out(['order' => $o]);
 
 case 'update':
@@ -173,6 +174,7 @@ case 'oldel': // Owner: hide an Orderla order for good (auto-sync won't bring it
 
 case 'items': // change bouquet / balloon / cake / occasion on an existing order (before the runner collects it)
   $m = need_login(); $o = load_order((int)($body['id'] ?? 0)); $C = catalog();
+  if (is_full($o)) fail('Order katalog penuh: item tak boleh ditukar di sini. Batalkan dan cipta order baru jika perlu.');
   if ($o['status'] === 'batal') fail('Order dah dibatalkan.');
   if (isset(jdec($o['del_steps'])['otw_pickup'])) fail('Runner dah ambil barang. Item tak boleh ditukar lagi.');
   $bq = (string)($body['bouquet'] ?? $o['bouquet']); $bal = (string)($body['balloon'] ?? $o['balloon']); $cake = (string)($body['cake'] ?? $o['cake']);
@@ -677,7 +679,7 @@ case 'dash': // ?by=paid (tarikh bayar) | created (tarikh order). Sales = paid, 
     'week' => ['keys' => $wks, 'cur' => array_values($bucket('o-\WW', $wks)), 'prev' => array_values($bucket('o-\WW', $pwks))],
     'month' => ['keys' => $mos, 'cur' => array_values($bucket('Y-m', $mos)), 'prev' => array_values($bucket('Y-m', $pmos))]];
   $todayDel = q("SELECT status, COUNT(*) n FROM orders WHERE del_date=? AND pay_status='paid' AND status<>'batal' GROUP BY status", [$t])->fetchAll();
-  $topBq = q("SELECT bouquet, COUNT(*) n FROM orders WHERE pay_status='paid' AND status<>'batal' AND $col>=? GROUP BY bouquet ORDER BY n DESC", ["$m0 00:00:00"])->fetchAll();
+  $topBq = q("SELECT bouquet, COUNT(*) n FROM orders WHERE pay_status='paid' AND status<>'batal' AND $col>=? AND bouquet<>'' GROUP BY bouquet ORDER BY n DESC", ["$m0 00:00:00"])->fetchAll();
   $C = catalog(); foreach ($topBq as &$b) $b['name'] = $C['bq'][$b['bouquet']] ?? $b['bouquet']; unset($b);
   // all time, per year: new system + Orderla history
   $yr = []; $all = ['baru' => ['n' => 0, 's' => 0.0], 'orderla' => ['n' => 0, 's' => 0.0]];
@@ -701,7 +703,7 @@ case 'reportcsv':
     fputcsv($out, ['Kod', 'Tarikh order', 'Tarikh bayar', 'Tarikh hantar', 'Slot', 'Status', 'Momen', 'Bouquet', 'Balloon', 'Kek', 'Polaroid', 'Penerima', 'Poskod', 'Zon', 'Pembeli', 'WhatsApp', 'Voucher', 'Diskaun', 'Agent', 'Jumlah', 'Saluran bayar']);
     $C = catalog();
     foreach ($paid as $o) fputcsv($out, [$o['code'], $o['created_at'], $o['paid_at'], $o['del_date'], $o['del_type'] . ($o['del_time'] ? ' ' . $o['del_time'] : ''), $o['status'],
-      $C['occ'][$o['occasion']] ?? $o['occasion'], $C['bq'][$o['bouquet']] ?? $o['bouquet'], $C['bal'][$o['balloon']] ?? $o['balloon'], $o['cake'], $o['photo_count'],
+      $C['occ'][$o['occasion']] ?? $o['occasion'], is_full($o) ? 'Katalog: ' . order_summary($o, 20) : ($C['bq'][$o['bouquet']] ?? $o['bouquet']), $C['bal'][$o['balloon']] ?? $o['balloon'], $o['cake'], $o['photo_count'],
       $o['r_name'], $o['r_post'], $o['zone'], $o['b_name'], $o['b_phone'], $o['voucher'] ?? '', $o['discount'] ?? 0, $o['agent_ref'] ?? '', $o['total'], $o['pay_channel']]);
     try {
       $lw = $by === 'del_date' ? 'del_date>=? AND del_date<=?' : 'created_at>=? AND created_at<=?';
@@ -715,14 +717,15 @@ case 'reportcsv':
   }
   $createdN = (int)q('SELECT COUNT(*) FROM orders WHERE created_at>=? AND created_at<=?', ["$from 00:00:00", "$to 23:59:59"])->fetchColumn();
   $createdPaid = (int)q("SELECT COUNT(*) FROM orders WHERE created_at>=? AND created_at<=? AND pay_status='paid'", ["$from 00:00:00", "$to 23:59:59"])->fetchColumn();
-  $C = catalog(); $sales = 0; $disc = 0; $rank = ['bouquet' => [], 'balloon' => [], 'occasion' => [], 'cake' => [], 'del' => [], 'zone' => [], 'area' => [], 'source' => [], 'voucher' => []]; $series = [];
+  $C = catalog(); $sales = 0; $disc = 0; $rank = ['bouquet' => [], 'full' => [], 'balloon' => [], 'occasion' => [], 'cake' => [], 'del' => [], 'zone' => [], 'area' => [], 'source' => [], 'voucher' => []]; $series = [];
   $DL = ['free' => 'Percuma 10am–6pm', 'A' => 'Slot A', 'B' => 'Slot B', 'C' => 'Slot C', 'spec' => 'Masa khusus'];
   $inc = function (string $k, string $name, float $v) use (&$rank) { $rank[$k][$name] = ($rank[$k][$name] ?? [0, 0]); $rank[$k][$name][0]++; $rank[$k][$name][1] += $v; };
   foreach ($paid as $o) {
     $v = (float)$o['total']; $sales += $v; $disc += (float)($o['discount'] ?? 0);
     $d = substr((string)$o[$by], 0, 10); $series[$d] = ($series[$d] ?? 0) + $v;
-    $inc('bouquet', $C['bq'][$o['bouquet']] ?? $o['bouquet'], $v); $inc('balloon', $C['bal'][$o['balloon']] ?? $o['balloon'], $v);
-    $inc('occasion', $C['occ'][$o['occasion']] ?? $o['occasion'], $v); $inc('cake', $o['cake'], $v);
+    if (is_full($o)) { foreach (full_items($o) as $l) { $rank['full'][$l['name']] ??= [0, 0]; $rank['full'][$l['name']][0] += (int)$l['qty']; $rank['full'][$l['name']][1] += $l['price'] * $l['qty']; } }
+    else { $inc('bouquet', $C['bq'][$o['bouquet']] ?? $o['bouquet'], $v); $inc('balloon', $C['bal'][$o['balloon']] ?? $o['balloon'], $v); $inc('cake', $o['cake'], $v); }
+    $inc('occasion', $C['occ'][$o['occasion']] ?? $o['occasion'], $v);
     $inc('del', $DL[$o['del_type']] ?? $o['del_type'], $v); $inc('zone', $o['zone'] === 'plus20' ? 'Zon merah (+RM20)' : ($o['zone'] === 'out' ? 'Luar kawasan (kes khas)' : 'Zon biru (percuma)'), $v);
     $inc('area', substr($o['r_post'], 0, 2) . 'xxx', $v); $inc('source', $o['agent_ref'] ? 'Agent: ' . $o['agent_ref'] : (!empty($o['created_by']) ? 'Sales HQ: ' . $o['created_by'] : 'Laman web (terus)'), $v);
     if (!empty($o['voucher'])) $inc('voucher', $o['voucher'], $v);
@@ -767,10 +770,10 @@ case 'calendar':
   $by = ($_GET['by'] ?? 'del') === 'created' ? 'created' : 'del';
   $col = $by === 'del' ? 'del_date' : 'created_at';
   $lo = "$m-01"; $hi = date('Y-m-t', strtotime($lo));
-  $rows = q("SELECT id,code,pay_status,status,del_date,del_type,del_time,created_at,r_name,bouquet,total FROM orders
+  $rows = q("SELECT id,code,kind,items,pay_status,status,del_date,del_type,del_time,created_at,r_name,bouquet,total FROM orders
     WHERE $col>=? AND $col<=? AND status<>'batal' ORDER BY $col", [$by === 'del' ? $lo : "$lo 00:00:00", $by === 'del' ? $hi : "$hi 23:59:59"])->fetchAll();
   $days = [];
-  foreach ($rows as $r) { $d = substr($by === 'del' ? $r['del_date'] : $r['created_at'], 0, 10); $days[$d][] = $r; }
+  foreach ($rows as $r) { $r['summary'] = order_summary($r, 2); unset($r['items']); $d = substr($by === 'del' ? $r['del_date'] : $r['created_at'], 0, 10); $days[$d][] = $r; }
   try { // Orderla orders (history, and anything still being taken there): by delivery date when known, else order date
     $lc = $by === 'del' ? 'COALESCE(del_date, DATE(created_at))' : 'DATE(created_at)';
     foreach (q("SELECT id, code_id, invoice_no, created_at, del_date, status, pay_status, total, name, receiver, items FROM legacy_orders
@@ -781,6 +784,21 @@ case 'calendar':
     }
   } catch (Throwable $e) {}
   json_out(['m' => $m, 'by' => $by, 'days' => $days]);
+
+case 'fullcat': // full catalogue price list (Admin HQ order form; owner edits in Stok)
+  need_login();
+  if ($post) {
+    need_owner(); $out = []; $seen = [];
+    foreach (array_slice((array)($body['items'] ?? []), 0, 300) as $c) {
+      if (!is_array($c)) continue; $n = str_in($c['name'] ?? '', 80); if ($n === '') continue;
+      $id = preg_replace('/[^a-z0-9-]/', '', strtolower((string)($c['id'] ?? ''))) ?: 'c' . substr(md5($n . microtime()), 0, 8);
+      while (isset($seen[$id])) $id .= 'x'; $seen[$id] = 1;
+      $out[] = ['id' => $id, 'cat' => isset(FULL_CATS[$c['cat'] ?? '']) ? $c['cat'] : 'lain', 'name' => $n, 'price' => max(0, round((float)($c['price'] ?? 0), 2)), 'on' => empty($c['on']) ? 0 : 1];
+    }
+    if (!$out) fail('Senarai katalog kosong.');
+    set_setting('full_catalog', json_encode($out, JSON_UNESCAPED_UNICODE));
+  }
+  json_out(['items' => full_catalog(), 'cats' => array_map(fn($x) => $x[0], FULL_CATS), 'del' => ['fee' => FULL_DEL_FEE, 'local' => FULL_DEL_LOCAL, 'local_post' => FULL_LOCAL_POST]]);
 
 case 'production': // what the team must make for a delivery date range: bouquets to arrange, balloons to pump, cakes to buy, add-ons
   need_login();
@@ -799,6 +817,11 @@ case 'production': // what the team must make for a delivery date range: bouquet
   foreach (q("SELECT * FROM orders WHERE del_date BETWEEN ? AND ? AND status<>'batal' ORDER BY del_date", [$from, $to])->fetchAll() as $o) {
     $count++; $p = jdec($o['prep']); $sent = in_array($o['status'], ['dalam_penghantaran', 'sampai', 'selesai'], true);
     $un = $o['pay_status'] !== 'paid'; $cd = $o['code']; $dd = $o['del_date'];
+    if (is_full($o)) {
+      foreach (full_items($o) as $i => $l) $add(FULL_CATS[$l['cat']][1] ?? 'etc', full_line_name($l), (int)$l['qty'], $sent || isset($p['it' . $i]), $un, $cd, $dd);
+      if ((int)$o['photo_count'] > 0) $add('etc', 'Polaroid (keping)', (int)$o['photo_count'], $sent || isset($p['polaroid']), $un, $cd, $dd);
+      continue;
+    }
     $add('bq', $lbl('bq', $o['bouquet'], $C['bq'][$o['bouquet']] ?? $o['bouquet']) . ($o['bq_note'] ? ' (' . $o['bq_note'] . ')' : ''), 1, $sent || isset($p['bouquet']), $un, $cd, $dd);
     $add('bal', $lbl('bal', $o['balloon'], $C['bal'][$o['balloon']] ?? $o['balloon']), 1, $sent || isset($p['balloon']), $un, $cd, $dd);
     $cake = $o['cake'] === OTHER_CAKE ? 'Ikut stok: ' . (implode(' / ', jdec($o['cake_flavours'])) ?: 'apa-apa') : $o['cake'];

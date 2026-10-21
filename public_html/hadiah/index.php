@@ -43,6 +43,7 @@ $slug = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower((string)$o['cake'])), 
 $tx = fn($s) => $en ? tr_en((string)$s) : (string)$s;
 $items = [['Bouquet ' . ($C['bq'][$o['bouquet']] ?? ''), $img('bouquet/' . $o['bouquet'] . '.webp')], ['Balloon ' . $tx($C['bal'][$o['balloon']] ?? ''), $img('balloon/' . $o['balloon'] . '.webp')]];
 if ($cake) $items[] = [$L('Kek ', 'Cake: ') . $o['cake'], $img('cake/' . $cake . '.webp')];
+if (is_full($o)) $items = array_map(fn($l) => [((int)$l['qty'] > 1 ? (int)$l['qty'] . '× ' : '') . $l['name'], null], full_items($o)); // catalogue items: names only (no product photos here)
 ?><!doctype html>
 <html lang="<?= $en ? 'en' : 'ms' ?>"><head>
 <link rel="icon" href="/favicon.ico?v=2" sizes="any"><link rel="icon" type="image/png" sizes="32x32" href="/assets/icon-32.png?v=2"><link rel="apple-touch-icon" href="/assets/apple-touch-icon.png?v=2"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -87,7 +88,7 @@ footer{text-align:center;margin-top:28px;color:var(--soft);font-size:13px}footer
   <p class="from"><?= $L('Hadiah istimewa daripada', 'A special gift from') ?> <b><?= $e($from) ?></b> 💐<br><?= $e($line) ?></p></section>
  <?php if ($wish !== ''): ?><section class="card"><h2>💌 <?= $L('Ayat dalam kad awak', 'The message in your card') ?></h2><div class="wish"><?= $e($wish) ?><?php if (!empty($o['sender'])): ?><span class="sig">— <?= $e($o['sender']) ?></span><?php endif ?></div></section><?php endif ?>
  <?php if ($hasPhoto): ?><section class="card photo"><h2>📸 <?= $L('Kenangan hari ni', "Today's memory") ?></h2><img src="<?= $e($ph) ?>" alt="<?= $e($L("Gambar $rf semasa menerima hadiah", "$rf receiving the gift")) ?>"><a class="btn ghost" href="<?= $e($ph) ?>&dl=1"><?= $L('Simpan gambar', 'Save photo') ?></a></section><?php endif ?>
- <section class="card"><h2>🎁 <?= $L('Dalam hadiah awak', 'In your gift') ?></h2><div class="items"><?php foreach ($items as [$t, $src]): ?><figure><img src="<?= $e($src) ?>" alt="<?= $e($t) ?>" loading="lazy" onerror="this.style.visibility='hidden'"><figcaption><?= $e($t) ?></figcaption></figure><?php endforeach ?></div></section>
+ <section class="card"><h2>🎁 <?= $L('Dalam hadiah awak', 'In your gift') ?></h2><div class="items"><?php foreach ($items as [$t, $src]): ?><figure><?php if ($src): ?><img src="<?= $e($src) ?>" alt="<?= $e($t) ?>" loading="lazy" onerror="this.style.visibility='hidden'"><?php else: ?><div style="aspect-ratio:1;display:grid;place-items:center;font-size:40px;background:#fff;border-radius:14px" aria-hidden="true">🎁</div><?php endif ?><figcaption><?= $e($t) ?></figcaption></figure><?php endforeach ?></div></section>
  <?php if ($vcode): ?><section class="card gift"><h2><?= $L('Hadiah kecil daripada kami', 'A little gift from us') ?> 🌸</h2>
   <?php if ($used): ?><p><?= $L('Voucher awak dah digunakan. Terima kasih kerana memilih 100 Blooms!', 'Your voucher has been used. Thank you for choosing 100 Blooms!') ?> 💕</p><a class="btn" href="../<?= $en ? 'en/' : '' ?>"><?= $L('Lihat hadiah kami', 'See our gifts') ?></a>
   <?php else: ?><p><?= $L('Giliran awak pula buat orang tersayang tersenyum.', 'Now it’s your turn to make someone you love smile.') ?></p><p><b>RM10 off</b> <?= $L('untuk order pertama awak di 100 Blooms.', 'your first order at 100 Blooms.') ?></p>
