@@ -83,7 +83,7 @@ case 'orders':
   $where = $W ? 'WHERE ' . implode(' AND ', $W) : '';
   $order = $f === 'pending' || $by === 'created_at' ? 'created_at DESC' : "del_date ASC, CASE del_type WHEN 'A' THEN 1 WHEN 'spec' THEN 2 WHEN 'free' THEN 3 WHEN 'B' THEN 4 ELSE 5 END, created_at";
   if ($f === 'all' || $f === 'delivered' || $f === 'issue') $order = 'created_at DESC';
-  $rows = q("SELECT id,code,lang,kind,items,created_at,pay_status,status,bouquet,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher,wish,photos,created_by,agent_ref,issue FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
+  $rows = q("SELECT id,code,lang,kind,items,created_at,pay_status,status,bouquet,bq_note,balloon,cake,photo_count,price_lines,prep,del_steps,del_date,del_type,del_time,r_name,r_post,zone,b_name,b_phone,total,notes,voucher,wish,photos,created_by,agent_ref,issue FROM orders $where ORDER BY $order LIMIT 300", $P)->fetchAll();
   foreach ($rows as &$r) { $r['summary'] = order_summary($r); $r['src'] = order_source($r); $ii = issue_of($r); $r['issue'] = $ii ? (empty($ii['resolved']) ? 'open' : 'done') : null; unset($r['created_by'], $r['agent_ref']); $r['progress'] = progress_text($r); $r['need'] = array_values(array_filter([$r['wish'] === WISH_NONE ? 'Wishcard belum' : null, count(jdec($r['photos'])) < (int)$r['photo_count'] ? 'Polaroid ' . count(jdec($r['photos'])) . '/' . (int)$r['photo_count'] : null])); unset($r['price_lines'], $r['prep'], $r['del_steps'], $r['wish'], $r['photos']); } unset($r);
   $t = date('Y-m-d');
   $legacy = []; $olToday = 0; $olLeft = 0;
@@ -770,7 +770,7 @@ case 'calendar':
   $by = ($_GET['by'] ?? 'del') === 'created' ? 'created' : 'del';
   $col = $by === 'del' ? 'del_date' : 'created_at';
   $lo = "$m-01"; $hi = date('Y-m-t', strtotime($lo));
-  $rows = q("SELECT id,code,kind,items,pay_status,status,del_date,del_type,del_time,created_at,r_name,bouquet,total FROM orders
+  $rows = q("SELECT id,code,kind,items,pay_status,status,del_date,del_type,del_time,created_at,r_name,bouquet,bq_note,total FROM orders
     WHERE $col>=? AND $col<=? AND status<>'batal' ORDER BY $col", [$by === 'del' ? $lo : "$lo 00:00:00", $by === 'del' ? $hi : "$hi 23:59:59"])->fetchAll();
   $days = [];
   foreach ($rows as $r) { $r['summary'] = order_summary($r, 2); unset($r['items']); $d = substr($by === 'del' ? $r['del_date'] : $r['created_at'], 0, 10); $days[$d][] = $r; }
@@ -805,18 +805,18 @@ case 'production': // what the team must make for a delivery date range: bouquet
   $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['from'] ?? '')) ? $_GET['from'] : date('Y-m-d');
   $days = max(1, min(14, (int)($_GET['days'] ?? 1))); $to = date('Y-m-d', strtotime("$from +" . ($days - 1) . ' days'));
   $C = catalog(); $M = product_meta(); $G = ['bq' => [], 'bal' => [], 'cake' => [], 'etc' => []];
-  $add = function (string $cat, string $label, int $n, bool $done, bool $unpaid, string $code, string $day) use (&$G) {
+  $add = function (string $cat, string $label, int $n, bool $done, bool $unpaid, array $ref, string $day) use (&$G) {
     if ($n < 1) return; // same item from both systems: ignore the product code and word order ("FB02 - Happy Birthday Floral" = "Happy Birthday Floral", "Moist Chocolate" = "Chocolate Moist")
     $w = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower(preg_replace('/^[A-Z]{1,4}\d{1,4}\s*-\s*/', '', trim($label))), -1, PREG_SPLIT_NO_EMPTY); sort($w); $k = implode(' ', $w);
     $r = &$G[$cat][$k]; $r ??= ['label' => trim($label), 'n' => 0, 'done' => 0, 'unpaid' => 0, 'orders' => []];
     if (preg_match('/^[A-Z]{1,4}\d{1,4}\s*-/', $label) && !preg_match('/^[A-Z]{1,4}\d{1,4}\s*-/', $r['label'])) $r['label'] = trim($label); // prefer the label with the code
-    $r['n'] += $n; if ($done) $r['done'] += $n; if ($unpaid) $r['unpaid'] += $n; $r['orders'][] = $code . ($n > 1 ? " ×$n" : '');
+    $r['n'] += $n; if ($done) $r['done'] += $n; if ($unpaid) $r['unpaid'] += $n; $r['orders'][] = $ref + ['n' => $n, 'paid' => !$unpaid, 'done' => $done];
   };
   $lbl = fn($t, $id, $name) => (($c = $M[$t][$id]['code'] ?? '') !== '' ? "$c - " : '') . $name;
   $count = 0;
   foreach (q("SELECT * FROM orders WHERE del_date BETWEEN ? AND ? AND status<>'batal' ORDER BY del_date", [$from, $to])->fetchAll() as $o) {
     $count++; $p = jdec($o['prep']); $sent = in_array($o['status'], ['dalam_penghantaran', 'sampai', 'selesai'], true);
-    $un = $o['pay_status'] !== 'paid'; $cd = $o['code']; $dd = $o['del_date'];
+    $un = $o['pay_status'] !== 'paid'; $cd = ['c' => $o['code'], 'id' => (int)$o['id']]; $dd = $o['del_date'];
     if (is_full($o)) {
       foreach (full_items($o) as $i => $l) $add(FULL_CATS[$l['cat']][1] ?? 'etc', full_line_name($l), (int)$l['qty'], $sent || isset($p['it' . $i]), $un, $cd, $dd);
       if ((int)$o['photo_count'] > 0) $add('etc', 'Polaroid (keping)', (int)$o['photo_count'], $sent || isset($p['polaroid']), $un, $cd, $dd);
@@ -833,7 +833,7 @@ case 'production': // what the team must make for a delivery date range: bouquet
   try { // Orderla orders: items are text like "1x Jessie Bouquet; 1x Secret Recipe Slice Cake (Chocolate Fudge); 1x Balloon Foil (FB02 - Happy Birthday Floral)"
     $bqNames = array_map('mb_strtolower', $C['bq']);
     foreach (q("SELECT * FROM legacy_orders WHERE del_date BETWEEN ? AND ? AND (status IS NULL OR status<>'cancelled')", [$from, $to])->fetchAll() as $o) {
-      $count++; $done = in_array((string)$o['status'], ['completed', 'delivered', 'shipped'], true); $un = $o['pay_status'] !== 'paid'; $cd = (string)($o['invoice_no'] ?: $o['code_id']);
+      $count++; $done = in_array((string)$o['status'], ['completed', 'delivered', 'shipped'], true); $un = $o['pay_status'] !== 'paid'; $cd = ['c' => (string)($o['invoice_no'] ?: $o['code_id']), 'lid' => (int)$o['id']];
       foreach (preg_split('/\s*;\s*/', (string)$o['items']) as $it) {
         if (!preg_match('/^(\d+)\s*x\s*(.+)$/iu', trim($it), $m)) { if (trim($it) !== '') $add('etc', trim($it), 1, $done, $un, $cd, ''); continue; }
         $n = (int)$m[1]; $name = trim($m[2]); $in = preg_match('/\(([^)]+)\)\s*$/', $name, $x) ? trim($x[1]) : '';

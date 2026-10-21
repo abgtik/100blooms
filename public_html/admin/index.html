@@ -124,6 +124,8 @@ a{color:var(--accent)}
 .prod .pr.ok .pn,.prod .pr.ok .pl{color:var(--soft);text-decoration:line-through}
 .prod .pl{font-weight:600;font-size:13.5px}
 .prod .pm{font-size:11.5px;color:var(--soft)}
+.pcode{border:1px solid var(--line);background:var(--card);color:var(--accent);font:600 11.5px var(--body);padding:2px 7px;border-radius:999px;cursor:pointer;margin:3px 2px 0 0;text-decoration:underline dotted}
+.pcode:hover{background:var(--tint)}.pcode.un{color:var(--warn)}.pcode.ok{color:var(--soft);text-decoration:line-through}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--line)}
 .cal .hd{font-size:11.5px;color:var(--soft);text-align:center;font-weight:700;padding:6px 0;background:var(--bg);border-bottom:1px solid var(--line)}
 .cal>*:not(:nth-child(7n)){box-shadow:inset -1px 0 0 var(--line)}
@@ -442,7 +444,7 @@ async function openOrder(id,reload){
      <div class="bar" style="margin:8px 0 0"><button class="btn sm" id="tis">Simpan perubahan</button><button class="btn ghost sm" id="tic">Batal</button></div></div>
     ${o.created_by?'':`<div class="rowx"><span>Momen</span><span>${h(OCC_T()[o.occasion]||o.occasion)} · ${h(REL_T()[o.relation]||o.relation)} (${o.gender==='l'?'L':'P'}) · panggil "${h(o.call_name)}"</span></div>`}
     ${o.kind==='full'?(o.items||[]).map(l=>`<div class="rowx"><span>${h(l.cat_label||'Item')}</span><span><b>${+l.qty} × ${h(l.name)}</b>${l.design?`<br><span class="mini">${h(l.design)}</span>`:''}</span></div>`).join('')
-    :`<div class="rowx"><span>Bouquet</span><span>${(PM.bq||{})[o.bouquet]?.code?`<b>${h(PM.bq[o.bouquet].code)}</b> - `:''}<b>${h(CAT.bq[o.bouquet]||o.bouquet)}</b></span></div>
+    :`<div class="rowx"><span>Bouquet</span><span>${(PM.bq||{})[o.bouquet]?.code?`<b>${h(PM.bq[o.bouquet].code)}</b> - `:''}<b>${h(CAT.bq[o.bouquet]||o.bouquet)}</b>${o.bq_note?`<br><span class="pg" style="background:var(--warnb);color:var(--warn)">🎀 ${h(o.bq_note)}</span>`:''}</span></div>
     <div class="rowx"><span>Balloon</span><span>${(PM.bal||{})[o.balloon]?.code?`<b>${h(PM.bal[o.balloon].code)}</b> - `:''}${h(CAT.bal[o.balloon]||o.balloon)}</span></div>
     <div class="rowx"><span>Kek</span><span>${h(cakeTxt)}</span></div>
     <div class="rowx"><span>Kek tambahan</span><span>${h(ext)}</span></div>`}
@@ -923,7 +925,9 @@ async function prodBox(box,d){
   const range=j.days>1?`${fmtD(j.from)} – ${fmtD(j.to)}`:fmtD(j.from);
   if(!j.orders){$('#pdb').innerHTML=`<p class="mini" style="margin:10px 0 0">Tiada order untuk ${h(range)}.</p>`;$('#pdcp').onclick=()=>toast('Tiada apa nak disalin');return}
   $('#pdb').innerHTML=`<p class="mini" style="margin:8px 0 0">${h(range)} · <b>${j.orders} order</b> (termasuk Orderla). Item yang dah ditanda siap dalam checklist dipotong.</p><div class="prod">${PRODG.filter(([k])=>(G[k]||[]).length).map(([k,t])=>`<div class="pg"><h3><span>${t}</span><span>${sum(k)-left(k)?`<span class="mini">${sum(k)-left(k)} siap · </span>`:''}<b>${sum(k)}</b></span></h3>
-    ${G[k].map(r=>`<div class="pr${r.done>=r.n?' ok':''}"><div class="pn">${r.n}</div><div style="flex:1;min-width:0"><div class="pl">${h(r.label)}</div><div class="pm">${r.done?`✅ ${r.done} siap · `:''}${r.unpaid?`<span style="color:var(--warn,#b26b00)">${r.unpaid} belum bayar</span> · `:''}<details style="display:inline"><summary style="display:inline;cursor:pointer">${r.orders.length} order</summary> ${r.orders.map(h).join(', ')}</details></div></div></div>`).join('')}</div>`).join('')}</div>`;
+    ${G[k].map(r=>`<div class="pr${r.done>=r.n?' ok':''}"><div class="pn">${r.n}</div><div style="flex:1;min-width:0"><div class="pl">${h(r.label)}</div><div class="pm">${r.done?`✅ ${r.done} siap · `:''}${r.unpaid?`<span style="color:var(--warn,#b26b00)">${r.unpaid} belum bayar</span> · `:''}<details style="display:inline"${r.orders.length<=3?' open':''}><summary style="display:inline;cursor:pointer">${r.orders.length} order</summary> ${r.orders.map(x=>`<button type="button" class="pcode${x.done?' ok':''}${x.paid?'':' un'}" ${x.id?`data-po="${x.id}"`:`data-pl="${x.lid}"`} title="Buka order">${h(x.c)}${x.n>1?' ×'+x.n:''}</button>`).join(' ')}</details></div></div></div>`).join('')}</div>`).join('')}</div>`;
+  $('#pdb').querySelectorAll('[data-po]').forEach(b=>b.onclick=()=>openOrder(+b.dataset.po,()=>prodBox(box,d)));
+  $('#pdb').querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>{const t=document.querySelector(`#cday .ord[data-lid="${b.dataset.pl}"]`);if(t){t.scrollIntoView({behavior:'smooth',block:'center'});if(t.parentNode.querySelector('[id^=lx]')?.hidden)t.click()}else toast('Order Orderla ni pada tarikh lain. Klik tarikh tu di kalendar.')});
   $('#pdcp').onclick=()=>{const txt=`*Production ${range}* (${j.orders} order)\n`+PRODG.filter(([k])=>(G[k]||[]).length).map(([k,t])=>`\n*${t}: ${sum(k)}*\n`+G[k].map(r=>`${r.n} × ${r.label}${r.unpaid?` (${r.unpaid} belum bayar)`:''}${r.done?` ✅${r.done}`:''}`).join('\n')).join('\n');
     navigator.clipboard.writeText(txt).then(()=>toast('Senarai production disalin. Paste dalam group WhatsApp.'),()=>toast('Tak dapat salin'))};
 }

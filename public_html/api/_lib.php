@@ -222,7 +222,7 @@ function prep_items(array $o): array {
     return $it;
   }
   $C = catalog(); $M = product_meta(); $code = fn($t, $id) => ($c = $M[$t][$id]['code'] ?? '') !== '' ? $c . ' - ' : ''; // product code first, so the team picks the right item
-  $it = ['bouquet' => 'Bouquet ' . $code('bq', $o['bouquet']) . ($C['bq'][$o['bouquet']] ?? $o['bouquet']), 'balloon' => 'Balloon ' . $code('bal', $o['balloon']) . ($C['bal'][$o['balloon']] ?? $o['balloon']),
+  $it = ['bouquet' => 'Bouquet ' . $code('bq', $o['bouquet']) . ($C['bq'][$o['bouquet']] ?? $o['bouquet']) . (!empty($o['bq_note']) ? ' · ' . $o['bq_note'] : ''), 'balloon' => 'Balloon ' . $code('bal', $o['balloon']) . ($C['bal'][$o['balloon']] ?? $o['balloon']),
     'cake' => 'Kek dibeli (' . $o['cake'] . ')'];
   if ((int)$o['photo_count'] > 0) $it['polaroid'] = 'Polaroid dicetak (' . (int)$o['photo_count'] . ' keping)';
   $it['wishcard'] = 'Wishcard ditulis';
@@ -1068,7 +1068,7 @@ function full_items(array $o): array { $j = jdec($o['items'] ?? null); return ar
 function full_line_name(array $l): string { return $l['name'] . (($l['design'] ?? '') !== '' ? ' – ' . $l['design'] : ''); }
 /** One-line summary of what's in the order (lists, calendar, team messages). */
 function order_summary(array $o, int $max = 3): string {
-  if (!is_full($o)) { $C = catalog(); return $C['bq'][$o['bouquet']] ?? (string)$o['bouquet']; }
+  if (!is_full($o)) { $C = catalog(); return ($C['bq'][$o['bouquet']] ?? (string)$o['bouquet']) . (!empty($o['bq_note']) ? ' (' . $o['bq_note'] . ')' : ''); }
   $L = full_items($o); $t = array_map(fn($l) => ((int)$l['qty'] > 1 ? (int)$l['qty'] . '× ' : '') . full_line_name($l), array_slice($L, 0, $max));
   return implode(', ', $t) . (count($L) > $max ? ' +' . (count($L) - $max) . ' lagi' : '');
 }
