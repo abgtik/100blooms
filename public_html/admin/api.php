@@ -135,6 +135,8 @@ case 'update':
   if (array_key_exists('notes', $body)) { $set[] = 'notes=?'; $P[] = str_in($body['notes'], 2000); }
   if (isset($body['r_name'])) { $v = str_in($body['r_name'], 100); if ($v === '') fail('Nama penerima tak boleh kosong.'); $set[] = 'r_name=?'; $P[] = $v; }
   if (isset($body['r_phone'])) { $v = str_in($body['r_phone'], 60); if (strlen(digits($v)) < 9) fail('Nombor telefon penerima tidak sah.'); $set[] = 'r_phone=?'; $P[] = $v; }
+  if (isset($body['b_name'])) { $v = str_in($body['b_name'], 100); if ($v === '') fail('Nama pembeli tak boleh kosong.'); $set[] = 'b_name=?'; $P[] = $v; }
+  if (isset($body['b_phone'])) { $v = str_in($body['b_phone'], 30); if (strlen(digits($v)) < 9) fail('Nombor WhatsApp pembeli tidak sah.'); $set[] = 'b_phone=?'; $P[] = $v; }
   if (isset($body['r_addr'])) { $v = str_in($body['r_addr'], 500); if ($v === '') fail('Alamat tak boleh kosong.'); $set[] = 'r_addr=?'; $P[] = $v; }
   if (array_key_exists('bill_to', $body)) { $b = str_in($body['bill_to'], 400); $set[] = 'bill_to=?'; $P[] = $b !== '' ? $b : null; }
   if (isset($body['del_date'])) { // customer may change the delivery date (no refunds policy)

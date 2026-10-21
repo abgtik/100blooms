@@ -463,6 +463,10 @@ async function openOrder(id,reload){
     <div class="rowx"><span>Sumber</span><span>${o.created_by?'WhatsApp, dimasukkan oleh '+h(o.created_by):'Laman web'}</span></div>
     <div class="rowx"><span>WhatsApp</span><span><a href="${wa(o.b_phone,`Hai ${o.b_name.split(' ')[0]}, ini 100 Blooms tentang order ${o.code}. Semak status hadiah di sini: ${o.track_url}`)}" target="_blank" rel="noopener">${h(o.b_phone)}</a></span></div>
     <div class="rowx"><span>Link semak order</span><span><a href="${h(o.track_url)}" target="_blank" rel="noopener">Buka</a> · <a href="#" id="ct">Salin</a></span></div>
+    <details style="margin-top:10px"><summary class="mini" style="cursor:pointer">✏️ Kemas kini pembeli (nama, WhatsApp)</summary>
+     <div class="fgrid" style="margin-top:8px"><label class="fl">Nama pembeli<input id="bn_e" value="${h(o.b_name)}" maxlength="100"></label><label class="fl">No. WhatsApp pembeli<input id="bp_e" value="${h(o.b_phone)}" maxlength="30" inputmode="tel"></label></div>
+     <button class="btn sm" id="bsv" style="margin-top:6px">Simpan pembeli</button>
+     <p class="mini" style="margin:4px 0 0">Mesej WhatsApp seterusnya (bayaran, terima kasih) dihantar ke nombor baru.</p></details>
     ${o.agent_ref?`<div class="rowx"><span>Agent</span><span>${o.agent?`<b>${h(o.agent.name)}</b> (#${o.agent.id})${o.agent.amount!==null&&o.agent.amount!==undefined?` · komisen ${rm(o.agent.amount)}${o.agent.payout_id?' (dah dibayar)':''}`:''}`:'#'+h(o.agent_ref)}</span></div>`:''}</div>
    <div class="card"><h2>🧾 Invoice &amp; resit</h2>
     <div class="bar" style="margin:0"><a class="btn ghost sm" href="${h(o.doc_invoice)}" target="_blank" rel="noopener">Invoice PDF</a>${o.pay_status==='paid'?`<a class="btn ghost sm" href="${h(o.doc_receipt)}" target="_blank" rel="noopener">Resit PDF</a>`:''}
@@ -506,6 +510,7 @@ async function openOrder(id,reload){
   if($('#ivc'))$('#ivc').onclick=()=>navigator.clipboard.writeText(o.invoice).then(()=>toast('Invoice disalin'));
   if($('#mp'))$('#mp').onclick=()=>{const r=prompt('Rujukan bayaran dari resit pembeli (contoh: no. transaksi)');if(r&&r.trim())done(api('update',{method:'POST',body:{id,mark_paid:1,pay_ref:r.trim()}}),'Ditanda dibayar')};
   if($('#cn'))$('#cn').onclick=()=>{if(confirm('Batalkan order '+o.code+'?'))done(api('update',{method:'POST',body:{id,status:'batal'}}),'Order dibatalkan')};
+  $('#bsv').onclick=()=>done(api('update',{method:'POST',body:{id,b_name:$('#bn_e').value,b_phone:$('#bp_e').value}}),'Pembeli dikemas kini');
   $('#rsv').onclick=()=>done(api('update',{method:'POST',body:{id,r_name:$('#rn_e').value,r_phone:$('#rp_e').value,r_addr:$('#ra_e').value}}),'Penerima dikemas kini');
   $('#sd').onclick=()=>done(api('update',{method:'POST',body:{id,del_date:$('#nd').value,del_type:$('#nt').value,del_time:$('#ntm').value}}),'Tarikh dikemas kini');
   $('#ct').onclick=e=>{e.preventDefault();navigator.clipboard.writeText(o.track_url).then(()=>toast('Link disalin'),()=>toast('Tak dapat salin'))};
