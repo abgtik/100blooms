@@ -120,6 +120,11 @@ case 'order':
   $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS; $o['invoice'] = invoice_msg($o, $o['pay_status'] !== 'paid' && $o['bill_code'] ? pay_url($o['bill_code']) : null);
   $o['agent'] = $o['agent_ref'] ? (q('SELECT a.id,a.name,c.amount,c.payout_id FROM agents a LEFT JOIN commissions c ON c.order_id=? AND c.agent_id=a.id WHERE a.id=?', [$o['id'], (int)$o['agent_ref']])->fetch() ?: null) : null;
   foreach (['cake_flavours', 'extra_cakes', 'photos', 'price_lines', 'prep', 'del_steps'] as $k) $o[$k] = json_decode((string)$o[$k], true) ?: [];
+  $o['rjob'] = (function () use ($o) { $j = job_of_order((int)$o['id']); if (!$j) return null; $r = $j['runner_id'] ? q('SELECT id,name,phone,r_plate FROM agents WHERE id=?', [$j['runner_id']])->fetch() : null;
+    return $j + ['runner' => $r ?: null, 'rating' => q('SELECT stars,comment FROM runner_ratings WHERE order_id=?', [$o['id']])->fetch() ?: null]; })();
+  $o['rjob_default'] = (float)setting('runner_pay_last', 15);
+  $o['runners_active'] = array_values(array_filter(array_map(fn($a) => runner_state($a) === 'active' ? ['id' => (int)$a['id'], 'name' => $a['name'], 'area' => $a['r_area'], 'avail' => $a['r_avail'] === date('Y-m-d')] : null,
+    q("SELECT * FROM agents WHERE runner='active' AND active=1 ORDER BY name")->fetchAll())));
   if (is_full($o)) { $j = jdec($o['items']); $o['items'] = full_items($o); $o['pickup'] = !empty($j['pickup']); foreach ($o['items'] as &$l) $l['cat_label'] = FULL_CATS[$l['cat']][0] ?? $l['cat']; unset($l); }
   json_out(['order' => $o]);
 
@@ -801,6 +806,82 @@ case 'fullcat': // full catalogue price list (Admin HQ order form; owner edits i
     set_setting('full_catalog', json_encode($out, JSON_UNESCAPED_UNICODE));
   }
   json_out(['items' => full_catalog(), 'cats' => array_map(fn($x) => $x[0], FULL_CATS), 'del' => ['fee' => FULL_DEL_FEE, 'local' => FULL_DEL_LOCAL, 'local_post' => FULL_LOCAL_POST]]);
+
+// ---------- runners ----------
+case 'runners': // applications, active runners with stats, jobs waiting for payment, recent ratings
+  need_login();
+  $rows = q("SELECT * FROM agents WHERE runner IS NOT NULL AND runner<>'' ORDER BY CASE runner WHEN 'pending' THEN 0 WHEN 'active' THEN 1 ELSE 2 END, r_applied DESC")->fetchAll();
+  $out = [];
+  foreach ($rows as $a) {
+    $s = q("SELECT COUNT(*) n, COALESCE(SUM(damage),0) dmg, COALESCE(SUM(CASE WHEN paid_at IS NULL THEN pay END),0) unpaid FROM runner_jobs WHERE runner_id=? AND status='done'", [$a['id']])->fetch();
+    $out[] = ['id' => (int)$a['id'], 'name' => $a['name'], 'phone' => $a['phone'], 'state' => runner_state($a), 'plate' => $a['r_plate'], 'area' => $a['r_area'], 'applied' => $a['r_applied'],
+      'avail' => $a['r_avail'] === date('Y-m-d'), 'susp' => $a['r_susp'], 'jobs' => (int)$s['n'], 'damage' => (int)$s['dmg'], 'unpaid' => (float)$s['unpaid'], 'rating' => runner_rating((int)$a['id']),
+      'active_jobs' => (int)q("SELECT COUNT(*) FROM runner_jobs WHERE runner_id=? AND status='taken'", [$a['id']])->fetchColumn()];
+  }
+  $unpaid = q("SELECT j.*, o.code, o.del_date, a.name rname, a.phone rphone, a.bank_name, a.bank_acc, a.bank_holder FROM runner_jobs j JOIN orders o ON o.id=j.order_id JOIN agents a ON a.id=j.runner_id WHERE j.status='done' AND j.paid_at IS NULL ORDER BY j.done_at")->fetchAll();
+  $ratings = q("SELECT r.*, o.code, a.name rname FROM runner_ratings r JOIN orders o ON o.id=r.order_id JOIN agents a ON a.id=r.runner_id ORDER BY r.created_at DESC LIMIT 30")->fetchAll();
+  $live = q("SELECT j.*, o.code, o.del_date, o.del_type, o.del_time, o.status ostatus, a.name rname FROM runner_jobs j JOIN orders o ON o.id=j.order_id LEFT JOIN agents a ON a.id=j.runner_id WHERE j.status IN ('open','taken') ORDER BY o.del_date, j.id")->fetchAll();
+  json_out(['runners' => $out, 'unpaid' => $unpaid, 'ratings' => $ratings, 'live' => $live]);
+
+case 'rpic': // runner photos for HQ review
+  need_login(); $a = q('SELECT r_face, r_bike FROM agents WHERE id=?', [(int)($_GET['id'] ?? 0)])->fetch();
+  $f = $a ? (($_GET['k'] ?? '') === 'bike' ? $a['r_bike'] : $a['r_face']) : ''; $p = $f ? runner_dir() . '/' . $f : '';
+  if (!$p || !is_file($p)) { http_response_code(404); exit; }
+  header('Content-Type: ' . (mime_content_type($p) ?: 'image/jpeg')); header('Cache-Control: private, no-store'); readfile($p); exit;
+
+case 'runner_set': // approve / reject / suspend / lift suspension / remove runner mode
+  $m = need_login(); $a = q('SELECT * FROM agents WHERE id=?', [(int)($body['id'] ?? 0)])->fetch(); if (!$a) fail('Runner tidak dijumpai.', 404);
+  $act = (string)($body['act'] ?? '');
+  if ($act === 'approve') { q("UPDATE agents SET runner='active', r_susp=NULL WHERE id=?", [$a['id']]);
+    runner_msg($a, "Tahniah {$a['name']}! 🎉\n\nPermohonan runner awak *diluluskan*. Mod runner dah aktif.\n\nCara dapat job:\n1. Buka dashboard dan tekan *Saya available hari ni*\n2. Ambil job di tab Runner (siapa cepat dia dapat), atau HQ assign terus pada awak\n3. Ikut langkah dalam app dan upload gambar penerima\n\nBayaran job dibuat selepas delivery selesai.\n" . SITE_URL . '/agent/#runner'); }
+  elseif ($act === 'reject') q("UPDATE agents SET runner='rejected' WHERE id=?", [$a['id']]);
+  elseif ($act === 'suspend') { $d = max(1, min(90, (int)($body['days'] ?? RUNNER_SUSPEND_DAYS))); $u = date('Y-m-d H:i:s', time() + $d * 86400); q('UPDATE agents SET r_susp=? WHERE id=?', [$u, $a['id']]);
+    runner_msg($a, "Hai {$a['name']}, mod runner awak digantung $d hari sehingga " . fmt_day(substr($u, 0, 10)) . ". Hubungi HQ jika ada pertanyaan.\n— 100 Blooms"); }
+  elseif ($act === 'unsuspend') q('UPDATE agents SET r_susp=NULL WHERE id=?', [$a['id']]);
+  elseif ($act === 'remove') q("UPDATE agents SET runner=NULL, r_avail=NULL WHERE id=?", [$a['id']]);
+  else fail('Tindakan tidak sah.');
+  json_out(['ok' => true]);
+
+case 'rjob': // create or change the runner job of an order
+  $m = need_login(); $o = load_order((int)($body['order_id'] ?? 0));
+  if ($o['pay_status'] !== 'paid' || $o['status'] === 'batal') fail('Job runner hanya untuk order yang dah dibayar.');
+  $pay = round((float)($body['pay'] ?? 0), 2); if ($pay <= 0 || $pay > 500) fail('Masukkan bayaran job (RM).');
+  $mode = ($body['mode'] ?? '') === 'assign' ? 'assign' : 'open'; $rid = $mode === 'assign' ? (int)($body['runner_id'] ?? 0) : null;
+  $r = null; if ($mode === 'assign') { $r = q('SELECT * FROM agents WHERE id=?', [$rid])->fetch(); if (!$r || runner_state($r) !== 'active') fail('Pilih runner yang aktif.'); }
+  $old = job_of_order((int)$o['id']); if ($old && $old['status'] === 'done') fail('Job ni dah selesai.');
+  if ($old && $old['status'] === 'taken' && isset(jdec($o['del_steps'])['otw_pickup'])) fail('Runner dah mula job ni. Tak boleh ditukar.');
+  $note = str_in($body['note'] ?? '', 300) ?: null;
+  if ($old) q('UPDATE runner_jobs SET pay=?, mode=?, runner_id=?, status=?, taken_at=?, note=? WHERE id=?', [$pay, $mode, $rid, $mode === 'assign' ? 'taken' : 'open', $mode === 'assign' ? date('Y-m-d H:i:s') : null, $note, $old['id']]);
+  else q('INSERT INTO runner_jobs (order_id,pay,mode,runner_id,status,note,created_at,created_by,taken_at) VALUES (?,?,?,?,?,?,?,?,?)',
+    [$o['id'], $pay, $mode, $rid, $mode === 'assign' ? 'taken' : 'open', $note, date('Y-m-d H:i:s'), $m['name'], $mode === 'assign' ? date('Y-m-d H:i:s') : null]);
+  set_setting('runner_pay_last', (string)$pay);
+  $j = job_of_order((int)$o['id']);
+  if ($mode === 'assign' && (!$old || (int)$old['runner_id'] !== $rid)) runner_msg($r, "🛵 *Job untuk awak* · {$o['code']}\n📍 " . area_of($o['r_addr'], $o['r_post']) . "\n📅 " . fmt_day($o['del_date']) . ' · ' . job_slot($o)
+    . "\n💰 RM" . number_format($pay, 2) . ($note ? "\n📝 $note" : '') . "\n\nButiran penuh di dashboard:\n" . SITE_URL . '/agent/#runner');
+  if ($mode === 'open' && (!$old || $old['mode'] !== 'open')) runner_announce($j, $o);
+  json_out(['ok' => true]);
+
+case 'rjob_cancel':
+  need_login(); $o = load_order((int)($body['order_id'] ?? 0)); $j = job_of_order((int)$o['id']); if (!$j) fail('Tiada job.');
+  if ($j['status'] === 'done') fail('Job dah selesai, tak boleh dibatalkan.');
+  if ($j['runner_id'] && isset(jdec($o['del_steps'])['otw_pickup'])) fail('Runner dah mula job ni.');
+  q('DELETE FROM runner_jobs WHERE id=?', [$j['id']]);
+  if ($j['runner_id'] && ($r = q('SELECT * FROM agents WHERE id=?', [$j['runner_id']])->fetch())) runner_msg($r, "Job {$o['code']} (" . fmt_day($o['del_date']) . ") dibatalkan oleh HQ. Terima kasih 🙏");
+  json_out(['ok' => true]);
+
+case 'rjob_paid':
+  $m = need_login(); $j = q('SELECT * FROM runner_jobs WHERE id=?', [(int)($body['id'] ?? 0)])->fetch(); if (!$j || $j['status'] !== 'done') fail('Job belum selesai.');
+  $ref = str_in($body['ref'] ?? '', 60); if ($ref === '') fail('Isi rujukan bayaran.');
+  q('UPDATE runner_jobs SET paid_at=?, paid_ref=?, paid_by=? WHERE id=?', [date('Y-m-d H:i:s'), $ref, $m['name'], $j['id']]);
+  $o = q('SELECT code FROM orders WHERE id=?', [$j['order_id']])->fetch(); $r = q('SELECT * FROM agents WHERE id=?', [$j['runner_id']])->fetch();
+  if ($r) runner_msg($r, "💸 Bayaran job *{$o['code']}* RM" . number_format((float)$j['pay'], 2) . " dah dibuat.\nRujukan: $ref\n\nTerima kasih {$r['name']}! — 100 Blooms");
+  json_out(['ok' => true]);
+
+case 'rjob_damage': // HQ marks a finished job as damaged (3 in a row → 7-day suspension)
+  need_login(); $j = q('SELECT * FROM runner_jobs WHERE id=?', [(int)($body['id'] ?? 0)])->fetch(); if (!$j || $j['status'] !== 'done') fail('Hanya job yang dah selesai.');
+  $on = !empty($body['on']) ? 1 : 0;
+  q('UPDATE runner_jobs SET damage=?, damage_note=? WHERE id=?', [$on, $on ? (str_in($body['note'] ?? '', 300) ?: null) : null, $j['id']]);
+  json_out(['ok' => true, 'suspended' => $on ? runner_damage_check((int)$j['runner_id']) : false]);
 
 case 'production': // what the team must make for a delivery date range: bouquets to arrange, balloons to pump, cakes to buy, add-ons
   need_login();

@@ -63,7 +63,9 @@ case 'me':
     'csrf' => $_SESSION['csrf'], 'link' => link_of((int)$m['id']), 'money' => agent_money((int)$m['id']),
     'month' => ['orders' => (int)$month['n'], 'rm' => (float)$month['rm']], 'pending' => $pending,
     'rate' => $m['rate'] !== null ? (float)$m['rate'] : agent_rate_default(), 'payout_min' => payout_min(), 'next_friday' => next_friday(),
-    'today' => date('Y-m-d'), 'wa' => WA_MAIN]);
+    'today' => date('Y-m-d'), 'wa' => WA_MAIN,
+    'runner' => ['state' => runner_state($m), 'plate' => $m['r_plate'], 'area' => $m['r_area'], 'avail' => $m['r_avail'] === date('Y-m-d'), 'susp' => $m['r_susp'],
+      'face' => (bool)$m['r_face'], 'bike' => (bool)$m['r_bike'], 'rating' => runner_rating((int)$m['id'])]]);
 
 case 'register':
   if (!$post) fail('POST sahaja.', 405);
@@ -157,6 +159,87 @@ case 'media': // library for posting: posters, product/customer photos, reviews,
 case 'mfile':
   need_agent(); $r = q('SELECT * FROM media WHERE id=? AND active=1', [(int)($_GET['id'] ?? 0)])->fetch();
   if (!$r) { http_response_code(404); exit; } media_serve($r, !empty($_GET['dl']));
+
+// ---------- runner mode ----------
+case 'r_apply': // runner application (or update of photos / plate / area): face photo, motorbike with box, plate, base area
+  $m = need_agent(); if (!$post) fail('POST sahaja.', 405);
+  $plate = strtoupper(preg_replace('/[^A-Za-z0-9 ]/', '', (string)($_POST['plate'] ?? ''))); $area = str_in($_POST['area'] ?? '', 100);
+  if (strlen(str_replace(' ', '', $plate)) < 3) fail('Isi no. plat motor.'); if ($area === '') fail('Isi kawasan asal awak.');
+  $save = function (string $k) use ($m) {
+    $f = $_FILES[$k] ?? null; if (!$f || $f['error'] === UPLOAD_ERR_NO_FILE) return null;
+    if ($f['error'] !== UPLOAD_ERR_OK || $f['size'] > 10 * 1024 * 1024) fail('Gambar gagal dimuat naik (maksimum 10MB).');
+    $info = @getimagesize($f['tmp_name']); if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) fail('Guna gambar JPG atau PNG.');
+    $dir = runner_dir(); if (!is_dir($dir)) mkdir($dir, 0755, true);
+    $name = $m['id'] . "-$k-" . bin2hex(random_bytes(4)) . '.' . str_replace('jpeg', 'jpg', image_type_to_extension($info[2], false));
+    if (!move_uploaded_file($f['tmp_name'], "$dir/$name")) fail('Simpan gambar gagal.', 500);
+    $old = $m["r_$k"] ?? ''; if ($old && is_file("$dir/$old")) @unlink("$dir/$old");
+    return $name;
+  };
+  $face = $save('face'); $bike = $save('bike');
+  if (!$face && !$m['r_face']) fail('Upload gambar muka awak.'); if (!$bike && !$m['r_bike']) fail('Upload gambar motor bersama box.');
+  $state = runner_state($m); $new = in_array($state, ['none', 'rejected'], true);
+  q('UPDATE agents SET r_plate=?, r_area=?, r_face=?, r_bike=?' . ($new ? ", runner='pending', r_applied=?" : '') . ' WHERE id=?',
+    array_merge([$plate, $area, $face ?: $m['r_face'], $bike ?: $m['r_bike']], $new ? [date('Y-m-d H:i:s')] : [], [$m['id']]));
+  if ($new) foreach (wa_cfg()['team'] as $t) if (wa_ready('team_paid')) wa_queue($t, "🛵 *Permohonan runner baru*\n{$m['name']} (agent #{$m['id']}) · " . wa_num($m['phone']) . "\n🏍️ $plate · 📍 $area\n\nLulus di admin → Agent → Runner:\n" . SITE_URL . '/admin/', 'team_paid');
+  json_out(['ok' => true]);
+
+case 'r_pic': // own runner photos
+  $m = need_agent(); $k = ($_GET['k'] ?? '') === 'bike' ? 'r_bike' : 'r_face'; $p = $m[$k] ? runner_dir() . '/' . $m[$k] : '';
+  if (!$p || !is_file($p)) { http_response_code(404); exit; }
+  header('Content-Type: ' . (mime_content_type($p) ?: 'image/jpeg')); header('Cache-Control: private, no-store'); readfile($p); exit;
+
+case 'r_avail':
+  $m = need_agent(); if (runner_state($m) !== 'active') fail('Mod runner belum aktif.');
+  q('UPDATE agents SET r_avail=? WHERE id=?', [!empty($body['on']) ? date('Y-m-d') : null, $m['id']]); json_out(['ok' => true]);
+
+case 'r_jobs':
+  $m = need_agent(); $st = runner_state($m); $rid = (int)$m['id'];
+  $load = fn($sql, $p) => array_values(array_filter(array_map(function ($j) use ($rid) { $o = q('SELECT * FROM orders WHERE id=?', [$j['order_id']])->fetch(); return $o ? runner_job_view($j, $o, $rid) : null; }, q($sql, $p)->fetchAll())));
+  $open = $st === 'active' ? array_values(array_filter($load("SELECT j.* FROM runner_jobs j JOIN orders o ON o.id=j.order_id WHERE j.status='open' AND j.mode='open' AND o.status<>'batal' AND o.del_date>=? ORDER BY o.del_date, j.id", [date('Y-m-d')]), fn($v) => !$v['cancelled'])) : [];
+  $mine = $load("SELECT j.* FROM runner_jobs j JOIN orders o ON o.id=j.order_id WHERE j.runner_id=? AND j.status='taken' ORDER BY o.del_date, j.id", [$rid]);
+  $hist = $load("SELECT * FROM runner_jobs WHERE runner_id=? AND status='done' ORDER BY done_at DESC LIMIT 60", [$rid]);
+  $sum = q("SELECT COALESCE(SUM(CASE WHEN paid_at IS NULL THEN pay END),0) unpaid, COALESCE(SUM(CASE WHEN paid_at>=? THEN pay END),0) month, COUNT(*) n FROM runner_jobs WHERE runner_id=? AND status='done'", [date('Y-m-01 00:00:00'), $rid])->fetch();
+  json_out(['state' => $st, 'open' => $open, 'mine' => $mine, 'history' => $hist, 'unpaid' => (float)$sum['unpaid'], 'month' => (float)$sum['month'], 'done' => (int)$sum['n'], 'rating' => runner_rating($rid), 'susp' => $m['r_susp']]);
+
+case 'r_take':
+  $m = need_agent(); if (runner_state($m) !== 'active') fail('Mod runner awak tidak aktif sekarang.');
+  $j = q('SELECT * FROM runner_jobs WHERE id=?', [(int)($body['id'] ?? 0)])->fetch(); if (!$j) fail('Job tidak dijumpai.', 404);
+  $n = q("UPDATE runner_jobs SET runner_id=?, status='taken', taken_at=? WHERE id=? AND status='open' AND mode='open'", [$m['id'], date('Y-m-d H:i:s'), $j['id']])->rowCount();
+  if (!$n) fail('Alamak, job ni dah diambil runner lain.');
+  json_out(['ok' => true]);
+
+case 'r_release': // give a job back before pickup starts
+  $m = need_agent(); $j = q('SELECT * FROM runner_jobs WHERE id=? AND runner_id=? AND status=\'taken\'', [(int)($body['id'] ?? 0), $m['id']])->fetch(); if (!$j) fail('Job tidak dijumpai.', 404);
+  $o = q('SELECT * FROM orders WHERE id=?', [$j['order_id']])->fetch(); if ($o && isset(jdec($o['del_steps'])['otw_pickup'])) fail('Job dah bermula. Hubungi HQ.');
+  q("UPDATE runner_jobs SET runner_id=NULL, status='open', mode='open', taken_at=NULL WHERE id=?", [$j['id']]);
+  foreach (wa_cfg()['team'] as $t) if (wa_ready('team_paid')) wa_queue($t, "↩️ Runner {$m['name']} lepaskan job {$o['code']} (" . fmt_day($o['del_date']) . "). Job dibuka semula untuk runner lain.", 'team_paid');
+  json_out(['ok' => true]);
+
+case 'r_step':
+  $m = need_agent(); if (runner_state($m) === 'none' || runner_state($m) === 'pending') fail('Mod runner belum aktif.');
+  $j = q("SELECT * FROM runner_jobs WHERE id=? AND runner_id=? AND status='taken'", [(int)($body['id'] ?? 0), $m['id']])->fetch(); if (!$j) fail('Job tidak dijumpai.', 404);
+  $o = q('SELECT * FROM orders WHERE id=?', [$j['order_id']])->fetch();
+  $o = runner_step($o, (string)($body['step'] ?? ''), 'Runner ' . $m['name']);
+  if (($body['step'] ?? '') === 'delivered') q("UPDATE runner_jobs SET status='done', done_at=? WHERE id=?", [date('Y-m-d H:i:s'), $j['id']]);
+  json_out(['ok' => true]);
+
+case 'r_photo': // recipient photo for the job's order
+  $m = need_agent(); $j = q("SELECT * FROM runner_jobs WHERE id=? AND runner_id=? AND status='taken'", [(int)($_POST['id'] ?? 0), $m['id']])->fetch(); if (!$j) fail('Job tidak dijumpai.', 404);
+  $o = q('SELECT * FROM orders WHERE id=?', [$j['order_id']])->fetch();
+  $f = $_FILES['file'] ?? null; if (!$f || $f['error'] !== UPLOAD_ERR_OK) fail('Gambar gagal dimuat naik.');
+  $info = @getimagesize($f['tmp_name']); if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) fail('Guna gambar JPG atau PNG.');
+  $dir = UPLOAD_DIR . '/' . $o['code']; if (!is_dir($dir)) mkdir($dir, 0755, true);
+  $name = 'penerima-' . date('His') . '.' . str_replace('jpeg', 'jpg', image_type_to_extension($info[2], false));
+  if (!move_uploaded_file($f['tmp_name'], "$dir/$name")) fail('Simpan gambar gagal.', 500);
+  q('UPDATE orders SET recipient_photo=?, updated_by=? WHERE id=?', [$name, 'Runner ' . $m['name'], $o['id']]);
+  json_out(['ok' => true]);
+
+case 'r_problem': // runner reports a problem on the road: goes to the order notes and to HQ on WhatsApp
+  $m = need_agent(); $j = q("SELECT * FROM runner_jobs WHERE id=? AND runner_id=?", [(int)($body['id'] ?? 0), $m['id']])->fetch(); if (!$j) fail('Job tidak dijumpai.', 404);
+  $o = q('SELECT * FROM orders WHERE id=?', [$j['order_id']])->fetch(); $why = str_in($body['text'] ?? '', 300); if ($why === '') fail('Tulis masalahnya.');
+  q('UPDATE orders SET notes=? WHERE id=?', [trim(($o['notes'] ?? '') . "\n[Runner {$m['name']} " . date('d/m H:i') . "] $why"), $o['id']]);
+  foreach (wa_cfg()['team'] as $t) if (wa_ready('team_paid')) wa_queue($t, "⚠️ *Runner lapor masalah* · {$o['code']}\n{$m['name']} · " . wa_num($m['phone']) . "\n\n$why\n\n" . SITE_URL . '/admin/', 'team_paid');
+  json_out(['ok' => true]);
 
 case 'passwd':
   $m = need_agent();

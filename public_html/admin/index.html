@@ -415,6 +415,7 @@ async function openOrder(id,reload){
       <hr><a role="menuitem" href="#" id="ddbill">Bill To (nama syarikat)…</a></div></div><button class="btn ghost sm" id="cx">Tutup</button></div></div>
    <div id="om"></div>
    ${wfCards(o)}
+   ${runnerCard(o)}
    ${afterCard(o)}
    <div class="card"><h2>Butiran penghantaran</h2>
     ${o.pickup?'<div class="msg warn" style="margin:0 0 8px">🏪 <b>Pickup di kedai</b>, tiada penghantaran.</div>':''}<div class="rowx"><span>Tarikh</span><span><b>${fmtD(o.del_date)}</b> · ${h(delTxt(o))}</span></div>
@@ -480,6 +481,7 @@ async function openOrder(id,reload){
   </div></div>`;
   const close=()=>{$('#layer').innerHTML=''};
   const done=async(p,msg)=>{try{await p;toast(msg);reload&&reload();openOrder(id,reload)}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}};
+  bindRunnerCard(o,done);
   $('#cx').onclick=close;$('#sc').onclick=e=>{if(e.target.id==='sc')close()};
   $('#ddb').onclick=e=>{e.stopPropagation();const m=$('#ddm'),open=m.hidden;m.hidden=!open;$('#ddb').setAttribute('aria-expanded',open)};
   $('#sc').addEventListener('click',e=>{if(!e.target.closest('.dd')&&$('#ddm'))$('#ddm').hidden=true});
@@ -973,13 +975,84 @@ async function Cal(el){
 const shrink=(f,max=1200)=>new Promise(res=>{const u=URL.createObjectURL(f),im=new Image();im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
   const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>res(b||f),'image/jpeg',max>1200?.92:.85)};im.onerror=()=>res(f);im.src=u});
 /* ---------- agents ---------- */
+/* ---------- runner job on an order ---------- */
+function runnerCard(o){
+  const j=o.rjob;if(!j&&(o.pay_status!=='paid'||o.status==='batal'))return '';
+  const RA=o.runners_active||[];
+  const form=`<div id="rjf" ${j?'hidden':''} style="margin-top:${j?'10px':'0'}"><div class="fgrid">
+    <label class="fl">Bayaran job (RM)<input id="rj_pay" type="number" min="1" step="0.5" value="${j?+j.pay:+o.rjob_default}"></label>
+    <label class="fl">Cara agih<select id="rj_mode"><option value="open"${j&&j.mode==='open'?' selected':''}>Buka kepada semua runner (siapa cepat dapat)</option><option value="assign"${j&&j.mode==='assign'?' selected':''}>Pilih runner</option></select></label>
+    <label class="fl" id="rj_rw" ${j&&j.mode==='assign'?'':'hidden'}>Runner<select id="rj_rid">${RA.length?RA.map(r=>`<option value="${r.id}"${j&&+j.runner_id===r.id?' selected':''}>${r.avail?'🟢 ':''}${h(r.name)}${r.area?' · '+h(r.area):''}</option>`).join(''):'<option value="">Tiada runner aktif</option>'}</select></label>
+    <label class="fl full">Nota untuk runner (tak wajib)<input id="rj_note" maxlength="300" value="${h(j?.note||'')}" placeholder="Contoh: call penerima dulu, hantar ke pondok guard"></label></div>
+    <div class="bar" style="margin:8px 0 0"><button class="btn sm" id="rj_go">${j?'Simpan job':'Cipta job runner'}</button>${j?'<button class="btn ghost sm" id="rj_x">Batal</button>':''}</div>
+    <p class="mini" style="margin:6px 0 0">🟢 = runner available hari ni. Job terbuka dihantar ke WhatsApp runner aktif. Runner hanya nampak alamat penuh selepas ambil job.</p></div>`;
+  const st=!j?'':j.status==='open'?'<span class="pg">⏳ Terbuka, menunggu runner</span>':j.status==='taken'?`<span class="pg pok">🛵 Diambil</span>`:`<span class="pg pok">✅ Selesai ${fmtDT(j.done_at)}</span>`;
+  const r=j&&j.runner;
+  return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0">🛵 Runner 100 Blooms</h2>${st}</div>
+   ${j?`<div class="rowx"><span>Bayaran job</span><span><b>${rm(j.pay)}</b>${j.status==='done'?(j.paid_at?` · ✅ dibayar ${fmtDT(j.paid_at)} (${h(j.paid_ref)})`:' · <b style="color:var(--warn)">belum dibayar</b>'):''}</span></div>
+    ${r?`<div class="rowx"><span>Runner</span><span><b>${h(r.name)}</b> #${r.id}${r.r_plate?' · '+h(r.r_plate):''} · <a href="https://wa.me/${String(r.phone).replace(/\D/g,'').replace(/^0/,'60')}" target="_blank" rel="noopener">WhatsApp</a></span></div>`:''}
+    ${j.note?`<div class="rowx"><span>Nota</span><span>${h(j.note)}</span></div>`:''}
+    ${j.rating?`<div class="rowx"><span>Rating penerima</span><span>${'★'.repeat(+j.rating.stars)}${'☆'.repeat(5-j.rating.stars)}${j.rating.comment?'<br><span class="mini">'+h(j.rating.comment)+'</span>':''}</span></div>`:''}
+    ${+j.damage?`<div class="msg bad" style="margin:8px 0 0">⚠️ Ditanda rosak${j.damage_note?': '+h(j.damage_note):''}</div>`:''}
+    <div class="bar" style="margin:8px 0 0">${j.status!=='done'?'<button class="btn ghost sm" id="rj_ed">✏️ Tukar</button><button class="btn ghost sm danger" id="rj_cx">Batal job</button>':''}
+     ${j.status==='done'&&!j.paid_at?'<button class="btn sm" id="rj_pd">💸 Tanda dah bayar runner</button>':''}${j.status==='done'?`<button class="btn ghost sm" id="rj_dm">${+j.damage?'Buang tanda rosak':'⚠️ Tanda rosak'}</button>`:''}</div>`
+   :'<p class="mini" style="margin:0 0 8px">Hantar guna runner sendiri (bukan Lalamove). Runner tekan langkah penghantaran dan upload gambar penerima dalam app runner.</p>'}
+   ${!j||j.status!=='done'?form:''}</div>`;
+}
+function bindRunnerCard(o,done){
+  if(!$('#rj_mode')&&!$('#rj_pd')&&!$('#rj_dm'))return;
+  const id=o.id;
+  if($('#rj_mode'))$('#rj_mode').onchange=()=>{$('#rj_rw').hidden=$('#rj_mode').value!=='assign'};
+  if($('#rj_ed'))$('#rj_ed').onclick=()=>{$('#rjf').hidden=!$('#rjf').hidden};
+  if($('#rj_x'))$('#rj_x').onclick=()=>{$('#rjf').hidden=true};
+  if($('#rj_go'))$('#rj_go').onclick=()=>done(api('rjob',{method:'POST',body:{order_id:id,pay:$('#rj_pay').value,mode:$('#rj_mode').value,runner_id:$('#rj_rid').value,note:$('#rj_note').value}}),'Job runner disimpan');
+  if($('#rj_cx'))$('#rj_cx').onclick=()=>{if(confirm('Batalkan job runner ni?'))done(api('rjob_cancel',{method:'POST',body:{order_id:id}}),'Job dibatalkan')};
+  if($('#rj_pd'))$('#rj_pd').onclick=()=>{const ref=prompt('Rujukan bayaran kepada runner (contoh no. transaksi):');if(ref)done(api('rjob_paid',{method:'POST',body:{id:o.rjob.id,ref}}),'Bayaran runner direkod')};
+  if($('#rj_dm'))$('#rj_dm').onclick=async()=>{const on=!+o.rjob.damage;let note='';if(on){note=prompt('Apa yang rosak? (contoh: kek terbalik, balloon pecah)');if(note===null)return}
+    try{const r=await api('rjob_damage',{method:'POST',body:{id:o.rjob.id,on,note}});done(Promise.resolve(),r.suspended?'Ditanda rosak. 3 kali berturut: runner digantung 7 hari.':on?'Ditanda rosak':'Tanda rosak dibuang')}catch(e){toast(e.message)}};
+}
+/* ---------- runners (Agent tab → Runner) ---------- */
+let AG_TAB='agent';
+const agTabs=()=>`<div class="seg" role="group" aria-label="Agent atau runner" style="margin:0 0 12px"><button type="button" data-agt="agent" aria-pressed="${AG_TAB==='agent'}">🤝 Agent</button><button type="button" data-agt="runner" aria-pressed="${AG_TAB==='runner'}">🛵 Runner</button></div>`;
+async function Runners(el){
+  el.innerHTML=agTabs()+'<div class="empty">Memuatkan…</div>';
+  let j;try{j=await api('runners')}catch(e){el.innerHTML=agTabs()+`<div class="msg bad">${h(e.message)}</div>`;return}
+  const R=j.runners,pend=R.filter(r=>r.state==='pending'),act=R.filter(r=>r.state==='active'||r.state==='suspended'),wa=p=>'https://wa.me/'+String(p).replace(/\D/g,'').replace(/^0/,'60');
+  const unpaidTot=j.unpaid.reduce((s,x)=>s+ +x.pay,0),star=r=>r.rating.avg?`★ ${r.rating.avg} <span class="mini">(${r.rating.n})</span>`:'<span class="mini">tiada rating</span>';
+  const pic=(id,k)=>`<a href="api.php?a=rpic&id=${id}&k=${k}" target="_blank" rel="noopener"><img src="api.php?a=rpic&id=${id}&k=${k}" alt="${k==='face'?'Muka':'Motor & box'}" loading="lazy" style="width:96px;height:96px;object-fit:cover;border-radius:12px;background:var(--bg)"></a>`;
+  el.innerHTML=agTabs()+`<div class="kpis"><div class="kpi"><small>Runner aktif</small><b>${R.filter(r=>r.state==='active').length}</b></div><div class="kpi"><small>Available hari ni</small><b>${R.filter(r=>r.state==='active'&&r.avail).length}</b></div>
+     <div class="kpi"><small>Permohonan baru</small><b>${pend.length}</b></div><div class="kpi"><small>Perlu bayar runner</small><b>${rm(unpaidTot)}</b></div></div>
+   <div class="card"><h2>Link pendaftaran runner</h2><p class="mini" style="margin-top:0">Kongsi link ni kepada rider di kawasan kedai. Mereka daftar sebagai agent (terus aktif) dan mohon mod runner (perlu kelulusan HQ).</p>
+    <div class="bar" style="margin:0"><input readonly value="${h((ME.site||location.origin)+'/agent/?daftar&runner')}" style="flex:1;min-width:220px" aria-label="Link pendaftaran runner"><button class="btn ghost sm" id="rlink">Salin</button></div></div>
+   ${pend.length?`<div class="card"><h2>Permohonan menunggu kelulusan</h2>${pend.map(r=>`<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;padding:10px 0;border-top:1px dashed var(--line)">${pic(r.id,'face')}${pic(r.id,'bike')}
+     <div style="flex:1;min-width:180px"><b>${h(r.name)}</b> #${r.id}<div class="mini">🏍️ ${h(r.plate||'-')} · 📍 ${h(r.area||'-')}<br>Mohon ${fmtDT(r.applied)} · <a href="${wa(r.phone)}" target="_blank" rel="noopener">WhatsApp</a></div>
+      <div class="bar" style="margin:8px 0 0"><button class="btn sm" data-rs="approve" data-id="${r.id}">✅ Lulus</button><button class="btn ghost sm" data-rs="reject" data-id="${r.id}">Tolak</button></div></div></div>`).join('')}</div>`:''}
+   <div class="card"><h2>Job runner aktif</h2>${j.live.length?j.live.map(x=>`<button class="ord" data-oid="${x.order_id}"><div><span class="c">${h(x.code)}</span> ${x.status==='open'?'<span class="pg">⏳ Terbuka</span>':'<span class="pg pok">🛵 '+h(x.rname||'')+'</span>'}<div class="m">${fmtD(x.del_date)} · ${h(DEL[x.del_type]||'')}${x.del_type==='spec'&&x.del_time?' '+h(x.del_time):''}</div></div><div class="r"><div class="t">${rm(x.pay)}</div></div></button>`).join(''):'<p class="mini" style="margin:0">Tiada job aktif. Cipta job dari butiran order (kad 🛵 Runner 100 Blooms).</p>'}</div>
+   <div class="card"><h2>Perlu bayar runner</h2><p class="mini" style="margin-top:0">Job yang dah selesai. Bayar runner, kemudian tekan "Dah bayar" dan isi rujukan.</p>
+    ${j.unpaid.length?j.unpaid.map(x=>`<div class="rowx"><span><b style="color:var(--ink)">${h(x.rname)}</b> · ${h(x.code)} (${fmtD(x.del_date)})<br><span class="mini">${x.bank_acc?h((x.bank_name||'')+' '+x.bank_acc+' · '+(x.bank_holder||'')):'Belum isi akaun bank'} · <a href="${wa(x.rphone)}" target="_blank" rel="noopener">WhatsApp</a></span></span><span><b style="color:var(--ink);font-size:16px">${rm(x.pay)}</b><br><button class="btn sm" data-rpd="${x.id}">Dah bayar</button></span></div>`).join(''):'<p class="mini" style="margin:0">Semua job dah dibayar 👍</p>'}</div>
+   <div class="card"><h2>Senarai runner</h2>${act.length?act.map(r=>`<div class="rowx" style="align-items:flex-start"><span><b style="color:var(--ink)">${r.avail&&r.state==='active'?'🟢 ':''}${h(r.name)}</b> #${r.id} · ${star(r)}<br><span class="mini">🏍️ ${h(r.plate||'-')} · 📍 ${h(r.area||'-')} · ${r.jobs} job · ${r.damage} rosak${r.active_jobs?` · ${r.active_jobs} job aktif`:''}${r.unpaid?` · belum bayar ${rm(r.unpaid)}`:''}</span>
+      ${r.state==='suspended'?`<br><span class="pg pbad">⛔ Digantung hingga ${fmtDT(r.susp)}</span>`:''}</span>
+     <span class="bar" style="margin:0;justify-content:flex-end">${pic(r.id,'face').replace(/96px/g,'44px')}${r.state==='suspended'?`<button class="btn ghost sm" data-rs="unsuspend" data-id="${r.id}">Tarik gantungan</button>`:`<button class="btn ghost sm" data-rs="suspend" data-id="${r.id}">Gantung</button>`}<button class="btn ghost sm danger" data-rs="remove" data-id="${r.id}">Buang</button></span></div>`).join(''):'<p class="mini" style="margin:0">Belum ada runner aktif.</p>'}</div>
+   <div class="card"><h2>Rating terkini dari penerima</h2>${j.ratings.length?j.ratings.map(x=>`<div class="rowx"><span><b style="color:var(--ink)">${h(x.rname)}</b> · ${h(x.code)}${x.comment?`<br><span class="mini">"${h(x.comment)}"</span>`:''}</span><span style="color:${+x.stars<=3?'var(--bad)':'#c98a00'}">${'★'.repeat(+x.stars)}${'☆'.repeat(5-x.stars)}</span></div>`).join(''):'<p class="mini" style="margin:0">Belum ada rating.</p>'}</div>`;
+  const re=()=>Runners(el);
+  $('#rlink').onclick=()=>navigator.clipboard.writeText(el.querySelector('input[readonly]').value).then(()=>toast('Link disalin'));
+  el.querySelectorAll('[data-rs]').forEach(b=>b.onclick=async()=>{const act=b.dataset.rs,body={id:+b.dataset.id,act};
+    if(act==='suspend'){const d=prompt('Gantung berapa hari?','7');if(!d)return;body.days=+d}
+    if(act==='remove'&&!confirm('Buang mod runner? Akaun agent kekal.'))return;
+    if(act==='reject'&&!confirm('Tolak permohonan ni?'))return;
+    try{await api('runner_set',{method:'POST',body});toast('Dikemas kini');re()}catch(e){toast(e.message)}});
+  el.querySelectorAll('[data-rpd]').forEach(b=>b.onclick=async()=>{const ref=prompt('Rujukan bayaran (contoh no. transaksi):');if(!ref)return;try{await api('rjob_paid',{method:'POST',body:{id:+b.dataset.rpd,ref}});toast('Bayaran direkod');re()}catch(e){toast(e.message)}});
+  el.querySelectorAll('[data-oid]').forEach(b=>b.onclick=()=>openOrder(+b.dataset.oid,re));
+}
 async function Agents(el){
+  el.onclick=e=>{const b=e.target.closest('[data-agt]');if(b){AG_TAB=b.dataset.agt;Agents(el)}};
+  if(AG_TAB==='runner')return Runners(el);
   const own=ME.role==='owner';let j;
   try{j=await api('agents')}catch(e){if(e.message!=='auth')el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
   const due=j.rows.filter(a=>a.due>=j.payout_min&&a.active),small=j.rows.filter(a=>a.due>0&&a.due<j.payout_min);
   const tot=due.reduce((s,a)=>s+a.due,0),sales=j.rows.reduce((s,a)=>s+a.sales,0),wa=p=>'https://wa.me/'+String(p).replace(/\D/g,'').replace(/^0/,'60');
   const bank=a=>own?(a.bank_acc?`${h(a.bank_name||'')} ${h(a.bank_acc)}<br><span class="mini">${h(a.bank_holder||'')}</span>`:'<span style="color:var(--warn)">Belum isi akaun bank</span>')+(a.has_qr?` · <a href="api.php?a=agent_qr&id=${a.id}" target="_blank" rel="noopener">Lihat QR</a>`:''):'';
-  el.innerHTML=`<div class="kpis"><div class="kpi"><small>Agent aktif</small><b>${j.rows.filter(a=>a.active).length}</b></div><div class="kpi"><small>Jualan melalui agent</small><b>${rm(sales)}</b></div><div class="kpi"><small>Perlu dibayar ${fmtD(j.next_friday)}</small><b>${rm(tot)}</b></div></div>
+  el.innerHTML=agTabs()+`<div class="kpis"><div class="kpi"><small>Agent aktif</small><b>${j.rows.filter(a=>a.active).length}</b></div><div class="kpi"><small>Jualan melalui agent</small><b>${rm(sales)}</b></div><div class="kpi"><small>Perlu dibayar ${fmtD(j.next_friday)}</small><b>${rm(tot)}</b></div></div>
    <div class="card"><h2>Bayaran Jumaat · ${fmtD(j.next_friday)}</h2><p class="mini" style="margin-top:0">Agent dengan baki ${rm(j.payout_min)} ke atas. Pindahkan wang, kemudian tekan "Dah bayar" dan isi rujukan.</p>
     ${due.length?due.map(a=>`<div class="rowx"><span><b style="color:var(--ink)">${h(a.name)}</b> #${a.id} · <a href="${wa(a.phone)}" target="_blank" rel="noopener">WhatsApp</a><br>${bank(a)}</span><span><b style="color:var(--ink);font-size:16px">${rm(a.due)}</b><br>${own?`<button class="btn sm" data-pay="${a.id}" data-amt="${a.due}" data-name="${h(a.name)}">Dah bayar</button>`:''}</span></div>`).join(''):'<p class="mini">Tiada agent yang perlu dibayar minggu ini.</p>'}
     ${small.length?`<p class="mini" style="margin:10px 0 0">Belum capai minimum: ${small.map(a=>`${h(a.name)} (${rm(a.due)})`).join(', ')}</p>`:''}</div>

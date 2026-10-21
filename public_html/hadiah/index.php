@@ -10,6 +10,14 @@ if (!$ok) { http_response_code(404); ?><!doctype html><meta charset="utf-8"><met
 <body style="font-family:system-ui;text-align:center;padding:60px 20px;color:#3b2732;background:#fbeef0"><h2>Link tidak sah</h2><p>Cuba buka semula link daripada WhatsApp.</p><p><a href="/" style="color:#d94f74">100blooms.my</a></p></body><?php exit; }
 
 $C = catalog(); $a = aftercare($o);
+// runner rating by the recipient (once per order, only for deliveries done by a 100 Blooms runner)
+$rj = job_of_order((int)$o['id']); $rj = $rj && $rj['status'] === 'done' && $rj['runner_id'] ? $rj : null;
+$rated = $rj ? q('SELECT stars FROM runner_ratings WHERE order_id=?', [$o['id']])->fetchColumn() : false;
+if ($rj && $rated === false && $_SERVER['REQUEST_METHOD'] === 'POST' && ($st = (int)($_POST['stars'] ?? 0)) >= 1 && $st <= 5) {
+  try { q('INSERT INTO runner_ratings (order_id,runner_id,stars,comment,created_at) VALUES (?,?,?,?,?)', [$o['id'], $rj['runner_id'], $st, str_in($_POST['comment'] ?? '', 500) ?: null, date('Y-m-d H:i:s')]); } catch (Throwable $x) {}
+  if ($st <= 3) { $rn = q('SELECT name FROM agents WHERE id=?', [$rj['runner_id']])->fetchColumn(); foreach (wa_cfg()['team'] as $t) if (wa_ready('team_paid')) wa_queue($t, "⭐ *Rating runner rendah* · {$o['code']}\nRunner: $rn\nBintang: $st/5" . (trim((string)($_POST['comment'] ?? '')) !== '' ? "\nKomen: " . str_in($_POST['comment'], 300) : '') . "\n\n" . SITE_URL . '/admin/', 'team_paid'); }
+  header('Location: ' . strtok($_SERVER['REQUEST_URI'], '#') . '#rate'); exit;
+}
 try { [$vcode, $vends] = rcp_voucher($o); } catch (Throwable $x) { $vcode = null; $vends = null; }
 if (empty($a['rcp_viewed_at'])) { $a = aftercare(q('SELECT aftercare FROM orders WHERE id=?', [$o['id']])->fetch() ?: []); $a['rcp_viewed_at'] = date('Y-m-d H:i:s'); aftercare_save((int)$o['id'], $a); }
 $used = $vcode && (int)q("SELECT COUNT(*) FROM orders WHERE voucher=? AND pay_status='paid'", [$vcode])->fetchColumn() > 0;
@@ -80,6 +88,7 @@ footer{text-align:center;margin-top:28px;color:var(--soft);font-size:13px}footer
 .conf{position:fixed;inset:0;pointer-events:none;overflow:hidden}.conf i{position:absolute;top:-12px;width:9px;height:14px;border-radius:2px;opacity:.85;animation:fall linear forwards}
 @keyframes fall{to{transform:translateY(105vh) rotate(540deg)}}
 @media (prefers-reduced-motion:reduce){.emo,.conf i{animation:none}.conf{display:none}}
+.stars{display:inline-flex;flex-direction:row-reverse;gap:4px}.stars input{position:absolute;opacity:0;width:1px;height:1px}.stars label{font-size:34px;color:#e5d6dc;cursor:pointer;line-height:1}.stars input:checked~label,.stars label:hover,.stars label:hover~label{color:#f4b400}.stars input:focus-visible+label{outline:2px solid var(--acc);border-radius:4px}
 </style></head><body>
 <div class="conf" aria-hidden="true"></div>
 <main>
@@ -89,7 +98,12 @@ footer{text-align:center;margin-top:28px;color:var(--soft);font-size:13px}footer
  <?php if ($wish !== ''): ?><section class="card"><h2>💌 <?= $L('Ayat dalam kad awak', 'The message in your card') ?></h2><div class="wish"><?= $e($wish) ?><?php if (!empty($o['sender'])): ?><span class="sig">— <?= $e($o['sender']) ?></span><?php endif ?></div></section><?php endif ?>
  <?php if ($hasPhoto): ?><section class="card photo"><h2>📸 <?= $L('Kenangan hari ni', "Today's memory") ?></h2><img src="<?= $e($ph) ?>" alt="<?= $e($L("Gambar $rf semasa menerima hadiah", "$rf receiving the gift")) ?>"><a class="btn ghost" href="<?= $e($ph) ?>&dl=1"><?= $L('Simpan gambar', 'Save photo') ?></a></section><?php endif ?>
  <section class="card"><h2>🎁 <?= $L('Dalam hadiah awak', 'In your gift') ?></h2><div class="items"><?php foreach ($items as [$t, $src]): ?><figure><?php if ($src): ?><img src="<?= $e($src) ?>" alt="<?= $e($t) ?>" loading="lazy" onerror="this.style.visibility='hidden'"><?php else: ?><div style="aspect-ratio:1;display:grid;place-items:center;font-size:40px;background:#fff;border-radius:14px" aria-hidden="true">🎁</div><?php endif ?><figcaption><?= $e($t) ?></figcaption></figure><?php endforeach ?></div></section>
- <?php if ($vcode): ?><section class="card gift"><h2><?= $L('Hadiah kecil daripada kami', 'A little gift from us') ?> 🌸</h2>
+ <?php if ($rj): ?><section class="card" id="rate"><h2>🛵 <?= $L('Macam mana runner kami?', 'How was our runner?') ?></h2>
+ <?php if ($rated !== false): ?><p style="margin:0"><?= str_repeat('★', (int)$rated) . str_repeat('☆', 5 - (int)$rated) ?> · <?= $L('Terima kasih atas penilaian awak!', 'Thank you for your rating!') ?></p>
+ <?php else: ?><form method="post" action="#rate"><div class="stars" role="radiogroup" aria-label="<?= $L('Bintang', 'Stars') ?>"><?php for ($i = 5; $i >= 1; $i--): ?><input type="radio" name="stars" value="<?= $i ?>" id="s<?= $i ?>" required><label for="s<?= $i ?>" title="<?= $i ?>">★</label><?php endfor ?></div>
+  <textarea name="comment" rows="2" maxlength="500" placeholder="<?= $L('Komen (tak wajib)', 'Comment (optional)') ?>" style="width:100%;margin-top:8px;border:1px solid #e5d6dc;border-radius:12px;padding:10px;font:inherit"></textarea>
+  <button type="submit" style="margin-top:8px;border:0;border-radius:999px;background:var(--acc);color:#fff;font:600 15px var(--body);padding:10px 20px;cursor:pointer"><?= $L('Hantar', 'Send') ?></button></form><?php endif ?></section><?php endif ?>
+<?php if ($vcode): ?><section class="card gift"><h2><?= $L('Hadiah kecil daripada kami', 'A little gift from us') ?> 🌸</h2>
   <?php if ($used): ?><p><?= $L('Voucher awak dah digunakan. Terima kasih kerana memilih 100 Blooms!', 'Your voucher has been used. Thank you for choosing 100 Blooms!') ?> 💕</p><a class="btn" href="../<?= $en ? 'en/' : '' ?>"><?= $L('Lihat hadiah kami', 'See our gifts') ?></a>
   <?php else: ?><p><?= $L('Giliran awak pula buat orang tersayang tersenyum.', 'Now it’s your turn to make someone you love smile.') ?></p><p><b>RM10 off</b> <?= $L('untuk order pertama awak di 100 Blooms.', 'your first order at 100 Blooms.') ?></p>
   <div class="code"><span id="vc"><?= $e($vcode) ?></span><button type="button" id="cp"><?= $L('Salin', 'Copy') ?></button></div>

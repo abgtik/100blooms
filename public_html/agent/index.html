@@ -37,6 +37,10 @@ input:focus-visible,button:focus-visible,a:focus-visible,select:focus-visible{ou
 .stat{background:var(--bg);border-radius:16px;padding:12px 14px}.stat small{display:block;color:var(--soft);font-size:12px;font-weight:600}.stat b{font:600 22px var(--display);display:block;margin-top:2px}
 .stat.hero{background:linear-gradient(140deg,var(--accent),var(--accent2));color:#fff}.stat.hero small{color:#ffe3ea}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.sw{position:relative;display:inline-block;width:50px;height:30px;flex:none}.sw input{opacity:0;width:0;height:0;position:absolute}
+.sw span{position:absolute;inset:0;background:#cdbfc4;border-radius:99px;transition:.2s;cursor:pointer}.sw span:before{content:"";position:absolute;width:24px;height:24px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.sw input:checked+span{background:var(--ok)}.sw input:checked+span:before{transform:translateX(20px)}.sw input:focus-visible+span{outline:3px solid var(--accent);outline-offset:2px}
+nav button{min-width:0}
 /* bottom nav */
 nav[hidden]{display:none!important}
 nav{position:fixed;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));background:#4a2330;border-radius:22px;display:flex;justify-content:center;gap:4px;padding:7px;z-index:5;box-shadow:0 10px 28px -8px rgba(74,35,48,.55);max-width:520px;margin:0 auto}
@@ -233,21 +237,95 @@ function startLanding(){
 }
 
 /* ---------- shell ---------- */
-const NAV=[['home','Utama','<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'],['orders','Order','<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['media','Media','<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>'],['money','Komisen','<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2s1 1.7 3 2 3 .9 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2M12 16v2"/>'],['me','Profil','<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/>']];
+const NAV=[['home','Utama','<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'],['orders','Order','<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>'],['media','Media','<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>'],['money','Komisen','<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2s1 1.7 3 2 3 .9 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2M12 16v2"/>'],['runner','Runner','<circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M9 17h6l-2-7h-3M13 10h3l2 7M5 13l2-3h3"/>'],['me','Profil','<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/>']];
 async function boot(fresh){
   try{const j=await api('me');ME=j;CSRF=j.csrf}catch(e){return auth(new URLSearchParams(location.search).has('daftar')?'register':'login')}
   $('#nav').hidden=false;
   $('#tr').innerHTML=`<button class="btn ghost sm" id="lo">Log keluar</button>`;
   $('#lo').onclick=async()=>{await api('logout',{method:'POST'}).catch(()=>{});ME=null;auth('login')};
-  if(fresh)tab='home';render(fresh);
+  if(fresh)tab='home';if(location.hash==='#runner'||new URLSearchParams(location.search).has('runner'))tab='runner';render(fresh);
 }
 function render(fresh){
   $('#nav').innerHTML=NAV.map(([k,t,i])=>`<button data-t="${k}" ${tab===k?'aria-current="page"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${i}</svg>${t}</button>`).join('');
   $('#nav').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render()});
-  ({home:Home,orders:Orders,media:Media,money:Money,me:Profile})[tab]($('#main'),fresh);
+  clearInterval(RUNT);({home:Home,orders:Orders,media:Media,money:Money,runner:Runner,me:Profile})[tab]($('#main'),fresh);
   window.scrollTo(0,0);
 }
 
+/* ---------- runner mode ---------- */
+let RUNT=0;
+const RSTEP={otw_pickup:'🛵 Saya OTW ambil barang',picked:'📦 Dah ambil barang, mula hantar',delivered:'✅ Dah sampai kepada penerima'};
+function runnerForm(r,again){
+  return `<form id="raf"><label for="rplate">No. plat motor</label><input id="rplate" value="${h(r.plate||'')}" placeholder="Contoh: WXY 1234" autocapitalize="characters" required>
+   <label for="rarea">Kawasan asal / kawasan biasa awak</label><input id="rarea" value="${h(r.area||'')}" placeholder="Contoh: Jenjarom, Banting, Klang" required>
+   <label for="rface">Gambar muka awak ${r.face?'<span class="hint">(dah ada, pilih untuk tukar)</span>':''}</label><input id="rface" type="file" accept="image/*" capture="user">
+   <label for="rbike">Gambar motor bersama box ${r.bike?'<span class="hint">(dah ada, pilih untuk tukar)</span>':''}</label><input id="rbike" type="file" accept="image/*">
+   <p class="hint" style="margin:10px 0 0">Gambar hanya untuk HQ kenal pasti runner dan tak dipaparkan kepada pelanggan.</p>
+   <div id="rerr"></div><button class="btn" id="rgo">${again?'Simpan':'Hantar permohonan runner'}</button></form>`;
+}
+function bindRunnerForm(el){
+  $('#raf').onsubmit=async e=>{e.preventDefault();const fd=new FormData();fd.append('plate',$('#rplate').value);fd.append('area',$('#rarea').value);
+    if($('#rface').files[0])fd.append('face',$('#rface').files[0]);if($('#rbike').files[0])fd.append('bike',$('#rbike').files[0]);
+    $('#rgo').disabled=true;try{await api('r_apply',{method:'POST',body:fd});const j=await api('me');ME=j;toast('Disimpan');Runner(el)}catch(x){$('#rerr').innerHTML=`<div class="msg bad">${h(x.message)}</div>`;$('#rgo').disabled=false}};
+}
+async function Runner(el){
+  const r=ME.runner||{state:'none'};
+  if(r.state==='none'||r.state==='rejected'){
+    el.innerHTML=`<h1>Jadi runner 100 Blooms 🛵</h1><p class="sub">Hantar hadiah ke pelanggan di kawasan awak dan dapat bayaran untuk setiap job. Link agent awak kekal aktif.</p>
+     <div class="card"><h2>Macam mana ia berfungsi</h2><ol class="terms" style="margin:0;padding-left:18px">
+      <li>Hantar permohonan: gambar muka, gambar motor dengan box, no. plat dan kawasan.</li>
+      <li>HQ semak dan luluskan. Awak dapat WhatsApp bila mod runner aktif.</li>
+      <li>Tekan <b>Saya available hari ni</b>. Ambil job yang dibuka (siapa cepat dia dapat) atau HQ assign terus pada awak.</li>
+      <li>Ikut langkah dalam app dan upload gambar penerima masa sampai.</li>
+      <li>Bayaran job dibuat oleh HQ selepas delivery selesai.</li>
+      <li>Polisi: 3 delivery rosak berturut-turut = mod runner digantung 7 hari. Penerima boleh beri rating pada runner.</li></ol></div>
+     ${r.state==='rejected'?'<div class="msg warn">Permohonan sebelum ini tidak diluluskan. Awak boleh kemas kini maklumat dan hantar semula.</div>':''}
+     <div class="card"><h2>Borang permohonan</h2>${runnerForm(r)}</div>`;
+    bindRunnerForm(el);return;
+  }
+  if(r.state==='pending'){
+    el.innerHTML=`<h1>Permohonan runner dihantar ✅</h1><p class="sub">HQ sedang semak permohonan awak. Awak akan dapat WhatsApp bila mod runner diluluskan. Sementara tu, link agent awak dah boleh digunakan.</p>
+     <div class="card"><h2>Kemas kini permohonan</h2>${runnerForm(r,true)}</div>`;bindRunnerForm(el);return;
+  }
+  el.innerHTML='<div class="card"><p class="hint" style="margin:0">Memuatkan job…</p></div>';
+  let j;try{j=await api('r_jobs')}catch(e){el.innerHTML=`<div class="msg bad">${h(e.message)}</div>`;return}
+  const sus=j.state==='suspended',rt=j.rating;
+  const jobCard=(v,kind)=>`<div class="ord" data-j="${v.id}"><div class="h"><div><span class="c">${h(v.code)}</span><br><b>${h(v.area)}</b><div class="m">${fmtD(v.date)} · ${h(v.slot)}</div></div><div style="text-align:right"><b>${rm(v.pay)}</b>${kind==='hist'?`<div class="m">${v.paid?'✅ Dibayar':'⏳ Belum dibayar'}</div>`:''}</div></div>
+    <div class="m" style="margin-top:6px">🎁 ${h(v.items)}</div>
+    ${kind==='open'?`<div class="acts"><button class="btn sm" data-take="${v.id}">Ambil job</button></div>`:''}
+    ${kind==='mine'?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
+      <div class="m">📦 Ambil di: ${h(v.pickup)}</div>
+      <div style="margin-top:6px"><b style="font-size:15px">${h(v.r_name)}</b><div class="m">${h(v.r_addr)}</div></div>
+      ${v.notes_runner?`<div class="msg warn" style="margin-top:8px">📝 ${h(v.notes_runner)}</div>`:''}
+      <div class="acts"><a class="btn ghost sm" href="https://waze.com/ul?q=${encodeURIComponent(v.r_addr)}" target="_blank" rel="noopener">Waze</a><a class="btn ghost sm" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v.r_addr)}" target="_blank" rel="noopener">Maps</a>
+       <a class="btn ghost sm" href="tel:${h(v.r_phone)}">Call</a><a class="btn ghost sm" href="https://wa.me/${String(v.r_phone).replace(/\D/g,'').replace(/^0/,'60')}" target="_blank" rel="noopener">WhatsApp</a></div>
+      <div class="hint" style="margin-top:8px">${Object.entries(v.steps||{}).map(([k,t])=>`✓ ${h({booked:'Job disahkan',otw_pickup:'OTW ambil',picked:'Dah ambil',delivered:'Sampai'}[k]||k)} ${h(String(t).slice(11,16))}`).join(' · ')}</div>
+      ${v.next==='delivered'&&!v.has_photo?`<label for="rp${v.id}">📸 Gambar penerima bersama hadiah (wajib)</label><input id="rp${v.id}" type="file" accept="image/*" capture="environment" data-ph="${v.id}">`:''}
+      ${v.next&&RSTEP[v.next]?`<button class="btn" data-step="${v.next}" data-id="${v.id}" ${!v.ready&&v.next==='otw_pickup'?'disabled':''} ${v.next==='delivered'&&!v.has_photo?'disabled':''}>${RSTEP[v.next]}</button>${!v.ready&&v.next==='otw_pickup'?'<p class="hint" style="margin:6px 0 0">⏳ Hadiah belum siap disediakan. Butang aktif bila HQ dah siapkan.</p>':''}`:''}
+      <div class="acts">${!Object.keys(v.steps||{}).includes('otw_pickup')?`<button class="btn ghost sm" data-rel="${v.id}">Lepaskan job</button>`:''}<button class="btn ghost sm" data-prob="${v.id}">⚠️ Lapor masalah</button></div></div>`:''}
+  </div>`;
+  el.innerHTML=`<h1>Runner 🛵</h1>
+   ${sus?`<div class="msg bad">Mod runner digantung sehingga ${fmtD(j.susp)}. Awak masih boleh siapkan job yang dah diambil.</div>`:''}
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><b style="font:600 16px var(--display)">Saya available hari ni</b><div class="hint">HQ & job baru hari ni hanya dihantar pada runner yang available</div></div>
+     <label class="sw" style="margin:0"><input type="checkbox" id="rav" ${r.avail?'checked':''} ${sus?'disabled':''} aria-label="Available hari ni"><span></span></label></div>
+    <div class="row2" style="margin-top:12px"><div class="stat hero"><small>Belum dibayar</small><b>${rm(j.unpaid)}</b></div><div class="stat"><small>Dibayar bulan ni</small><b>${rm(j.month)}</b></div>
+     <div class="stat"><small>Job selesai</small><b>${j.done}</b></div><div class="stat"><small>Rating penerima</small><b>${rt.avg?'★ '+rt.avg:'-'}</b><span class="hint">${rt.n} penilaian</span></div></div></div>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Job saya</h2><button class="btn ghost sm" id="rrf">↻ Muat semula</button></div>
+    ${j.mine.length?j.mine.map(v=>jobCard(v,'mine')).join(''):'<p class="hint" style="margin:8px 0 0">Tiada job aktif.</p>'}</div>
+   <div class="card"><h2>Job tersedia</h2>${sus?'<p class="hint" style="margin:0">Tak boleh ambil job baru semasa digantung.</p>':j.open.length?j.open.map(v=>jobCard(v,'open')).join(''):'<p class="hint" style="margin:0">Belum ada job dibuka. Awak akan dapat WhatsApp bila ada job baru.</p>'}</div>
+   <div class="card"><h2>Sejarah job</h2>${j.history.length?j.history.map(v=>jobCard(v,'hist')).join(''):'<p class="hint" style="margin:0">Belum ada job selesai.</p>'}</div>
+   <details class="card"><summary style="cursor:pointer;font-weight:600">Profil runner (plat, kawasan, gambar)</summary>${runnerForm(r,true)}</details>`;
+  bindRunnerForm(el);
+  const re=()=>Runner(el);
+  $('#rrf').onclick=re;
+  $('#rav').onchange=async e=>{try{await api('r_avail',{method:'POST',body:{on:e.target.checked}});ME.runner.avail=e.target.checked;toast(e.target.checked?'Awak available hari ni':'Tak available')}catch(x){toast(x.message);e.target.checked=!e.target.checked}};
+  el.querySelectorAll('[data-take]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('r_take',{method:'POST',body:{id:+b.dataset.take}});toast('Job dah jadi milik awak 🎉');re()}catch(x){toast(x.message);re()}});
+  el.querySelectorAll('[data-rel]').forEach(b=>b.onclick=async()=>{if(!confirm('Lepaskan job ni? Job akan dibuka semula untuk runner lain.'))return;try{await api('r_release',{method:'POST',body:{id:+b.dataset.rel}});re()}catch(x){toast(x.message)}});
+  el.querySelectorAll('[data-prob]').forEach(b=>b.onclick=async()=>{const t=prompt('Apa masalahnya? (contoh: penerima tak angkat call, alamat tak jumpa)');if(!t)return;try{await api('r_problem',{method:'POST',body:{id:+b.dataset.prob,text:t}});toast('HQ dah dimaklumkan')}catch(x){toast(x.message)}});
+  el.querySelectorAll('[data-ph]').forEach(i=>i.onchange=async()=>{if(!i.files[0])return;const fd=new FormData();fd.append('id',i.dataset.ph);fd.append('file',i.files[0]);toast('Memuat naik…');try{await api('r_photo',{method:'POST',body:fd});toast('Gambar diupload');re()}catch(x){toast(x.message)}});
+  el.querySelectorAll('[data-step]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('r_step',{method:'POST',body:{id:+b.dataset.id,step:b.dataset.step}});toast(b.dataset.step==='delivered'?'Tahniah! Job selesai 🎉':'Dikemas kini');re()}catch(x){toast(x.message);b.disabled=false}});
+  RUNT=setInterval(()=>{if(tab==='runner'&&!document.hidden&&!document.activeElement?.matches('input,textarea'))re()},60000);
+}
 /* ---------- home ---------- */
 function Home(el,fresh){
   const j=ME,a=j.agent,m=j.money,need=Math.max(0,j.payout_min-m.due);

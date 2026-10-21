@@ -102,7 +102,7 @@ function remember_clear(string $kind, ?int $uidAll = null): void {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 20) return;
+  if ($v >= 21) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -152,6 +152,9 @@ function migrate(PDO $pdo): void {
   // v20: full-catalogue orders (Admin HQ only): kind='full' and the item lines as JSON
   $run("ALTER TABLE orders ADD COLUMN kind VARCHAR(6) NOT NULL DEFAULT 'combo'");
   $run('ALTER TABLE orders ADD COLUMN items TEXT NULL');
+  // v21: runners (freelance riders): runner mode on agents, delivery jobs, recipient ratings
+  foreach (RUNNER_COLS as $c) $run("ALTER TABLE agents ADD COLUMN $c");
+  foreach (runner_schema($my) as $sql) $run($sql);
   // v14/v15: new catalogue items (e.g. Congrats Grad Polkadot balloon) get a row in Stok
   // v16: cake menu change (New York Cheese added) - cakes get their Stok rows too
   $ins = $my ? 'INSERT IGNORE' : 'INSERT OR IGNORE'; $C = catalog();
@@ -163,7 +166,7 @@ function migrate(PDO $pdo): void {
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','20')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','21')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
@@ -174,7 +177,7 @@ function agent_schema(string $driver): array {
   id $id, name VARCHAR(100) NOT NULL, phone VARCHAR(30) NOT NULL, email VARCHAR(150) NOT NULL UNIQUE, pass_hash VARCHAR(255) NOT NULL,
   active TINYINT NOT NULL DEFAULT 1, rate DECIMAL(8,2) NULL,
   bank_name VARCHAR(60) NULL, bank_acc VARCHAR(40) NULL, bank_holder VARCHAR(100) NULL, qr_file VARCHAR(40) NULL,
-  ig VARCHAR(150) NULL, tiktok VARCHAR(150) NULL, fb VARCHAR(150) NULL, created_at DATETIME NOT NULL, last_login DATETIME NULL
+  ig VARCHAR(150) NULL, tiktok VARCHAR(150) NULL, fb VARCHAR(150) NULL, created_at DATETIME NOT NULL, last_login DATETIME NULL, " . implode(', ', RUNNER_COLS) . "
 )$tail",
 "CREATE TABLE IF NOT EXISTS commissions (
   id $id, order_id INT NOT NULL UNIQUE, agent_id INT NOT NULL, amount DECIMAL(8,2) NOT NULL, created_at DATETIME NOT NULL, payout_id INT NULL
@@ -183,7 +186,7 @@ function agent_schema(string $driver): array {
 "CREATE TABLE IF NOT EXISTS payouts (
   id $id, agent_id INT NOT NULL, amount DECIMAL(8,2) NOT NULL, ref VARCHAR(100) NULL, paid_by VARCHAR(100) NULL, created_at DATETIME NOT NULL
 )$tail",
-  ];
+  ...runner_schema($my)];
 }
 function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare($sql); $s->execute($p); return $s; }
 function setting(string $k, $default = null) { $r = q('SELECT v FROM settings WHERE k=?', [$k])->fetchColumn(); return $r === false ? $default : $r; }
@@ -588,7 +591,7 @@ const UNPAID_MIN = 5; // minutes before an unpaid website order is followed up
 const WA_TYPES = ['team_paid' => 'Team: order baru dibayar', 'team_unpaid' => 'Team: order website belum dibayar selepas 5 minit (untuk follow up)',
   'buyer_unpaid' => 'Pembeli: peringatan bayar selepas 5 minit (dengan link bayaran)', 'buyer_paid' => 'Pembeli: bayaran diterima', 'buyer_otw' => 'Pembeli: hadiah dalam perjalanan',
   'buyer_done' => 'Pembeli: terima kasih + gambar penerima + hadiah + link ulasan (30 minit selepas sampai, jika tiada masalah)',
-  'rcp_gift' => 'Penerima: page kenangan (wish + gambar) + voucher RM10 (30 minit selepas sampai, jika tiada masalah)', 'agent_comm' => 'Agent: komisen baru', 'agent_payout' => 'Agent: komisen dibayar', 'agent_welcome' => 'Agent: selamat datang selepas daftar'];
+  'rcp_gift' => 'Penerima: page kenangan (wish + gambar) + voucher RM10 (30 minit selepas sampai, jika tiada masalah)', 'agent_comm' => 'Agent: komisen baru', 'agent_payout' => 'Agent: komisen dibayar', 'agent_runner' => 'Runner: kelulusan, job baru, bayaran & gantungan', 'agent_welcome' => 'Agent: selamat datang selepas daftar'];
 function wa_cfg(): array {
   static $c = null; if ($c !== null) return $c;
   $on = json_decode((string)setting('wa_on', ''), true);
@@ -1380,3 +1383,4 @@ function notify_paid(array $o): void {
   if (!@mail(NOTIFY_EMAIL, "[100 Blooms] Order dibayar {$o['code']} RM{$o['total']}", $body, "From: 100 Blooms <$from>\r\nContent-Type: text/plain; charset=utf-8", '-f' . $from))
     error_log("100blooms: notify mail failed for {$o['code']}");
 }
+require_once __DIR__ . '/_runner.php';
