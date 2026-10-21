@@ -102,7 +102,7 @@ function remember_clear(string $kind, ?int $uidAll = null): void {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 21) return;
+  if ($v >= 22) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -155,6 +155,8 @@ function migrate(PDO $pdo): void {
   // v21: runners (freelance riders): runner mode on agents, delivery jobs, recipient ratings
   foreach (RUNNER_COLS as $c) $run("ALTER TABLE agents ADD COLUMN $c");
   foreach (runner_schema($my) as $sql) $run($sql);
+  // v22: Combo orders placed without a photo had no polaroid slot, so the buyer couldn't upload one later
+  if ($v < 22) $pdo->exec("UPDATE orders SET photo_count=1 WHERE photo_count=0 AND kind<>'full' AND status<>'batal'");
   // v14/v15: new catalogue items (e.g. Congrats Grad Polkadot balloon) get a row in Stok
   // v16: cake menu change (New York Cheese added) - cakes get their Stok rows too
   $ins = $my ? 'INSERT IGNORE' : 'INSERT OR IGNORE'; $C = catalog();
@@ -166,7 +168,7 @@ function migrate(PDO $pdo): void {
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','21')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','22')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
@@ -1135,6 +1137,7 @@ function build_order(array $in, int $photoCount, ?DateTimeImmutable $now = null,
     $extra[$k] = $n; $extraN += $n;
   }
   if ($extraN > MAX_EXTRA_CAKE) $E[] = 'Maksimum ' . MAX_EXTRA_CAKE . ' kek tambahan.';
+  if (!$full) $photoCount = max(1, $photoCount); // Combo Jimat includes 1 polaroid: keep its slot even if the photo comes later (upload from Semak)
   if ($photoCount > MAX_PHOTOS) $E[] = 'Maksimum ' . MAX_PHOTOS . ' gambar.';
 
   $wish = str_in($in['wish'] ?? '', !empty($opts['manual']) || !empty($opts['staff']) ? WISH_MAX_STAFF : WISH_MAX); if ($wish === '') $E[] = 'Ayat wishcard belum diisi.';
