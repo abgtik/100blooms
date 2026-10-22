@@ -116,8 +116,9 @@ case 'order':
   $o['issue'] = issue_of($o) ?: null; $o['aftercare'] = aftercare($o) ?: null; $o['issue_reasons'] = ISSUE_REASONS; $o['rcp_url'] = rcp_url($o); $o['rcp_ok'] = rcp_reachable($o);
   $dAt = (string)(jdec($o['del_steps'])['delivered']['at'] ?? ''); $o['after_due'] = $dAt !== '' ? date('Y-m-d H:i:s', strtotime($dAt) + AFTERCARE_MIN * 60) : null;
   $o['after_auto'] = $dAt !== '' && $dAt >= (string)setting('aftercare_since', '9999') ; $o['wa_on'] = wa_ready('buyer_done'); $o['doc_receipt'] = doc_url($o, 'receipt');
+  $o['invoice'] = invoice_msg($o, $o['pay_status'] !== 'paid' && $o['bill_code'] ? pay_url($o['bill_code']) : null); // needs the token for its links
   unset($o['token']);
-  $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS; $o['invoice'] = invoice_msg($o, $o['pay_status'] !== 'paid' && $o['bill_code'] ? pay_url($o['bill_code']) : null);
+  $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS;
   $o['agent'] = $o['agent_ref'] ? (q('SELECT a.id,a.name,c.amount,c.payout_id FROM agents a LEFT JOIN commissions c ON c.order_id=? AND c.agent_id=a.id WHERE a.id=?', [$o['id'], (int)$o['agent_ref']])->fetch() ?: null) : null;
   foreach (['cake_flavours', 'extra_cakes', 'photos', 'price_lines', 'prep', 'del_steps'] as $k) $o[$k] = json_decode((string)$o[$k], true) ?: [];
   $o['rjob'] = (function () use ($o) { $j = job_of_order((int)$o['id']); if (!$j) return null; $r = $j['runner_id'] ? q('SELECT id,name,phone,r_plate FROM agents WHERE id=?', [$j['runner_id']])->fetch() : null;
