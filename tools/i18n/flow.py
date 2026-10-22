@@ -52,7 +52,7 @@ X={
 "Penghantaran percuma (10am–6pm)":"Free delivery (10am–6pm)","Caj kawasan (Rawang / Kuang / Selayang / Sg Buloh)":"Area surcharge (Rawang / Kuang / Selayang / Sg Buloh)","Pelarasan harga":"Price adjustment",
 # balloon
 "Langkah 2 · Balloon":"Step 2 · Balloon","Kami pilih yang paling kena dengan momen awak.":"We picked the ones that best match your moment.",
-"Semua balloon":"All balloons","Disusun ikut tema. Tekan untuk pilih.":"Grouped by theme. Tap to choose.","Pujuk & maaf":"Sorry & make up","Keluarga":"Family",
+"Semua balloon":"All balloons","Disusun ikut tema. Tekan untuk pilih.":"Grouped by theme. Tap to choose.","Pujuk & maaf":"Sorry & make up","Tahniah":"Congratulations","Keluarga":"Family",
 "Happy Birthday Biru":"Happy Birthday Blue","Happy Birthday Confetti Biru":"Happy Birthday Confetti Blue","I Love You Merah":"I Love You Red",
 "I Love You Putih-Merah":"I Love You Red & White","I'm Sorry Pelangi":"I'm Sorry Rainbow","Get Well Soon Matahari":"Get Well Soon Sunshine","Congrats Grad Putih":"Congrats Grad White",
 # cake

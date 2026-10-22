@@ -35,7 +35,7 @@ function catalog(): array {
       'hb-jungle'=>'Happy Birthday Jungle','anniv'=>'Happy Anniversary','ily-red'=>'I Love You Merah','ily-rw'=>'I Love You Putih-Merah','roses'=>'Heart Roses',
       'ly-gold'=>'Love You Gold','candy'=>'Sweet Heart','sorry-dots'=>"I'm Sorry Polka Dot",'sorry-stripe'=>"I'm Sorry Pelangi",'gws-sun'=>'Get Well Soon Matahari',
       'gws-wishes'=>'Get Well Soon Wishes','gws-plaster'=>'Get Well Soon Plaster','grad-gold'=>'Congrats Grad Gold','grad-black'=>'Congrats Graduate',
-      'grad-white'=>'Congrats Grad Putih','grad-pink'=>'Congrats Grad Pink','grad-key'=>'Congrats Grad Key','grad-dots'=>'Congrats Grad Polkadot','hb-confetti'=>'Happy Birthday Confetti Biru','mothers-day'=>'Happy Mother\'s Day','fathers-day'=>'Happy Father\'s Day','mom'=>'Love You Mom','dad'=>'Best Dad Ever',
+      'grad-white'=>'Congrats Grad Putih','grad-pink'=>'Congrats Grad Pink','grad-key'=>'Congrats Grad Key','grad-dots'=>'Congrats Grad Polkadot','congrats'=>'Congratulations','hb-confetti'=>'Happy Birthday Confetti Biru','mothers-day'=>'Happy Mother\'s Day','fathers-day'=>'Happy Father\'s Day','mom'=>'Love You Mom','dad'=>'Best Dad Ever',
       'baby-boy'=>'New Baby Boy','baby-girl'=>'New Baby Girl'],
     'cake_free' => ['Chocolate Fudge','Chocolate Moist','New York Cheese','Carrot Cake'],
     'cake_up' => ['Chocolate Indulgence','Chocolate Chip Walnut','Red Velvet', OTHER_CAKE],
@@ -102,7 +102,7 @@ function remember_clear(string $kind, ?int $uidAll = null): void {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 22) return;
+  if ($v >= 23) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -157,7 +157,7 @@ function migrate(PDO $pdo): void {
   foreach (runner_schema($my) as $sql) $run($sql);
   // v22: Combo orders placed without a photo had no polaroid slot, so the buyer couldn't upload one later
   if ($v < 22) $pdo->exec("UPDATE orders SET photo_count=1 WHERE photo_count=0 AND kind<>'full' AND status<>'batal'");
-  // v14/v15: new catalogue items (e.g. Congrats Grad Polkadot balloon) get a row in Stok
+  // v14/v15/v23: new catalogue items (e.g. Congrats Grad Polkadot, Congratulations balloons) get a row in Stok
   // v16: cake menu change (New York Cheese added) - cakes get their Stok rows too
   $ins = $my ? 'INSERT IGNORE' : 'INSERT OR IGNORE'; $C = catalog();
   $cakeList = []; foreach (array_merge($C['cake_free'], $C['cake_up']) as $c) $cakeList[$c] = $c;
@@ -168,7 +168,7 @@ function migrate(PDO $pdo): void {
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','22')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','23')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
