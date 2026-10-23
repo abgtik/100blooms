@@ -1113,5 +1113,20 @@ case 'passwd':
   $had = !empty($_COOKIE[remember_cookie('admin')]); remember_clear('admin', (int)$m['id']); if ($had) remember_set('admin', (int)$m['id']); // other devices sign in again
   json_out(['ok' => true]);
 
+case 'papan': // Papan Sales snapshot sent by the WhatsApp Reader (api/papan.php)
+  need_login();
+  $raw = (string)setting('papan_data', '');
+  $data = null;
+  if (str_starts_with($raw, 'gz:')) $data = json_decode((string)gzdecode(base64_decode(substr($raw, 3))), true);
+  elseif (str_starts_with($raw, 'js:')) $data = json_decode(substr($raw, 3), true);
+  json_out(['data' => $data, 'at' => setting('papan_at'), 'has_key' => setting('papan_key_hash', '') !== '']);
+
+case 'papan_key': // Owner: new connection key for the Reader (shown once; only the hash is kept)
+  need_owner();
+  if (!$post) fail('POST sahaja.', 405);
+  $k = bin2hex(random_bytes(20));
+  set_setting('papan_key_hash', hash('sha256', $k));
+  json_out(['key' => $k]);
+
 default: fail('Tindakan tidak dikenali.', 404);
 }

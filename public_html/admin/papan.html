@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Papan Sales · 100 Blooms</title>
+<style>
+  :root{--bg:#faf7f5;--panel:#fff;--ink:#2a2224;--muted:#7d7275;--line:#ece4e1;--accent:#c2185b;--accent-soft:#fbe4ee;
+    --red:#d32f2f;--red-soft:#fdecec;--yel:#b7791f;--yel-soft:#fff6e0;--wait:#5c6bc0;--wait-soft:#eceefb;--grn:#2e7d32;--grn-soft:#e6f4e7;--end:#8d8487;--end-soft:#f1eeed}
+  @media (prefers-color-scheme:dark){:root{--bg:#171314;--panel:#211b1d;--ink:#f3ecee;--muted:#a99da1;--line:#352c2f;--accent:#f06292;--accent-soft:#3a2230;
+    --red:#ef5350;--red-soft:#3a1f1f;--yel:#f6c453;--yel-soft:#3a3120;--wait:#9fa8da;--wait-soft:#25283a;--grn:#81c784;--grn-soft:#1e2e20;--end:#a99da1;--end-soft:#2a2426}}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 16px}
+  .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  h1{font-size:17px;margin:0}
+  h1 b{color:var(--accent)}
+  .upd{font-size:12px;color:var(--muted)}
+  .upd.stale{color:var(--red);font-weight:600}
+  .sp{flex:1}
+  button,.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:9px;padding:6px 11px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px;font-size:13px}
+  button.pri,.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chips{display:flex;gap:6px;margin-top:10px;overflow-x:auto;padding-bottom:2px}
+  .chip{white-space:nowrap;border-radius:99px;padding:5px 12px;font-size:13px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
+  .chip b{font-variant-numeric:tabular-nums}
+  .chip.on{outline:2px solid var(--accent)}
+  .chip.merah{background:var(--red-soft);color:var(--red)} .chip.kuning{background:var(--yel-soft);color:var(--yel)}
+  .chip.tunggu{background:var(--wait-soft);color:var(--wait)} .chip.hijau{background:var(--grn-soft);color:var(--grn)} .chip.tamat{background:var(--end-soft);color:var(--end)}
+  .sum{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:8px}
+  .sum b{color:var(--ink)}
+  .search{width:100%;margin-top:10px;border:1px solid var(--line);border-radius:9px;padding:8px 11px;background:var(--bg);color:var(--ink);font:inherit}
+  .bar{max-width:900px;margin:0 auto;padding:8px 16px 0}
+  main{max-width:900px;margin:0 auto;padding:12px 16px 60px;display:flex;flex-direction:column;gap:10px}
+  .card{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--end);border-radius:12px;padding:11px 13px}
+  .card.merah{border-left-color:var(--red)} .card.kuning{border-left-color:var(--yel)} .card.tunggu{border-left-color:var(--wait)} .card.hijau{border-left-color:var(--grn)}
+  .row{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .nm{font-weight:600}
+  .tag{font-size:11px;border-radius:6px;padding:1px 7px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+  .tag.org{background:var(--grn-soft);color:var(--grn)} .tag.tpl{background:var(--wait-soft);color:var(--wait)}
+  .stage{font-size:12px;font-weight:600;color:var(--muted)}
+  .why{margin-top:3px;font-weight:600;font-size:14px}
+  .card.merah .why{color:var(--red)} .card.kuning .why{color:var(--yel)} .card.tunggu .why{color:var(--wait)} .card.hijau .why{color:var(--grn)}
+  .msg{margin-top:4px;color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sug{margin-top:8px;background:var(--bg);border:1px dashed var(--line);border-radius:9px;padding:8px 10px;font-size:13px;white-space:pre-wrap}
+  .sug .img{display:block;font-size:12px;color:var(--accent);margin-bottom:3px}
+  .acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .empty,.note{color:var(--muted);text-align:center;padding:30px 10px;font-size:14px}
+  .setup{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;max-width:900px;margin:12px auto 0;display:none}
+  .setup input{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin:6px 0;background:var(--bg);color:var(--ink);font:inherit}
+  .key{font-family:ui-monospace,monospace;background:var(--bg);padding:8px;border-radius:8px;word-break:break-all;user-select:all}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:9px;font-size:13px;opacity:0;transition:.2s;pointer-events:none}
+  .toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>Papan Sales · <b>100 Blooms</b></h1>
+    <span class="upd" id="upd">Memuatkan…</span>
+    <span class="sp"></span>
+    <button id="setBtn" title="Tetapan sambungan">⚙️</button>
+    <button id="refBtn" title="Muat semula">↻</button>
+  </div>
+  <div class="chips" id="chips"></div>
+</header>
+<div class="bar"><div class="sum" id="sum"></div><input class="search" id="q" placeholder="Cari nama, nombor atau mesej…"></div>
+<div class="setup" id="setup"></div>
+<main id="list"><div class="empty">Memuatkan…</div></main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const SERVER = location.pathname.startsWith('/admin');
+const LABEL = {merah:'🔴 Balas sekarang', kuning:'🟡 Follow-up', tunggu:'⏳ Belum masa', hijau:'🟢 Selesai', tamat:'⚪ Tamat / lama'};
+const IMGNAME = {'gambar-penerima':'kolaj gambar penerima','testimoni':'screenshot testimoni','balon-birthday':'poster balloon ikut majlis','katalog-bunga':'katalog bouquet'};
+let data = null, filter = 'aktif', csrf = '', me = null;
+try { filter = localStorage.getItem('papan.filter') || 'aktif'; } catch (_) {}
+
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 1600); }
+function ago(sec) { if (sec < 90) return 'baru tadi'; if (sec < 3600) return Math.round(sec/60) + ' min lalu'; if (sec < 86400) return Math.round(sec/3600) + ' jam lalu'; return Math.round(sec/86400) + ' hari lalu'; }
+function waNum(n) { let d = String(n || '').replace(/\D/g, ''); if (d.startsWith('0')) d = '6' + d; return d; }
+
+async function api(path, opt = {}) {
+  const r = await fetch(path, {credentials: 'same-origin', ...opt, headers: {'content-type': 'application/json', ...(csrf ? {'X-CSRF': csrf} : {}), ...(opt.headers || {})}});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.error || ('HTTP ' + r.status)); e.status = r.status; throw e; }
+  return j;
+}
+
+async function load() {
+  try {
+    if (SERVER) {
+      if (!csrf) { const m = await api('/admin/api.php?a=me'); csrf = m.csrf; me = m.user; }
+      const r = await api('/admin/api.php?a=papan');
+      data = r.data; data && (data._server = r);
+    } else data = await api('/api/papan');
+    render();
+  } catch (e) {
+    if (e.status === 401) { $('#list').innerHTML = `<div class="empty">Sila log masuk dulu.<br><br><a class="btn pri" href="/admin/">Log masuk admin</a></div>`; $('#upd').textContent = ''; return; }
+    $('#upd').textContent = 'Ralat: ' + e.message;
+  }
+}
+
+function render() {
+  if (!data || !data.items) {
+    $('#upd').textContent = '';
+    $('#list').innerHTML = `<div class="empty">${SERVER ? 'Belum ada data dari Reader WhatsApp.<br>Tekan ⚙️ untuk jana kunci sambungan, kemudian masukkan kunci itu dalam Reader di PC.' : 'Tiada data.'}</div>`;
+    return;
+  }
+  const age = Date.now()/1000 - data.at;
+  const upd = $('#upd');
+  upd.textContent = 'Dikemas kini ' + ago(age) + (age > 600 ? ' — PC/Reader mungkin tertutup' : '');
+  upd.className = 'upd' + (age > 600 ? ' stale' : '');
+  if (!SERVER && data.sync) upd.textContent += data.sync.url ? (data.sync.ok ? ' · ☁️ online' : ' · ☁️ ' + (data.sync.error || 'belum dihantar')) : ' · ☁️ belum disambung';
+
+  const s = data.ringkasan || {};
+  const chips = [['aktif', `Perlu tindakan <b>${(s.merah||0)+(s.kuning||0)}</b>`], ['merah', `${LABEL.merah} <b>${s.merah||0}</b>`], ['kuning', `${LABEL.kuning} <b>${s.kuning||0}</b>`],
+    ['tunggu', `${LABEL.tunggu} <b>${s.tunggu||0}</b>`], ['hijau', `${LABEL.hijau} <b>${s.hijau||0}</b>`], ['tamat', `${LABEL.tamat} <b>${s.tamat||0}</b>`], ['semua', 'Semua']];
+  $('#chips').innerHTML = chips.map(([k, t]) => `<span class="chip ${k} ${filter===k?'on':''}" data-f="${k}">${t}</span>`).join('');
+  $('#sum').innerHTML = `<span>Leads hari ni: <b>${s.leads_hari_ini||0}</b> (iklan ${s.iklan_hari_ini||0})</span>` +
+    (s.ada_data_order ? `<span>Invoice belum bayar: <b>${s.invoice_belum_bayar||0}</b> · <b>RM${Number(s.nilai_belum_bayar||0).toFixed(0)}</b></span>` : `<span>Status bayaran: dari chat sahaja (website belum disambung)</span>`);
+
+  const q = $('#q').value.trim().toLowerCase();
+  const items = data.items.filter(i => (filter === 'semua' || (filter === 'aktif' ? (i.warna === 'merah' || i.warna === 'kuning') : i.warna === filter)) &&
+    (!q || (i.nama + ' ' + i.nombor + ' ' + i.mesej + ' ' + (i.order ? i.order.code : '')).toLowerCase().includes(q)));
+  const now = Date.now()/1000;
+  $('#list').innerHTML = items.length ? items.map((i, n) => {
+    const src = i.sumber || {};
+    const tagc = src.jenis === 'iklan' ? '' : src.jenis === 'template' ? 'tpl' : 'org';
+    const sug = i.cadangan;
+    const wa = i.nombor ? `https://wa.me/${waNum(i.nombor)}${sug ? '?text=' + encodeURIComponent(sug.teks) : ''}` : '';
+    return `<div class="card ${i.warna}">
+      <div class="row"><span class="nm">${esc(i.nama)}</span><span class="tag ${tagc}">${esc(src.nama || '')}</span>${i.order ? `<span class="tag ${i.order.bayar ? 'org' : ''}">${esc(i.order.code)} · RM${Number(i.order.total).toFixed(0)}${i.order.bayar ? ' ✓' : ''}</span>` : ''}</div>
+      <div class="stage">${esc(i.peringkat || '')}${i.seterusnya ? ' → ' + esc(i.seterusnya) : ''} · aktiviti ${ago(now - i.akhir)}</div>
+      <div class="why">${esc(i.sebab)}</div>
+      <div class="msg">💬 ${esc(i.mesej)}</div>
+      ${sug && (i.warna === 'kuning' || i.warna === 'merah') ? `<div class="sug">${sug.gambar ? `<span class="img">📎 Hantar dulu: ${esc(IMGNAME[sug.gambar] || sug.gambar)}</span>` : ''}${esc(sug.teks)}</div>` : ''}
+      <div class="acts">
+        ${wa ? `<a class="btn pri" href="${wa}" target="_blank" rel="noopener">💬 Buka WhatsApp${sug && (i.warna === 'kuning' || i.warna === 'merah') ? ' + ayat' : ''}</a>` : ''}
+        ${sug ? `<button data-copy="${n}">📋 Salin ayat</button>` : ''}
+        ${i.nombor ? `<button data-num="${esc(i.nombor)}">☎️ ${esc(i.nombor)}</button>` : ''}
+      </div></div>`;
+  }).join('') : `<div class="empty">Tiada chat dalam kategori ini 🎉</div>`;
+  $('#list').querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copy(items[+b.dataset.copy].cadangan.teks));
+  $('#list').querySelectorAll('[data-num]').forEach(b => b.onclick = () => copy(b.dataset.num));
+  $('#chips').querySelectorAll('[data-f]').forEach(c => c.onclick = () => { filter = c.dataset.f; try { localStorage.setItem('papan.filter', filter); } catch (_) {} render(); });
+}
+
+async function copy(t) {
+  try { await navigator.clipboard.writeText(t); toast('Disalin ✓'); }
+  catch (_) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Disalin ✓'); }
+}
+
+function setupPanel() {
+  const el = $('#setup');
+  if (el.style.display === 'block') { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  if (SERVER) {
+    const owner = me && me.role === 'owner';
+    el.innerHTML = `<b>Sambungan Reader WhatsApp</b>
+      <p class="upd">Reader di PC hantar papan ini ke sini setiap 2 minit, dan ambil status bayaran order dari website. Kunci hanya dipaparkan sekali — salin dan tampal dalam Reader (halaman /papan di PC → ⚙️).</p>
+      ${owner ? `<button class="pri" id="genKey">Jana kunci baru</button> <span class="upd">(kunci lama akan tamat)</span><div id="keyOut"></div>` : '<p class="upd">Hanya Owner boleh jana kunci.</p>'}`;
+    const g = $('#genKey');
+    if (g) g.onclick = async () => {
+      if (!confirm('Jana kunci baru? Reader yang guna kunci lama perlu dikemas kini.')) return;
+      try { const r = await api('/admin/api.php?a=papan_key', {method: 'POST', body: '{}'}); $('#keyOut').innerHTML = `<p>Kunci baru:</p><div class="key">${esc(r.key)}</div>`; }
+      catch (e) { $('#keyOut').textContent = 'Gagal: ' + e.message; }
+    };
+  } else {
+    const sy = (data && data.sync) || {};
+    el.innerHTML = `<b>Hantar papan ke 100blooms.my</b>
+      <p class="upd">Supaya awak boleh tengok papan ini dari telefon di mana-mana (100blooms.my/admin/papan.html). Kunci dijana di halaman itu oleh Owner.</p>
+      <input id="sUrl" placeholder="https://100blooms.my" value="${esc(sy.url || 'https://100blooms.my')}">
+      <input id="sKey" placeholder="Kunci sambungan" type="password">
+      <button class="pri" id="sSave">Simpan & sambung</button> <span class="upd" id="sMsg">${sy.url ? (sy.ok ? 'Tersambung ✓ · hantar terakhir ' + ago(Date.now()/1000 - sy.at) : 'Ralat: ' + esc(sy.error || '-')) : ''}</span>`;
+    $('#sSave').onclick = async () => {
+      try { const r = await api('/api/papan/sambung', {method: 'POST', body: JSON.stringify({url: $('#sUrl').value, key: $('#sKey').value})}); $('#sMsg').textContent = r.ok ? 'Tersambung ✓' : ('Ralat: ' + (r.error || '')); load(); }
+      catch (e) { $('#sMsg').textContent = 'Ralat: ' + e.message; }
+    };
+  }
+}
+
+$('#setBtn').onclick = setupPanel;
+$('#refBtn').onclick = load;
+$('#q').oninput = render;
+load();
+setInterval(load, SERVER ? 60000 : 20000);
+setInterval(() => data && render(), 30000);
+</script>
+</body>
+</html>
