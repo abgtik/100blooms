@@ -117,6 +117,7 @@ case 'order':
   $dAt = (string)(jdec($o['del_steps'])['delivered']['at'] ?? ''); $o['after_due'] = $dAt !== '' ? date('Y-m-d H:i:s', strtotime($dAt) + AFTERCARE_MIN * 60) : null;
   $o['after_auto'] = $dAt !== '' && $dAt >= (string)setting('aftercare_since', '9999') ; $o['wa_on'] = wa_ready('buyer_done'); $o['doc_receipt'] = doc_url($o, 'receipt');
   $o['invoice'] = invoice_msg($o, $o['pay_status'] !== 'paid' && $o['bill_code'] ? pay_url($o['bill_code']) : null); // needs the token for its links
+  $o['topup'] = jdec($o['topup']) ?: null; $o['topup_due'] = topup_due(['topup' => json_encode($o['topup'])]);
   unset($o['token']);
   $o['prep_items'] = prep_items($o); $o['del_labels'] = DEL_STEPS;
   $o['agent'] = $o['agent_ref'] ? (q('SELECT a.id,a.name,c.amount,c.payout_id FROM agents a LEFT JOIN commissions c ON c.order_id=? AND c.agent_id=a.id WHERE a.id=?', [$o['id'], (int)$o['agent_ref']])->fetch() ?: null) : null;
@@ -178,6 +179,38 @@ case 'oldel': // Owner: hide an Orderla order for good (auto-sync won't bring it
   need_owner();
   $r = q('SELECT id, code_id FROM legacy_orders WHERE id=?', [(int)($body['id'] ?? 0)])->fetch(); if (!$r) fail('Order tidak dijumpai.', 404);
   set_setting('olx_' . substr(md5((string)$r['code_id']), 0, 20), '1'); q('DELETE FROM legacy_orders WHERE id=?', [$r['id']]);
+  json_out(['ok' => true]);
+
+case 'addons': // add-ons asked for after the order was placed (flowers, chocolates, anything else)
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0));
+  if ($o['status'] === 'batal') fail('Order dah dibatalkan.');
+  if (isset(jdec($o['del_steps'])['otw_pickup'])) fail('Runner dah ambil barang. Add-on tak boleh ditambah lagi.');
+  $new = [];
+  foreach (ADDONS as $k => [$an, $ap]) { $n = max(0, min(99, (int)($body['addons'][$k] ?? 0))); if ($n) $new[] = ["Add-on: $an × $n", round($ap * $n, 2)]; }
+  foreach (array_slice((array)($body['custom'] ?? []), 0, 5) as $c) {
+    $nm = str_in($c['name'] ?? '', 60); $pr = round((float)($c['price'] ?? 0), 2); $qt = max(1, min(99, (int)($c['qty'] ?? 1)));
+    if ($nm === '') continue; if ($pr < 0) fail('Harga tak boleh negatif.');
+    $new[] = ["Add-on: $nm × $qt", round($pr * $qt, 2)];
+  }
+  if (!$new) fail('Pilih sekurang-kurangnya satu add-on.');
+  $sum = round(array_sum(array_column($new, 1)), 2);
+  $L = array_merge(jdec($o['price_lines']), $new); $total = round((float)$o['total'] + $sum, 2);
+  $reprice = $o['pay_status'] !== 'paid' && empty($o['bill_code']); // invoice not paid and no payment link yet: just a bigger invoice
+  $t = jdec($o['topup']);
+  if (!$reprice) { if (!empty($t['paid_at'])) { $t['history'][] = ['due' => $t['due'], 'paid_at' => $t['paid_at'], 'ref' => $t['ref'] ?? '']; unset($t['paid_at'], $t['ref'], $t['paid_by']); $t['due'] = 0; $t['lines'] = []; }
+    $t['lines'] = array_merge($t['lines'] ?? [], $new);
+    $t['due'] = round((float)($t['due'] ?? 0) + $sum, 2); $t['at'] = date('Y-m-d H:i:s'); $t['by'] = $m['name']; }
+  $log = '[' . date('j/n H:i') . ' ' . $m['name'] . '] Add-on: ' . implode(', ', array_map(fn($l) => preg_replace('/^Add-on: /u', '', $l[0]) . ' RM' . number_format($l[1], 2), $new))
+    . ($reprice ? '. Jumlah invoice kini RM' . number_format($total, 2) : '. Bayaran tambahan RM' . number_format($sum, 2) . ' perlu dikutip.');
+  q('UPDATE orders SET price_lines=?, total=?, topup=?, notes=?, updated_by=? WHERE id=?', [json_encode($L, JSON_UNESCAPED_UNICODE), $total, $t ? json_encode($t, JSON_UNESCAPED_UNICODE) : null, trim(($o['notes'] ?? '') . "\n" . $log), $m['name'], $o['id']]);
+  $st = derive_status(q('SELECT * FROM orders WHERE id=?', [$o['id']])->fetch()); q('UPDATE orders SET status=? WHERE id=? AND status<>?', [$st, $o['id'], 'batal']);
+  json_out(['ok' => true, 'reprice' => $reprice, 'sum' => $sum, 'total' => $total]);
+
+case 'topup_paid': // buyer paid the add-on balance
+  $m = need_login(); $o = load_order((int)($body['id'] ?? 0)); $t = jdec($o['topup']); if (!topup_due($o)) fail('Tiada baki tambahan.');
+  $ref = str_in($body['ref'] ?? '', 60); if ($ref === '') fail('Isi rujukan bayaran.');
+  $t['paid_at'] = date('Y-m-d H:i:s'); $t['ref'] = $ref; $t['paid_by'] = $m['name'];
+  q('UPDATE orders SET topup=?, notes=? WHERE id=?', [json_encode($t, JSON_UNESCAPED_UNICODE), trim(($o['notes'] ?? '') . "\n[" . date('j/n H:i') . ' ' . $m['name'] . '] Bayaran tambahan RM' . number_format((float)$t['due'], 2) . " diterima ($ref)"), $o['id']]);
   json_out(['ok' => true]);
 
 case 'items': // change bouquet / balloon / cake / occasion on an existing order (before the runner collects it)

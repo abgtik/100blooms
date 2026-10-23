@@ -47,6 +47,8 @@ json_out([
   'after' => (function () use ($o) { $a = aftercare($o); $i = issue_of($o); $done = in_array($o['status'], ['sampai', 'selesai'], true);
     return ['offer' => !empty($a['offer']), 'gift' => $a['gift'] ?? null, 'review' => $done ? review_url() : null,
       'sorry' => !empty($i['voucher']) && !empty($i['msg_at']) ? ['code' => $i['voucher'], 'ends' => $i['voucher_ends']] : null]; })(),
+  'topup' => topup_due($o) > 0 ? ['due' => topup_due($o), 'lines' => array_map(fn($l) => [preg_replace('/^Add-on: /u', '', (string)$l[0]), (float)$l[1]], jdec($o['topup'])['lines'] ?? []),
+    'bank' => setting('bank_text', ''), 'qr' => bank_qr_path() !== null] : null,
   'wa' => wa_contact_for($o), 'manual' => $o['created_by'] !== null, 'bill_to' => (string)($o['bill_to'] ?? ''),
   'bank' => ($o['pay_status'] !== 'paid' && $o['status'] !== 'batal' && (!$o['bill_code'] || $o['pay_mode'] === 'invoice'))
     ? ['text' => setting('bank_text', ''), 'qr' => bank_qr_path() !== null] : null,

@@ -102,7 +102,7 @@ function remember_clear(string $kind, ?int $uidAll = null): void {
 /** Small, idempotent schema upgrades for installs made before a feature existed (setup.php is deleted after install). */
 function migrate(PDO $pdo): void {
   try { $v = (int)$pdo->query("SELECT v FROM settings WHERE k='schema_v'")->fetchColumn(); } catch (Throwable $e) { return; } // not installed yet
-  if ($v >= 23) return;
+  if ($v >= 24) return;
   $my = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
   $tail = $my ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci' : '';
   $run = function (string $sql) use ($pdo) { try { $pdo->exec($sql); } catch (PDOException $e) { if (!preg_match('/exist|Duplicate/i', $e->getMessage())) throw $e; } };
@@ -157,6 +157,8 @@ function migrate(PDO $pdo): void {
   foreach (runner_schema($my) as $sql) $run($sql);
   // v22: Combo orders placed without a photo had no polaroid slot, so the buyer couldn't upload one later
   if ($v < 22) $pdo->exec("UPDATE orders SET photo_count=1 WHERE photo_count=0 AND kind<>'full' AND status<>'batal'");
+  // v24: add-ons added after purchase that the buyer pays separately (balance)
+  $run('ALTER TABLE orders ADD COLUMN topup TEXT NULL');
   // v14/v15/v23: new catalogue items (e.g. Congrats Grad Polkadot, Congratulations balloons) get a row in Stok
   // v16: cake menu change (New York Cheese added) - cakes get their Stok rows too
   $ins = $my ? 'INSERT IGNORE' : 'INSERT OR IGNORE'; $C = catalog();
@@ -168,7 +170,7 @@ function migrate(PDO $pdo): void {
     $pdo->exec("UPDATE orders SET status='baru' WHERE status IN ('disiapkan','dalam_penghantaran') AND pay_status='paid'");
   }
   $pdo->exec("DELETE FROM settings WHERE k='schema_v'");
-  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','23')");
+  $pdo->exec("INSERT INTO settings (k,v) VALUES ('schema_v','24')");
 }
 function agent_schema(string $driver): array {
   $my = $driver === 'mysql';
@@ -224,6 +226,7 @@ function prep_items(array $o): array {
     $it = []; foreach (full_items($o) as $i => $l) $it['it' . $i] = (FULL_CATS[$l['cat']][0] ?? 'Item') . ': ' . full_line_name($l) . ' × ' . (int)$l['qty'];
     if ((int)$o['photo_count'] > 0) $it['polaroid'] = 'Polaroid dicetak (' . (int)$o['photo_count'] . ' keping)';
     $it['wishcard'] = 'Wishcard ditulis';
+    foreach (json_decode((string)$o['price_lines'], true) ?: [] as $i => $l) if (str_starts_with((string)$l[0], 'Add-on: ')) $it['addon' . $i] = $l[0]; // added after purchase
     return $it;
   }
   $C = catalog(); $M = product_meta(); $code = fn($t, $id) => ($c = $M[$t][$id]['code'] ?? '') !== '' ? $c . ' - ' : ''; // product code first, so the team picks the right item
@@ -1370,8 +1373,10 @@ function pay_url(string $ref): ?string {
 }
 
 /** Mark an order paid exactly once (callback and status check can race). Returns true if this call changed it. */
+/** Balance still owed for add-ons added after the payment link / payment (0 when none or already paid). */
+function topup_due(array $o): float { $t = jdec($o['topup'] ?? null); return !empty($t['due']) && empty($t['paid_at']) ? (float)$t['due'] : 0.0; }
 function mark_paid(array $o, string $ref, string $channel, float $amount): bool {
-  if (abs($amount - (float)$o['total']) > 0.009) { error_log("100blooms: amount mismatch for {$o['code']}: $amount vs {$o['total']}"); return false; }
+  if (abs($amount - (float)$o['total']) > 0.009 && abs($amount - ((float)$o['total'] - topup_due($o))) > 0.009) // the original bill, before add-ons added later { error_log("100blooms: amount mismatch for {$o['code']}: $amount vs {$o['total']}"); return false; }
   $n = q("UPDATE orders SET pay_status='paid', status='baru', paid_at=?, pay_ref=?, pay_channel=? WHERE id=? AND pay_status<>'paid'",
     [date('Y-m-d H:i:s'), mb_substr($ref, 0, 60), mb_substr($channel, 0, 30), $o['id']])->rowCount();
   if ($n) after_paid((int)$o['id']);

@@ -1,4 +1,5 @@
 X={
+"💰 Bayaran tambahan add-on":"💰 Add-on balance payment","Add-on yang awak minta dah kami tambah. Sila bayar baki di bawah melalui pemindahan bank / QR, kemudian hantar resit.":"We've added the add-ons you asked for. Please pay the balance below by bank transfer / QR, then send us the receipt.",
 "100 Blooms laman utama":"100 Blooms home page","Semak order awak":"Track your order",
 "Masukkan kod order dan nombor WhatsApp yang awak guna masa order.":"Enter your order code and the WhatsApp number you used when ordering.",
 "Kod order":"Order code","Contoh: HB261015-GZTJ":"e.g. HB261015-GZTJ","Semak order":"Track order",

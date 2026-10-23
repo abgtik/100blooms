@@ -414,6 +414,7 @@ async function openOrder(id,reload){
       <a role="menuitem" href="${h(o.doc_invoice)}&print=1" target="_blank" rel="noopener">Cetak invoice</a>${o.pay_status==='paid'?`<a role="menuitem" href="${h(o.doc_receipt)}&print=1" target="_blank" rel="noopener">Cetak resit</a>`:''}
       <hr><a role="menuitem" href="#" id="ddbill">Bill To (nama syarikat)…</a></div></div><button class="btn ghost sm" id="cx">Tutup</button></div></div>
    <div id="om"></div>
+   ${topupCard(o)}
    ${wfCards(o)}
    ${runnerCard(o)}
    ${afterCard(o)}
@@ -433,7 +434,14 @@ async function openOrder(id,reload){
      <p class="mini" style="margin:0">Caj tidak dikira semula. Kutip beza harga (jika ada) secara manual.</p></details></div>
    <div class="card" style="background:var(--warnb)"><h2>📝 Nota dalaman <span class="mini" style="font-weight:400">(team sahaja, customer tak nampak)</span></h2><textarea id="nn" rows="3" style="width:100%" placeholder="Contoh: perisa kek ditukar, customer minta call dulu">${h(o.notes||'')}</textarea>
     <button class="btn ghost sm" id="sn" style="margin-top:8px">Simpan nota</button></div>
-   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">Isi hadiah</h2>${o.kind!=='full'&&o.status!=='batal'&&!(o.del_steps||{}).otw_pickup?'<button class="btn ghost sm" id="tie">✏️ Tukar item</button>':''}${o.kind==='full'?'<span class="pg">🛍️ Katalog penuh</span>':''}</div>
+   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">Isi hadiah</h2>${o.kind!=='full'&&o.status!=='batal'&&!(o.del_steps||{}).otw_pickup?'<button class="btn ghost sm" id="tie">✏️ Tukar item</button>':''}${o.kind==='full'?'<span class="pg">🛍️ Katalog penuh</span>':''}${o.status!=='batal'&&!(o.del_steps||{}).otw_pickup?'<button class="btn ghost sm" id="aoe">➕ Add-on</button>':''}</div>
+    <div id="aow" hidden class="tiw"><b style="display:block;margin-bottom:6px">Tambah add-on pada order ni</b>
+     ${['Bunga','Coklat'].map(g=>`<div class="adg"><span class="mini">${g}</span><div class="adl">${Object.entries(ADDONS).filter(([,a])=>a[3]===g).map(([id,[n,p,u]])=>`<label class="adi"><span>${h(n)}<small>RM${p}/${u}</small></span>
+       <span class="stp"><button type="button" data-ad2="-1" aria-label="Kurang ${h(n)}">−</button><input type="number" min="0" max="99" value="0" data-ao2="${id}" data-p="${p}" aria-label="Bilangan ${h(n)}"><button type="button" data-ad2="1" aria-label="Tambah ${h(n)}">+</button></span></label>`).join('')}</div></div>`).join('')}
+     <div class="fgrid" style="margin-top:8px"><label class="fl">Item lain (tak wajib)<input id="ao_n" maxlength="60" placeholder="Contoh: Balloon tambahan, kek sepotong"></label><label class="fl">Kuantiti<input id="ao_q" type="number" min="1" max="99" value="1"></label><label class="fl">Harga seunit (RM)<input id="ao_p" type="number" min="0" step="0.5" placeholder="0"></label></div>
+     <div class="msg ${o.pay_status==='paid'||o.bill_code?'warn':'ok'}" id="ao_s" style="margin:8px 0 0">Jumlah add-on: <b>RM0</b></div>
+     <p class="mini" style="margin:6px 0 0">${o.pay_status==='paid'?'Order dah dibayar: pembeli perlu buat <b>bayaran tambahan</b> (QR bank). Sistem rekod baki dan tunjuk di link Semak pembeli.':o.bill_code?'Link bayaran dah dihantar: harga asal kekal, add-on direkod sebagai <b>bayaran tambahan</b> (QR bank).':'Order belum dibayar: add-on ditambah terus ke invoice.'} Add-on masuk checklist penyediaan.</p>
+     <div class="bar" style="margin:8px 0 0"><button class="btn sm" id="aos">Simpan add-on</button><button class="btn ghost sm" id="aoc">Batal</button></div></div>
     <div id="tiw" hidden class="tiw"><div class="fgrid">
      <label class="fl">Occasion<select id="ti_occ">${Object.entries(CAT.occ||{}).map(([k,n])=>`<option value="${k}"${k===o.occasion?' selected':''}>${h(n)}</option>`).join('')}</select></label>
      <label class="fl">Bouquet<select id="ti_bq">${Object.entries(CAT.bq).map(([k,n])=>`<option value="${k}"${k===o.bouquet?' selected':''}>${h(((PM.bq||{})[k]?.code?PM.bq[k].code+' - ':'')+n)}</option>`).join('')}</select></label>
@@ -482,6 +490,14 @@ async function openOrder(id,reload){
   const close=()=>{$('#layer').innerHTML=''};
   const done=async(p,msg)=>{try{await p;toast(msg);reload&&reload();openOrder(id,reload)}catch(e){$('#om').innerHTML=`<div class="msg bad">${h(e.message)}</div>`}};
   bindRunnerCard(o,done);
+  if($('#aoe')){const sum=()=>{let s=0;el2().querySelectorAll('[data-ao2]').forEach(i=>s+=(+i.value||0)*(+i.dataset.p));s+=(+$('#ao_q').value||0)*(+$('#ao_p').value||0)*($('#ao_n').value.trim()?1:0);$('#ao_s').innerHTML=`Jumlah add-on: <b>${rm(s)}</b>`;return s};
+    const el2=()=>$('#aow');
+    $('#aoe').onclick=()=>{$('#aow').hidden=!$('#aow').hidden};$('#aoc').onclick=()=>{$('#aow').hidden=true};
+    el2().querySelectorAll('[data-ad2]').forEach(b=>b.onclick=()=>{const i=b.parentNode.querySelector('input');i.value=Math.max(0,Math.min(99,(+i.value||0)+ +b.dataset.ad2));i.closest('.adi').classList.toggle('on',+i.value>0);sum()});
+    el2().querySelectorAll('input').forEach(i=>i.addEventListener('input',()=>{if(i.dataset.ao2)i.closest('.adi').classList.toggle('on',+i.value>0);sum()}));
+    $('#aos').onclick=()=>{const ad={};el2().querySelectorAll('[data-ao2]').forEach(i=>{if(+i.value>0)ad[i.dataset.ao2]=+i.value});const nm=$('#ao_n').value.trim();
+      if(!sum())return toast('Pilih add-on dulu');done(api('addons',{method:'POST',body:{id,addons:ad,custom:nm?[{name:nm,qty:$('#ao_q').value,price:$('#ao_p').value}]:[]}}),'Add-on ditambah')};}
+  if($('#tpd'))$('#tpd').onclick=()=>{const ref=prompt('Rujukan bayaran tambahan (contoh no. transaksi):');if(ref)done(api('topup_paid',{method:'POST',body:{id,ref}}),'Bayaran tambahan direkod')};
   $('#cx').onclick=close;$('#sc').onclick=e=>{if(e.target.id==='sc')close()};
   $('#ddb').onclick=e=>{e.stopPropagation();const m=$('#ddm'),open=m.hidden;m.hidden=!open;$('#ddb').setAttribute('aria-expanded',open)};
   $('#sc').addEventListener('click',e=>{if(!e.target.closest('.dd')&&$('#ddm'))$('#ddm').hidden=true});
@@ -993,6 +1009,17 @@ async function Cal(el){
 const shrink=(f,max=1200)=>new Promise(res=>{const u=URL.createObjectURL(f),im=new Image();im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
   const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);c.toBlob(b=>res(b||f),'image/jpeg',max>1200?.92:.85)};im.onerror=()=>res(f);im.src=u});
 /* ---------- agents ---------- */
+/* add-on balance owed by the buyer (add-ons added after payment / after the payment link) */
+function topupCard(o){
+  const t=o.topup;if(!t||!t.due)return '';
+  if(!o.topup_due)return `<div class="msg ok" style="margin:0 0 12px">✅ Bayaran tambahan add-on ${rm(t.due)} diterima ${fmtDT(t.paid_at)} (${h(t.ref||'')})</div>`;
+  const ln=(t.lines||[]).map(([l,p])=>`• ${String(l).replace(/^Add-on: /,'')} (${rm(p)})`).join('\n');
+  const msg=`Hai ${o.b_name.split(' ')[0]} 🌸\n\nAdd-on untuk order *${o.code}* dah kami tambah:\n${ln}\n\n💰 Bayaran tambahan: *${rm(o.topup_due)}*\n\nBoleh bayar melalui QR bank di link ni dan hantar resit di sini ya:\n${o.track_url}\n\nTerima kasih! — 100 Blooms`;
+  return `<div class="card" style="background:var(--warnb)"><h2>💰 Bayaran tambahan add-on belum diterima</h2>
+   <div class="rowx"><span>Baki perlu dibayar</span><span><b style="font-size:17px">${rm(o.topup_due)}</b></span></div>
+   ${(t.lines||[]).map(([l,p])=>`<div class="rowx"><span>${h(String(l).replace(/^Add-on: /,''))}</span><span>${rm(p)}</span></div>`).join('')}
+   <div class="bar" style="margin:8px 0 0"><a class="btn ghost sm" href="https://api.whatsapp.com/send?phone=${String(o.b_phone).replace(/\D/g,'').replace(/^0/,'60')}&text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">WhatsApp pembeli</a><button class="btn sm" id="tpd">Sahkan bayaran tambahan</button></div></div>`;
+}
 /* ---------- runner job on an order ---------- */
 function runnerCard(o){
   const j=o.rjob;if(!j&&(o.pay_status!=='paid'||o.status==='batal'))return '';
